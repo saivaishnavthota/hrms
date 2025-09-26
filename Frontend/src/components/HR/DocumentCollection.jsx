@@ -117,59 +117,120 @@ const DocumentCollection = () => {
   const fetchEmployeeDocuments = async (employeeId) => {
     setLoadingDocuments(true);
     try {
-      const response = await fetch(`http://127.0.0.1:8000/documents/emp/${employeeId}`);
+      // Fetch all documents for all employees, then pick current employee
+      const response = await fetch('http://127.0.0.1:8000/documents/all-documents');
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
-      const data = await response.json();
-      
-      // Document type mapping for display names
-      const documentTypeMapping = {
-        'resume': 'Resume',
-        'id_proof': 'ID Proof',
-        'address_proof': 'Address Proof',
-        'education_certificate': 'Education Certificate',
-        'experience_letter': 'Experience Letter',
-        'medical_certificate': 'Medical Certificate',
-        'bank_statement': 'Bank Statement',
-        'passport_copy': 'Passport Copy',
-        'pan_card': 'PAN Card',
-        'aadhar_card': 'Aadhar Card',
-        'salary_slip': 'Salary Slip',
-        'form16_or_12b_or_taxable_income': 'Tax Documents'
+      const allDocsData = await response.json();
+
+      const employeeEntry = Array.isArray(allDocsData)
+        ? allDocsData.find((e) => String(e.id) === String(employeeId))
+        : null;
+
+      // Backend canonical document fields
+      const docFields = [
+        'aadhar',
+        'pan',
+        'latest_graduation_certificate',
+        'updated_resume',
+        'offer_letter',
+        'latest_compensation_letter',
+        'experience_relieving_letter',
+        'latest_3_months_payslips',
+        'form16_or_12b_or_taxable_income',
+        'ssc_certificate',
+        'hsc_certificate',
+        'hsc_marksheet',
+        'graduation_marksheet',
+        'postgraduation_marksheet',
+        'postgraduation_certificate',
+        'passport',
+      ];
+
+      const displayNameMap = {
+        aadhar: 'Aadhar Card',
+        pan: 'PAN Card',
+        latest_graduation_certificate: 'Graduation Certificate',
+        updated_resume: 'Resume',
+        offer_letter: 'Offer Letter',
+        latest_compensation_letter: 'Compensation Letter',
+        experience_relieving_letter: 'Experience Letter',
+        latest_3_months_payslips: 'Payslips',
+        form16_or_12b_or_taxable_income: 'Tax Documents',
+        ssc_certificate: 'SSC Certificate',
+        hsc_certificate: 'HSC Certificate',
+        hsc_marksheet: 'HSC Marksheet',
+        graduation_marksheet: 'Graduation Marksheet',
+        postgraduation_marksheet: 'Post Graduation Marksheet',
+        postgraduation_certificate: 'Post Graduation Certificate',
+        passport: 'Passport',
       };
-      
-      // Transform API response to match OnboardingEmployees format
-      const transformedDocs = Object.entries(data)
-        .filter(([key, value]) => key !== 'uploaded_at' && typeof value === 'boolean')
-        .map(([key, isUploaded], index) => ({
+
+      const statusDict = employeeEntry?.documents || {};
+
+      const transformedDocs = docFields.map((key) => {
+        const isUploaded = Boolean(statusDict[key]);
+        return {
           id: key,
-          name: documentTypeMapping[key] || key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+          name: displayNameMap[key] || key.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase()),
           type: 'PDF',
-          upload_date: data.uploaded_at || new Date().toISOString().split('T')[0],
+          upload_date: isUploaded ? (employeeEntry?.uploaded_at || 'N/A') : 'N/A',
           url: isUploaded ? `http://127.0.0.1:8000/documents/${employeeId}/${key}` : null,
-          status: isUploaded ? 'approved' : 'pending'
-        }))
-        .filter(doc => doc.status === 'approved'); // Only show uploaded documents
-      
+          status: isUploaded ? 'uploaded' : 'not_uploaded',
+        };
+      });
+
       setEmployeeDocuments(transformedDocs);
     } catch (error) {
       console.error('Error fetching employee documents:', error);
-      // Fallback to sample data from employee object if API fails
-      const employee = employeesData.find(emp => emp.id === employeeId);
-      if (employee && employee.documents) {
-        const transformedDocs = employee.documents.map(doc => ({
-          id: doc.id,
-          name: doc.name,
-          type: doc.type,
-          upload_date: doc.uploadDate,
-          url: `#document-${doc.id}`,
-          status: doc.status
-        }));
-        setEmployeeDocuments(transformedDocs);
-      } else {
-        setEmployeeDocuments([]);
-      }
+      // Fallback to empty list of all known document types with not uploaded
+      const docFields = [
+        'aadhar',
+        'pan',
+        'latest_graduation_certificate',
+        'updated_resume',
+        'offer_letter',
+        'latest_compensation_letter',
+        'experience_relieving_letter',
+        'latest_3_months_payslips',
+        'form16_or_12b_or_taxable_income',
+        'ssc_certificate',
+        'hsc_certificate',
+        'hsc_marksheet',
+        'graduation_marksheet',
+        'postgraduation_marksheet',
+        'postgraduation_certificate',
+        'passport',
+      ];
+      const displayNameMap = {
+        aadhar: 'Aadhar Card',
+        pan: 'PAN Card',
+        latest_graduation_certificate: 'Graduation Certificate',
+        updated_resume: 'Resume',
+        offer_letter: 'Offer Letter',
+        latest_compensation_letter: 'Compensation Letter',
+        experience_relieving_letter: 'Experience Letter',
+        latest_3_months_payslips: 'Payslips',
+        form16_or_12b_or_taxable_income: 'Tax Documents',
+        ssc_certificate: 'SSC Certificate',
+        hsc_certificate: 'HSC Certificate',
+        hsc_marksheet: 'HSC Marksheet',
+        graduation_marksheet: 'Graduation Marksheet',
+        postgraduation_marksheet: 'Post Graduation Marksheet',
+        postgraduation_certificate: 'Post Graduation Certificate',
+        passport: 'Passport',
+      };
+      setEmployeeDocuments(
+        docFields.map((key) => ({
+          id: key,
+          name: displayNameMap[key] || key,
+          type: 'PDF',
+          upload_date: 'N/A',
+          url: null,
+          status: 'not_uploaded',
+        }))
+      );
     } finally {
       setLoadingDocuments(false);
     }
@@ -512,7 +573,7 @@ const DocumentCollection = () => {
                       className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium bg-gradient-to-r from-blue-100 to-indigo-100 text-blue-800 border border-blue-200 hover:from-blue-200 hover:to-indigo-200 transition-all duration-200"
                     >
                       <Eye className="w-3 h-3 mr-1" />
-                      View All ({employee.documents.length})
+                      View All 
                     </button>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
@@ -562,14 +623,6 @@ const DocumentCollection = () => {
                     <div key={`${doc.id || doc.type}-${index}`} className="bg-white/70 backdrop-blur-sm border border-gray-200 rounded-xl p-4 shadow-md hover:shadow-lg transition-shadow">
                       <div className="flex items-start justify-between mb-3">
                         <div className="flex items-center">
-                          {isRejectMode && (
-                            <input
-                              type="checkbox"
-                              checked={selectedDocuments.includes(doc.id || doc.type)}
-                              onChange={() => handleDocumentSelection(doc.id || doc.type)}
-                              className="mr-2 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                            />
-                          )}
                           <div className="w-10 h-10 bg-gradient-to-r from-blue-100 to-indigo-100 rounded-lg flex items-center justify-center mr-3">
                             <span className="text-lg">📄</span>
                           </div>
@@ -578,6 +631,15 @@ const DocumentCollection = () => {
                             <p className="text-xs text-gray-500">Uploaded: {doc.upload_date}</p>
                           </div>
                         </div>
+                        <span
+                          className={`inline-flex items-center px-2 py-1 rounded-full text-[10px] font-medium border ${
+                            doc.status === 'uploaded'
+                              ? 'bg-green-100 text-green-800 border-green-200'
+                              : 'bg-gray-100 text-gray-800 border-gray-200'
+                          }`}
+                        >
+                          {doc.status === 'uploaded' ? 'Uploaded' : 'Not Uploaded'}
+                        </span>
                       </div>
                       
                       <div className="mb-3">
@@ -588,14 +650,20 @@ const DocumentCollection = () => {
                       
                       <div className="flex items-center space-x-2">
                         <button
-                          onClick={() => window.open(doc.url, '_blank')}
-                          className="flex-1 inline-flex items-center justify-center px-3 py-1.5 text-xs font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded-md hover:bg-blue-100 transition-colors"
+                          onClick={() => { if (doc.url) window.open(doc.url, '_blank'); }}
+                          disabled={!doc.url}
+                          className={`flex-1 inline-flex items-center justify-center px-3 py-1.5 text-xs font-medium border rounded-md transition-colors ${
+                            doc.url
+                              ? 'text-blue-700 bg-blue-50 border-blue-200 hover:bg-blue-100'
+                              : 'text-gray-400 bg-gray-100 border-gray-200 cursor-not-allowed'
+                          }`}
                         >
                           <Eye className="w-3 h-3 mr-1" />
                           View
                         </button>
                         <button
                           onClick={async () => {
+                            if (!doc.url) return;
                             try {
                               const response = await fetch(doc.url);
                               if (!response.ok) throw new Error('Failed to download file');
@@ -610,7 +678,12 @@ const DocumentCollection = () => {
                               console.error('Download error:', error);
                             }
                           }}
-                          className="flex-1 inline-flex items-center justify-center px-3 py-1.5 text-xs font-medium text-green-700 bg-green-50 border border-green-200 rounded-md hover:bg-green-100 transition-colors"
+                          disabled={!doc.url}
+                          className={`flex-1 inline-flex items-center justify-center px-3 py-1.5 text-xs font-medium border rounded-md transition-colors ${
+                            doc.url
+                              ? 'text-green-700 bg-green-50 border-green-200 hover:bg-green-100'
+                              : 'text-gray-400 bg-gray-100 border-gray-200 cursor-not-allowed'
+                          }`}
                         >
                           <Download className="w-3 h-3 mr-1" />
                           Download
@@ -629,21 +702,7 @@ const DocumentCollection = () => {
                 </div>
               )}
             </div>
-            <div className="flex justify-between items-center p-6 border-t border-gray-200">
-              <div className="flex space-x-3">
-                <button onClick={handleApproveAll} className="inline-flex items-center px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors duration-200">
-                  <Check className="w-4 h-4 mr-2" />
-                  Approve All
-                </button>
-                <button onClick={() => setIsRejectMode(!isRejectMode)} className="inline-flex items-center px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors duration-200">
-                  {isRejectMode ? 'Cancel' : 'Reject'}
-                </button>
-                {isRejectMode && selectedDocuments.length > 0 && (
-                  <button onClick={handleRejectDocuments} className="inline-flex items-center px-4 py-2 bg-red-700 text-white rounded-md hover:bg-red-800 transition-colors duration-200">
-                    Reject Selected ({selectedDocuments.length})
-                  </button>
-                )}
-              </div>
+            <div className="flex justify-end items-center p-6 border-t border-gray-200">
               <button onClick={handleCloseModal} className="px-4 py-2 bg-gray-100 rounded-md hover:bg-gray-200 transition-colors duration-200">
                 Close
               </button>

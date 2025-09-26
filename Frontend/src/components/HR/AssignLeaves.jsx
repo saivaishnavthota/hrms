@@ -1,81 +1,98 @@
 import React, { useState } from 'react';
-import { Eye, Edit, Trash2, ChevronUp, ChevronDown } from 'lucide-react';
+import { Eye, Edit, Trash2, ChevronUp, ChevronDown, UserCircle } from 'lucide-react';
 import EditEmployeeModal from './EditEmployeeModal';
+import axios from 'axios';
+import { toast } from 'react-toastify';
 
 const AssignLeaves = () => {
+  // Employees fetched from backend
+  const [employeeLeaveData, setEmployeeLeaveData] = useState([]);
+  const [loadingEmployees, setLoadingEmployees] = useState(true);
+  const [employeesError, setEmployeesError] = useState(null);
+
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState(null);
+  const [selectedIds, setSelectedIds] = useState(new Set());
+  const [actionLoading, setActionLoading] = useState(false);
+  const [actionMessage, setActionMessage] = useState(null);
+  const [actionError, setActionError] = useState(null);
 
-  // Sample data with employee leave balances
-  const [employeeLeaveData, setEmployeeLeaveData] = useState([
-    {
-      id: 1,
-      employee: 'Dr. Sarah Johnson',
-      type: 'Full-time',
-      role: 'Senior Doctor',
-      sickLeave: 12,
-      casualLeave: 15,
-      annualLeave: 25,
-      maternityLeave: 90,
-      paternityLeave: 15
-    },
-    {
-      id: 2,
-      employee: 'Mr. John Smith',
-      type: 'Full-time',
-      role: 'Nurse',
-      sickLeave: 10,
-      casualLeave: 12,
-      annualLeave: 20,
-      maternityLeave: 0,
-      paternityLeave: 10
-    },
-    {
-      id: 3,
-      employee: 'Ms. Emily Davis',
-      type: 'Part-time',
-      role: 'Receptionist',
-      sickLeave: 8,
-      casualLeave: 10,
-      annualLeave: 15,
-      maternityLeave: 60,
-      paternityLeave: 0
-    },
-    {
-      id: 4,
-      employee: 'Dr. Michael Brown',
-      type: 'Full-time',
-      role: 'Specialist',
-      sickLeave: 15,
-      casualLeave: 18,
-      annualLeave: 30,
-      maternityLeave: 0,
-      paternityLeave: 20
-    },
-    {
-      id: 5,
-      employee: 'Ms. Lisa Wilson',
-      type: 'Full-time',
-      role: 'Administrator',
-      sickLeave: 12,
-      casualLeave: 15,
-      annualLeave: 22,
-      maternityLeave: 120,
-      paternityLeave: 0
-    },
-    {
-      id: 6,
-      employee: 'Mr. David Garcia',
-      type: 'Contract',
-      role: 'Technician',
-      sickLeave: 6,
-      casualLeave: 8,
-      annualLeave: 12,
-      maternityLeave: 0,
-      paternityLeave: 15
-    }
-  ]);
+  // Sample data with employee leave balance
+
+  // Fetch onboarded employees from backend and map to local structure
+  React.useEffect(() => {
+    const fetchEmployees = async () => {
+      setEmployeesError(null);
+      setLoadingEmployees(true);
+      try {
+        const res = await axios.get('http://127.0.0.1:8000/users/onboarded-employees');
+        const list = Array.isArray(res.data) ? res.data : res.data?.data || [];
+        const mapped = list.map((e) => ({
+          id: e.id,
+          employee: e.name,
+          email: e.email || e.personal_email || '',
+          avatar: e.avatar || null,
+          type: e.type || 'Full-time',
+          role: e.role || 'Employee',
+          // Leave balances will be fetched/assigned separately. Default to 0.
+          sickLeave: 0,
+          casualLeave: 0,
+          annualLeave: 0,
+          maternityLeave: 0,
+          paternityLeave: 0,
+        }));
+        setEmployeeLeaveData(mapped);
+        toast.success(`Loaded ${mapped.length} employees`);
+
+        // Fetch existing leave balances per employee and populate
+        const fetchBalances = async () => {
+          let failedCount = 0;
+          const results = await Promise.allSettled(
+            mapped.map(async (emp) => {
+              try {
+                const balRes = await axios.get(`http://127.0.0.1:8000/leave/leave_balances/${emp.id}`);
+                const bal = balRes.data;
+                setEmployeeLeaveData((prev) => prev.map((e) => (
+                  e.id === emp.id
+                    ? {
+                        ...e,
+                        sickLeave: bal.sick_leaves ?? e.sickLeave,
+                        casualLeave: bal.casual_leaves ?? e.casualLeave,
+                        annualLeave: bal.paid_leaves ?? e.annualLeave,
+                        maternityLeave: bal.maternity_leave ?? e.maternityLeave,
+                        paternityLeave: bal.paternity_leave ?? e.paternityLeave,
+                      }
+                    : e
+                )));
+              } catch (err) {
+                // If not found (404), skip; balances remain defaults
+                const status = err?.response?.status;
+                if (status !== 404) {
+                  console.warn(`Failed to fetch balance for employee ${emp.id}:`, err);
+                  failedCount += 1;
+                }
+              }
+            })
+          );
+          const succeeded = results.filter(r => r.status === 'fulfilled').length;
+          if (failedCount > 0) {
+            toast.warn(`Updated ${succeeded} balances; ${failedCount} failed`);
+          } else if (mapped.length > 0) {
+            toast.success('Leave balances updated');
+          }
+        };
+        fetchBalances();
+      } catch (err) {
+        console.error('Failed to fetch onboarded employees:', err);
+        setEmployeesError('Failed to fetch employees. Please ensure backend is running.');
+        toast.error('Failed to load employees');
+      } finally {
+        setLoadingEmployees(false);
+      }
+    };
+    fetchEmployees();
+  }, []);
 
   const handleSort = (key) => {
     let direction = 'asc';
@@ -151,6 +168,117 @@ const AssignLeaves = () => {
 
   const sortedData = getSortedData();
 
+  const toggleSelect = (id) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const isAllSelected = sortedData.length > 0 && sortedData.every(emp => selectedIds.has(emp.id));
+  const toggleSelectAll = () => {
+    setSelectedIds(prev => {
+      if (isAllSelected) return new Set();
+      const next = new Set();
+      sortedData.forEach(emp => next.add(emp.id));
+      return next;
+    });
+  };
+
+  const assignDefaultLeaves = async () => {
+    setActionMessage(null);
+    setActionError(null);
+    if (selectedIds.size === 0) {
+      setActionError('Please select at least one employee.');
+      toast.info('Please select at least one employee');
+      return;
+    }
+    setActionLoading(true);
+    const DEFAULTS = {
+      sick_leaves: 6,
+      casual_leaves: 6,
+      paid_leaves: 15,
+      maternity_leave: 0,
+      paternity_leave: 0,
+    };
+
+    try {
+      const ids = Array.from(selectedIds);
+      let failed = 0;
+      for (const id of ids) {
+        try {
+          await axios.post(`http://127.0.0.1:8000/leave/init/${id}`);
+        } catch (err) {
+          const status = err?.response?.status;
+          // If already exists (likely 400), continue to update
+          if (status !== 400 && status !== 409) {
+            failed += 1;
+            console.warn('Init failed for employee', id, err);
+            continue;
+          }
+        }
+        try {
+          await axios.put(`http://127.0.0.1:8000/leave/leave-balance/${id}`, DEFAULTS);
+        } catch (err) {
+          failed += 1;
+          console.error('Update balance failed for employee', id, err);
+          continue;
+        }
+
+        // Refetch balance from backend to restore UI from source of truth
+        try {
+          const balRes = await axios.get(`http://127.0.0.1:8000/leave/leave_balances/${id}`);
+          const bal = balRes.data;
+          setEmployeeLeaveData(prev => prev.map(emp => (
+            emp.id === id
+              ? {
+                  ...emp,
+                  sickLeave: bal.sick_leaves ?? DEFAULTS.sick_leaves,
+                  casualLeave: bal.casual_leaves ?? DEFAULTS.casual_leaves,
+                  annualLeave: bal.paid_leaves ?? DEFAULTS.paid_leaves,
+                  maternityLeave: bal.maternity_leave ?? DEFAULTS.maternity_leave,
+                  paternityLeave: bal.paternity_leave ?? DEFAULTS.paternity_leave,
+                }
+              : emp
+          )));
+        } catch (err) {
+          console.warn(`Failed to refetch balance for employee ${id}, falling back to defaults`, err);
+          setEmployeeLeaveData(prev => prev.map(emp => (
+            emp.id === id
+              ? {
+                  ...emp,
+                  sickLeave: DEFAULTS.sick_leaves,
+                  casualLeave: DEFAULTS.casual_leaves,
+                  annualLeave: DEFAULTS.paid_leaves,
+                  maternityLeave: DEFAULTS.maternity_leave,
+                  paternityLeave: DEFAULTS.paternity_leave,
+                }
+              : emp
+          )));
+        }
+      }
+      const successCount = ids.length - failed;
+      if (successCount > 0 && failed === 0) {
+        toast.success(`Assigned default leaves to ${successCount} employee(s)`);
+        setActionMessage(`Assigned default leaves to ${successCount} employee(s).`);
+      } else if (successCount > 0 && failed > 0) {
+        toast.warn(`Assigned ${successCount}, ${failed} failed`);
+        setActionMessage(`Assigned ${successCount}, ${failed} failed.`);
+      } else {
+        toast.error('Failed to assign default leaves');
+        setActionError('Failed to assign default leaves. Please try again.');
+      }
+    } catch (err) {
+      console.error('Failed assigning default leaves:', err);
+      setActionError('Failed to assign default leaves. Please try again.');
+      toast.error('Failed to assign default leaves');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   return (
     <div className="p-6">
       <div className="mb-6">
@@ -159,12 +287,48 @@ const AssignLeaves = () => {
       </div>
 
       <div className="bg-white rounded-lg shadow">
+        {/* Toolbar */}
+        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={assignDefaultLeaves}
+              disabled={selectedIds.size === 0 || actionLoading || loadingEmployees}
+              className={`inline-flex items-center px-3 py-2 rounded-md text-sm font-medium ${selectedIds.size === 0 || actionLoading ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-blue-600 text-white hover:bg-blue-700'}`}
+            >
+              Assign Default Leaves (6/6/15)
+            </button>
+            {actionLoading && (
+              <span className="text-sm text-gray-600">Applying...</span>
+            )}
+          </div>
+          <div className="text-sm text-gray-600">
+            Selected: {selectedIds.size}
+          </div>
+        </div>
+
+        {/* Employees loading/error state */}
+        {loadingEmployees && (
+          <div className="px-4 py-2 bg-gray-50 text-gray-700 border-b border-gray-200">Loading employees...</div>
+        )}
+        {employeesError && (
+          <div className="px-4 py-2 bg-red-50 text-red-700 border-b border-red-200">{employeesError}</div>
+        )}
+
+        {(actionMessage || actionError) && (
+          <div className={`px-4 py-2 ${actionError ? 'bg-red-50 text-red-700 border border-red-200' : 'bg-green-50 text-green-700 border border-green-200'}`}>
+            {actionError || actionMessage}
+          </div>
+        )}
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  #
+                  <input
+                    type="checkbox"
+                    checked={isAllSelected}
+                    onChange={toggleSelectAll}
+                  />
                 </th>
                 <th 
                   className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
@@ -247,11 +411,33 @@ const AssignLeaves = () => {
               {sortedData.map((employee, index) => (
                 <tr key={employee.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {index + 1}
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.has(employee.id)}
+                      onChange={() => toggleSelect(employee.id)}
+                    />
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm font-medium text-gray-900">
-                      {employee.employee}
+                  <td className="px-6 py-4">
+                    <div className="flex items-center gap-3">
+                      {employee.avatar ? (
+                        <img
+                          src={employee.avatar}
+                          alt={employee.employee}
+                          className="w-8 h-8 rounded-full object-cover"
+                        />
+                      ) : (
+                        <UserCircle className="w-8 h-8 text-gray-400" />
+                      )}
+                      <div className="flex items-center min-w-0">
+                        <span className="text-sm font-medium text-gray-900 truncate">
+                          {employee.employee}
+                        </span>
+                        {employee.email && (
+                          <span className="text-xs text-gray-500 truncate ml-2">
+                            {employee.email}
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">

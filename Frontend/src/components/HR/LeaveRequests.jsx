@@ -1,13 +1,61 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Eye, Trash2, ChevronUp, ChevronDown } from 'lucide-react';
 import ViewLeaveApplication from './ViewLeaveApplication';
 import PendingRequests from './PendingRequests';
+import axios from 'axios';
 
-const LeaveRequests = () => {
+const LeaveRequests = ({ hrId = 1 }) => {
   const [activeTab, setActiveTab] = useState('pending');
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedLeave, setSelectedLeave] = useState(null);
+  const [leaveRequests, setLeaveRequests] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  // Fetch HR leave requests
+  const fetchLeaveRequests = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const response = await axios.get(`http://127.0.0.1:8000/leave/hr/leave-requests/${hrId}`);
+      const mapped = (response.data || []).map((item) => ({
+        id: item.leave_id ?? item.id,
+        employee: item.employee_name,
+        leaveType: item.leave_type,
+        startDate: item.start_date,
+        endDate: item.end_date,
+        days: item.no_of_days,
+        status: (item.hr_status || item.final_status || 'Pending').toLowerCase(),
+        appliedOn: item.created_at || item.start_date,
+        reason: item.reason,
+      }));
+      setLeaveRequests(mapped);
+    } catch (err) {
+      console.error('Error fetching HR leave requests:', err);
+      setError('Failed to fetch leave requests. Please try again.');
+      // Fallback sample data for development
+      setLeaveRequests([
+        {
+          id: 101,
+          employee: 'John Doe',
+          leaveType: 'Annual Leave',
+          startDate: '2025-01-12',
+          endDate: '2025-01-16',
+          days: 5,
+          status: 'pending',
+          appliedOn: '2025-01-05',
+          reason: 'Family trip',
+        },
+      ]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchLeaveRequests();
+  }, [hrId]);
 
   
   const handleSort = (key) => {
@@ -77,6 +125,18 @@ const LeaveRequests = () => {
     }
   };
 
+  const sortedRequests = React.useMemo(() => {
+    const data = [...leaveRequests];
+    if (sortConfig.key) {
+      data.sort((a, b) => {
+        if (a[sortConfig.key] < b[sortConfig.key]) return sortConfig.direction === 'asc' ? -1 : 1;
+        if (a[sortConfig.key] > b[sortConfig.key]) return sortConfig.direction === 'asc' ? 1 : -1;
+        return 0;
+      });
+    }
+    return data;
+  }, [leaveRequests, sortConfig]);
+
   return (
     <div className="p-6">
       {/* Tab Navigation */}
@@ -112,6 +172,11 @@ const LeaveRequests = () => {
         <PendingRequests />
       ) : (
         <div className="bg-white rounded-lg shadow">
+          {loading ? (
+            <div className="px-6 py-10 text-center text-gray-600">Loading leave requests...</div>
+          ) : error ? (
+            <div className="px-6 py-4 text-red-700 bg-red-50 border border-red-200">{error}</div>
+          ) : (
           <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-gray-50">
@@ -155,7 +220,7 @@ const LeaveRequests = () => {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {leaveRequests.map((request) => (
+              {sortedRequests.map((request) => (
                 <tr key={request.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                     {request.id}
@@ -212,6 +277,7 @@ const LeaveRequests = () => {
             </tbody>
           </table>
         </div>
+          )}
 
         {/* Footer */}
         <div className="px-6 py-4 border-t border-gray-200 bg-gray-50">

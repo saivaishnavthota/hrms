@@ -103,22 +103,31 @@ import { Label } from '@/components/ui/label';
       
       // Fetch all data in parallel
       const [employeesRes, managersRes, hrsRes, locationsRes] = await Promise.all([
-        axios.get('http://127.0.0.1:8000/users/onboarded-employees'),
+        axios.get('http://127.0.0.1:8000/users/employees'),
         axios.get('http://127.0.0.1:8000/users/managers'),
         axios.get('http://127.0.0.1:8000/users/hrs'),
         axios.get('http://127.0.0.1:8000/locations/')
       ]);
 
-      // Process employees data
-      const employeesData = employeesRes.data.data.map(emp => ({
-        id: emp.id,
+      // Process employees data (supports multiple response shapes)
+      const rawEmployees = Array.isArray(employeesRes.data?.data)
+        ? employeesRes.data.data
+        : Array.isArray(employeesRes.data)
+          ? employeesRes.data
+          : Array.isArray(employeesRes.data?.employees)
+            ? employeesRes.data.employees
+            : [];
+
+      const employeesData = rawEmployees.map(emp => ({
+        id: emp.employeeId ?? emp.id,
         name: emp.name,
-        to_email: emp.email,
-        employeeId: `EMP${emp.id}`,
-        type: emp.type,
+        to_email: emp.to_email ?? emp.personal_email,
+        company_email: emp.email ?? emp.company_email,
+        employeeId: emp.employeeId ? `EMP${emp.employeeId}` : (emp.id ? `EMP${emp.id}` : ''),
+        type: emp.type || 'Employee',
         designation: emp.role || 'Employee',
         status: emp.status || 'Active',
-        location: emp.location_name || '',
+        location: emp.location_name || emp.location || '',
         locationId: emp.location_id || null,
         dateOfJoining: emp.doj || '',
         hr: emp.hr && emp.hr.length > 0 ? emp.hr.join(', ') : 'Not Assigned',
@@ -138,11 +147,7 @@ import { Label } from '@/components/ui/label';
       console.error('Error details:', err.response?.data || err.message);
       setError('Failed to fetch data. Please try again.');
       
-      // Fallback to sample data for development
-
-      setManagers([{ id: 1, name: "John Smith" }, { id: 2, name: "Sarah Johnson" }]);
-      setHrs([{ id: 1, name: "Mike Wilson" }, { id: 2, name: "Lisa Brown" }]);
-      setLocations([{ id: 1, name: "New York" }, { id: 2, name: "London" }]);
+      
     } finally {
       setLoading(false);
     }
@@ -160,7 +165,7 @@ import { Label } from '@/components/ui/label';
         hr_ids: employeeData.hr_ids // Array of HR IDs
       };
 
-      const response = await axios.post('http://127.0.0.1:8000/onboarding/hr/assign', assignmentData);
+      const response = await axios.post('http://127.0.0.1:8000/hr/assign', assignmentData);
       
       if (response.status === 200) {
         toast.success('Employee assigned successfully!');
@@ -283,7 +288,7 @@ import { Label } from '@/components/ui/label';
 
     setEditFormData({
       fullName: employee.name || '',
-      companyMail: employee.email || '',
+      companyMail: employee.company_email || '',
       dateOfJoining: employee.dateOfJoining || '',
       location: employee.location,
       hr1: assignedHRs[0] || '',
@@ -393,7 +398,7 @@ import { Label } from '@/components/ui/label';
         employee_id: selectedEmployee?.id || 0,
         location_id: locationId || 0,
         doj: editFormData.dateOfJoining,
-        to_email: selectedEmployee.email  ,
+        to_email: selectedEmployee?.to_email,
         company_email: editFormData.companyMail,
         manager1_id: manager1Id || null,
         manager2_id: manager2Id || null,
@@ -404,7 +409,7 @@ import { Label } from '@/components/ui/label';
       
       console.log('Sending request body:', requestBody);
       
-      const response = await fetch('http://127.0.0.1:8000/onboarding/hr/assign', {
+      const response = await fetch('http://127.0.0.1:8000/hr/assign', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -668,7 +673,7 @@ import { Label } from '@/components/ui/label';
                     </div>
                     <div>
                       <div className="font-medium text-gray-900">{employee.name}</div>
-                      <div className="text-sm text-gray-500">{employee.email}</div>
+                      <div className="text-sm text-gray-500">{employee.company_email}</div>
                     </div>
                   </div>
                 </TableCell>
@@ -1134,8 +1139,12 @@ import { Label } from '@/components/ui/label';
                     </div>
                   </div>
                   <div>
-                    <label className="text-sm font-medium text-gray-600">Email</label>
-                    <div className="text-gray-900">{selectedEmployee.email}</div>
+                    <label className="text-sm font-medium text-gray-600">Company Email</label>
+                    <div className="text-gray-900">{selectedEmployee.company_email || 'N/A'}</div>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-600">Personal Email</label>
+                    <div className="text-gray-900">{selectedEmployee.to_email || 'N/A'}</div>
                   </div>
                   <div>
                     <label className="text-sm font-medium text-gray-600">Employment Type</label>

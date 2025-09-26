@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { 
   Eye, 
   Edit, 
@@ -47,87 +47,17 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 
-// Sample expense data
-const sampleExpenses = [
-  {
-    id: 1,
-    employee: {
-      name: "Dr. Sarah Johnson",
-      email: "sarah.johnson@example.com",
-      avatar: "SJ"
-    },
-    category: "Travel",
-    amount: 1250.00,
-    details: "Business trip to New York - Flight and accommodation",
-    submittedOn: "2025-01-15",
-    status: "Pending",
-    requestId: "EXP001"
-  },
-  {
-    id: 2,
-    employee: {
-      name: "Mr. John Smith",
-      email: "john.smith@example.com",
-      avatar: "JS"
-    },
-    category: "Meals",
-    amount: 85.50,
-    details: "Client dinner at downtown restaurant",
-    submittedOn: "2025-01-14",
-    status: "Approved",
-    requestId: "EXP002"
-  },
-  {
-    id: 3,
-    employee: {
-      name: "Ms. Emily Davis",
-      email: "emily.davis@example.com",
-      avatar: "ED"
-    },
-    category: "Office Supplies",
-    amount: 245.75,
-    details: "Laptop accessories and stationery items",
-    submittedOn: "2025-01-13",
-    status: "Rejected",
-    requestId: "EXP003"
-  },
-  {
-    id: 4,
-    employee: {
-      name: "Dr. Michael Wilson",
-      email: "michael.wilson@example.com",
-      avatar: "MW"
-    },
-    category: "Training",
-    amount: 850.00,
-    details: "Professional development course certification",
-    submittedOn: "2025-01-12",
-    status: "Pending",
-    requestId: "EXP004"
-  },
-  {
-    id: 5,
-    employee: {
-      name: "Ms. Lisa Brown",
-      email: "lisa.brown@example.com",
-      avatar: "LB"
-    },
-    category: "Transportation",
-    amount: 125.30,
-    details: "Taxi fare for client meetings",
-    submittedOn: "2025-01-11",
-    status: "Approved",
-    requestId: "EXP005"
-  }
-];
 
 const ExpenseManagement = () => {
+  const [activeTab, setActiveTab] = useState('pending');
   const [expenses, setExpenses] = useState(sampleExpenses);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [perPage, setPerPage] = useState('10');
   const [selectedExpense, setSelectedExpense] = useState(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
 
   const getAvatarColor = (name) => {
     const colors = [
@@ -213,6 +143,34 @@ const ExpenseManagement = () => {
         </Button>
       </div>
 
+      {/* Tabs */}
+      <div className="mb-2">
+        <div className="border-b border-gray-200">
+          <nav className="-mb-px flex space-x-8">
+            <button
+              onClick={() => setActiveTab('pending')}
+              className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                activeTab === 'pending'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              Pending Requests
+            </button>
+            <button
+              onClick={() => setActiveTab('all')}
+              className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                activeTab === 'all'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              All Expense Request
+            </button>
+          </nav>
+        </div>
+      </div>
+
       {/* Search and Filters */}
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-4 flex-1">
@@ -262,6 +220,11 @@ const ExpenseManagement = () => {
 
       {/* Table */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+          {loading ? (
+            <div className="px-6 py-10 text-center text-gray-600">Loading expenses...</div>
+          ) : error ? (
+            <div className="px-6 py-4 text-red-700 bg-red-50 border border-red-200">{error}</div>
+          ) : (
           <Table>
             <TableHeader>
               <TableRow className="bg-gray-50 border-b border-gray-200">
@@ -337,6 +300,7 @@ const ExpenseManagement = () => {
             ))}
           </TableBody>
         </Table>
+          )}
       </div>
 
       {/* Pagination Info */}

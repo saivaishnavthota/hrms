@@ -472,7 +472,7 @@ async def assign_employee(data: AssignEmployeeRequest, session: Session = Depend
             cur.execute("SELECT name FROM locations WHERE id = %s", (data.location_id,))
             location_row = cur.fetchone()
         location_name = location_row[0] if location_row else "Not Assigned"
-
+        print(to_email)
         await send_credentials_email(
             to_email=data.to_email,
             company_email=data.company_email,

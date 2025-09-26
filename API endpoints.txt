@@ -1,0 +1,305 @@
+======================================================================
+                    HR ONBOARDING PORTAL - API ENDPOINTS
+======================================================================
+
+This document contains all API endpoints discovered from the Backend source code.
+Base URL: http://127.0.0.1:8000
+
+======================================================================
+👥 USER MANAGEMENT APIs (/users)
+======================================================================
+
+POST   /users/hr/approve
+       - HR approves employee onboarding
+       - Authentication required
+
+POST   /users/login
+       - User authentication/login
+       - Returns access token and user type
+
+POST   /users/reset-onboarding-password
+       - Resets password for onboarding employees
+       - Requires employee_id and new_password
+
+POST   /users/verify-otp
+       - Verifies OTP sent to user's email
+       - Used for password reset flow
+
+POST   /users/change-password
+       - Changes password after OTP verification
+       - Requires email and new_password
+
+POST   /users/forgot-password
+       - Initiates password reset process
+       - Sends OTP to user's email
+
+POST   /users/reset-password
+       - Resets password using current password
+       - Requires email, currentPassword, and new_password
+
+GET    /users/managers
+       - Fetches list of all managers
+       - Returns manager ID and name
+
+GET    /users/hrs
+       - Fetches list of all HR personnel
+       - Returns HR ID and name
+
+GET    /users/employees
+       - Fetches all employees with assigned HRs and Managers
+       - Returns comprehensive employee data
+
+GET    /users/employee/{employee_id}
+       - Retrieves specific employee details
+       - Returns employee onboarding information
+
+PUT    /users/employee/{employee_id}
+       - Updates existing employee details
+       - Requires EmployeeOnboardingRequest data
+
+GET    /users/{employee_id}
+       - Gets employee profile with managers, HRs, and location
+       - Returns complete employee profile
+
+GET    /users/me
+       - Gets current authenticated user information
+       - Requires authentication
+
+GET    /users/onboarded-employees
+       - Get all onboarded employees with document status and details
+       - Authentication required
+       - Role Access: HR, Manager
+       - Returns: List of onboarded employees with id, name, email, type, role, status, avatar, document_count
+
+GET    /users/onboarded-employees/{employee_id}/documents
+       - Get document details for a specific onboarded employee
+       - Authentication required
+       - Role Access: HR, Manager
+       - Returns: Employee info and list of uploaded documents with type, name, upload date, and URL
+
+======================================================================
+📄 DOCUMENT MANAGEMENT APIs (/documents)
+======================================================================
+
+POST   /documents/upload
+       - Uploads multiple documents for an employee
+       - Handles multipart form data with employeeId
+
+GET    /documents/all-documents
+       - Fetches document status for all employees
+       - Returns upload status for each document type
+
+GET    /documents/emp/{employee_id}
+       - Lists document upload status for specific employee
+       - Returns boolean status for each document type
+
+GET    /documents/{employee_id}/{doc_type}
+       - Previews/downloads specific document
+       - Supports various document types (PDF, images)
+
+POST   /documents/save-draft
+       - Saves document draft status
+       - Stores boolean flags for each document type
+
+======================================================================
+📅 ATTENDANCE MANAGEMENT APIs (/attendance)
+======================================================================
+
+GET    /attendance/active-projects
+       - Fetches active projects for employee/manager/HR
+       - Query params: employee_id, manager_id, or hr_id
+
+POST   /attendance/
+       - Saves attendance with projects and subtasks
+       - Supports bulk attendance submission
+
+GET    /attendance/weekly
+       - Gets weekly attendance for specific user
+       - Query params: employee_id, manager_id, or hr_id
+
+GET    /attendance/daily
+       - Gets daily attendance for specific month/year
+       - Supports employee, manager, and HR views
+
+GET    /attendance/mgr-assigned
+       - Gets attendance summary for manager's assigned employees
+       - Query params: manager_id, month, year
+
+GET    /attendance/hr-assigned
+       - Gets attendance summary for HR's assigned employees
+       - Query params: hr_id, month, year
+
+GET    /attendance/hr-daily
+       - Gets detailed daily attendance for HR view
+       - Query params: hr_id, year, month
+
+======================================================================
+📅 CALENDAR MANAGEMENT APIs (/calendar)
+======================================================================
+
+POST   /calendar/add
+       - Adds holiday to master calendar
+       - Requires location_id, holiday_date, holiday_name
+
+GET    /calendar/
+       - Gets all holidays or filtered by location
+       - Optional query param: location_id
+
+DELETE /calendar/{holiday_id}
+       - Deletes specific holiday
+       - Requires holiday_id
+
+GET    /calendar/by-location/{location_id}
+       - Gets holidays for specific location
+       - Returns holidays filtered by location_id
+
+======================================================================
+🎯 ONBOARDING MANAGEMENT APIs (/onboarding)
+======================================================================
+
+POST   /onboarding/hr/create_employee
+       - Creates new employee in onboarding system
+       - Sends login credentials via email
+
+POST   /onboarding/details
+       - Stores employee onboarding details
+       - Uses emp_details stored procedure
+
+POST   /onboarding/upload
+       - Uploads onboarding documents
+       - Handles multipart form data
+
+GET    /onboarding/doc/{employee_id}
+       - Lists onboarding document status
+       - Returns upload status for each document
+
+GET    /onboarding/doc/{employee_id}/{doc_type}
+       - Previews onboarding document
+       - Supports various file types with auto-detection
+
+GET    /onboarding/details/{employee_id}
+       - Gets employee onboarding details
+       - Returns comprehensive onboarding information
+
+GET    /onboarding/all
+       - Gets all onboarding employees
+       - Returns list with status information
+
+POST   /onboarding/hr/approve/{onboarding_id}
+       - Approves employee and moves to main system
+       - Calls approve_employee stored procedure
+
+POST   /onboarding/hr/assign
+       - Assigns approved employee to location, managers, and HRs
+       - Sends credentials email with company details
+
+======================================================================
+🏗️ PROJECT MANAGEMENT APIs (/projects)
+======================================================================
+
+POST   /projects/
+       - Creates new project
+       - Returns created project with details
+
+GET    /projects/get_projects
+       - Gets all projects with assigned employees
+       - Returns comprehensive project information
+
+PUT    /projects/{project_id}/status
+       - Updates project status
+       - Requires HR/Manager/Account Manager role
+
+GET    /projects/all-projects
+       - Gets all active projects
+       - Returns project_id, name, and status
+
+GET    /projects/manager-employees
+       - Gets employees assigned to specific manager
+       - Query param: manager_id
+
+POST   /projects/employees/{emp_id}/projects
+       - Assigns projects to employee
+       - Requires manager_id and project list
+
+======================================================================
+🏖️ LEAVE MANAGEMENT APIs (/leave)
+======================================================================
+
+POST   /leave/apply_leave
+       - Employee applies for leave
+       - Calculates leave days excluding holidays and weekoffs
+       - Requires employee_id, leave_type, reason, start_date, end_date
+       - Returns leave details with corrected total days
+
+GET    /leave/all_leaves/{employee_id}
+       - Gets all leave history for specific employee
+       - Returns list of all leave records for the employee
+
+GET    /leave/manager/pending-leaves/{manager_id}
+       - Gets pending leave requests for manager approval
+       - Returns leaves with employee details for assigned employees
+
+POST   /leave/manager/leave-action/{leave_id}
+       - Manager approves or rejects leave request
+       - Requires action: "Approved" or "Rejected"
+       - Updates manager_status and overall status if rejected
+
+GET    /leave/hr/pending-leaves/{hr_id}
+       - Gets leave requests pending HR approval
+       - Only shows leaves already approved by manager
+       - Returns leaves for employees assigned to this HR
+
+POST   /leave/hr/leave-action/{leave_id}
+       - HR approves or rejects leave request
+       - Requires action: "Approved" or "Rejected"
+       - Sets final leave status
+
+GET    /leave/leave-requests/{manager_id}
+       - Gets all leave requests for manager's employees
+       - Optional status filter parameter
+       - Returns comprehensive leave and employee information
+
+GET    /leave/hr/leave-requests/{hr_id}
+       - Gets all leave requests for HR's assigned employees
+       - Only shows leaves after manager approval
+       - Optional status filter parameter
+
+GET    /leave/leave_balances/{employee_id}
+       - Gets leave balance for specific employee
+       - Returns all leave types and remaining balances
+
+POST   /leave/init/{employee_id}
+       - Initializes leave balance for new employee
+       - Creates balance record with default values
+       - Returns created leave balance
+
+PUT    /leave/leave-balance/{employee_id}
+       - Updates employee leave balance
+       - Allows updating sick, casual, paid, maternity, paternity leaves
+       - Returns updated balance information
+
+======================================================================
+🔧 ADDITIONAL ENDPOINTS
+======================================================================
+
+The backend also includes:
+- Authentication middleware with JWT tokens
+- CORS configuration for cross-origin requests
+- Database session management
+- Email service integration
+- File upload handling with binary storage
+- Role-based access control
+
+======================================================================
+📝 NOTES
+======================================================================
+
+1. All endpoints require proper authentication except login and password reset
+2. File uploads support multiple formats with automatic type detection
+3. Attendance system supports project tracking and subtask management
+4. Document management handles both regular and onboarding documents
+5. Calendar system supports location-based holiday management
+6. Project assignments support multiple managers and HRs per employee
+7. Email notifications are sent for various actions (login, approval, assignment)
+
+======================================================================

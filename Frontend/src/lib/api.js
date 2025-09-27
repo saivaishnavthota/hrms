@@ -123,11 +123,48 @@ export const userAPI = {
     return response.data;
   },
 
+  // GET /users/onboarded-employees - Returns onboarded employees details including total count
+  getOnboardedEmployeesCount: async () => {
+    const response = await api.get('/users/onboarded-employees');
+    // Endpoint returns an object with `count` and employee details list
+    return response.data?.count ?? null;
+  },
+
   // POST /users/hr/approve - HR approves employee onboarding
   approveEmployee: async (employeeData) => {
     const response = await api.post('/users/hr/approve', employeeData);
     return response.data;
   }
+};
+
+// Leave management API endpoints
+export const leaveAPI = {
+  // POST /leave/apply_leave - Employee applies for leave
+  applyLeave: async (data) => {
+    const payload = {
+      employee_id: data.employee_id,
+      leave_type: data.leave_type,
+      reason: data.reason,
+      start_date: data.start_date,
+      end_date: data.end_date,
+      // Optional flag for half-day leave; backend accepts extra keys
+      half_day: !!data.half_day,
+    };
+    const response = await api.post('/leave/apply_leave', payload);
+    return response.data;
+  },
+
+  // GET /leave/all_leaves/{employee_id} - Employee leave history
+  getEmployeeLeaves: async (employeeId) => {
+    const response = await api.get(`/leave/all_leaves/${employeeId}`);
+    return response.data;
+  },
+
+  // GET /leave/leave_balances/{employee_id} - Current leave balances
+  getLeaveBalance: async (employeeId) => {
+    const response = await api.get(`/leave/leave_balances/${employeeId}`);
+    return response.data;
+  },
 };
 
 // Export the axios instance for custom requests

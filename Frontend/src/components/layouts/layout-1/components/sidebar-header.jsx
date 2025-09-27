@@ -17,32 +17,18 @@ export function SidebarHeader() {
       <Link to="/hr/dashboard">
         <div className="dark:hidden flex items-center gap-2">
           <img
-            src={toAbsoluteUrl('/media/app/Nxzen.png')}
-            className="default-logo h-[22px] max-w-none"
+            src={toAbsoluteUrl('/media/app/NxzenLogo.png')}
+            className="default-logo h-[40px] max-w-[200px]"
             alt="Nxzen Logo"
           />
-          <span className="default-logo text-lg font-semibold text-gray-800">Nxzen</span>
-
+         
           <img
             src={toAbsoluteUrl('/media/app/Nxzen.png')}
-            className="small-logo h-[22px] max-w-none"
+            className="small-logo h-[40px] max-w-[50px]"
             alt="Nxzen Mini Logo"
           />
         </div>
-        <div className="hidden dark:block flex items-center gap-2">
-          <img
-            src={toAbsoluteUrl('/media/app/Nxzen.png')}
-            className="default-logo h-[22px] max-w-none"
-            alt="Nxzen Dark Logo"
-          />
-          <span className="default-logo text-lg font-semibold text-white">Nxzen</span>
-
-          <img
-            src={toAbsoluteUrl('/media/app/Nxzen.png')}
-            className="small-logo h-[22px] max-w-none"
-            alt="Nxzen Mini Logo"
-          />
-        </div>
+       
       </Link>
       <Button
         onClick={handleToggleClick}

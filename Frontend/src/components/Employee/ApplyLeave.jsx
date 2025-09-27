@@ -1,19 +1,38 @@
-import React, { useState } from 'react';
-import { Calendar, FileText, Send, CheckCircle } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Calendar, FileText, Send, CheckCircle, Eye, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useUser } from '@/contexts/UserContext';
+import { leaveAPI } from '@/lib/api';
 
 const ApplyLeave = () => {
+  const [activeTab, setActiveTab] = useState('apply'); // 'apply' | 'past'
   const [leaveData, setLeaveData] = useState({
     leaveType: '',
     startDate: '',
     endDate: '',
     reason: '',
+    halfDay: false,
     emergencyContact: '',
     handoverNotes: ''
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [message, setMessage] = useState('');
+
+  // Leave balance status summary
+  const [balancesLoading, setBalancesLoading] = useState(false);
+  const [balancesError, setBalancesError] = useState(null);
+  const [balances, setBalances] = useState({
+    sick: { allocated: 0, available: 0, applied: 0 },
+    casual: { allocated: 0, available: 0, applied: 0 },
+    annual: { allocated: 0, available: 0, applied: 0 },
+  });
+
+  // Past leaves state
+  const [allLeaves, setAllLeaves] = useState([]);
+  const [pastLeavesLoading, setPastLeavesLoading] = useState(false);
+  const [pastLeavesError, setPastLeavesError] = useState(null);
+  const [selectedLeave, setSelectedLeave] = useState(null);
 
   const leaveTypes = [
     'Annual Leave',
@@ -37,20 +56,129 @@ const ApplyLeave = () => {
       const end = new Date(leaveData.endDate);
       const diffTime = Math.abs(end - start);
       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+      if (leaveData.halfDay && diffDays === 1) return 0.5;
       return diffDays;
     }
     return 0;
   };
 
+  const { user } = useUser();
+
+  // Fetch leave balances and compute applied totals
+  useEffect(() => {
+    const employeeId = user?.employeeId || JSON.parse(localStorage.getItem('user') || '{}')?.employeeId;
+    if (!employeeId) return;
+
+    const loadBalances = async () => {
+      setBalancesLoading(true);
+      setBalancesError(null);
+      try {
+        const [balanceRes, leavesRes] = await Promise.allSettled([
+          leaveAPI.getLeaveBalance(employeeId),
+          leaveAPI.getEmployeeLeaves(employeeId),
+        ]);
+
+        const bal = balanceRes.status === 'fulfilled' ? balanceRes.value : {};
+        const leaves = leavesRes.status === 'fulfilled' ? leavesRes.value : [];
+        setAllLeaves(leaves);
+
+        const availableSick = bal?.sick_leaves ?? 0;
+        const availableCasual = bal?.casual_leaves ?? 0;
+        const availableAnnual = bal?.paid_leaves ?? 0;
+
+        // Sum decisions by type: include only approved or rejected
+        const totals = {
+          sick: { approved: 0, rejected: 0 },
+          casual: { approved: 0, rejected: 0 },
+          annual: { approved: 0, rejected: 0 },
+        };
+        for (const lv of Array.isArray(leaves) ? leaves : []) {
+          const type = (lv.leave_type || lv.leaveType || '').toLowerCase();
+          const days = lv.no_of_days ?? lv.total_days ?? 0;
+          const status = (lv.status || '').toLowerCase();
+          const isApproved = status === 'approved';
+          const isRejected = status === 'rejected';
+          if (!(isApproved || isRejected)) continue; // ignore pending
+
+          const assign = (bucket) => {
+            if (type.includes('sick')) totals.sick[bucket] += days;
+            else if (type.includes('casual')) totals.casual[bucket] += days;
+            else if (type.includes('paid') || type.includes('annual')) totals.annual[bucket] += days;
+          };
+          assign(isApproved ? 'approved' : 'rejected');
+        }
+
+        setBalances({
+          sick: {
+            available: availableSick,
+            applied: totals.sick.approved + totals.sick.rejected,
+            // allocated reflects available + approved (exclude rejected)
+            allocated: availableSick + totals.sick.approved,
+          },
+          casual: {
+            available: availableCasual,
+            applied: totals.casual.approved + totals.casual.rejected,
+            allocated: availableCasual + totals.casual.approved,
+          },
+          annual: {
+            available: availableAnnual,
+            applied: totals.annual.approved + totals.annual.rejected,
+            allocated: availableAnnual + totals.annual.approved,
+          },
+        });
+      } catch (err) {
+        console.error('Failed to load leave balances:', err);
+        setBalancesError('Failed to load leave balances');
+      } finally {
+        setBalancesLoading(false);
+      }
+    };
+
+    loadBalances();
+  }, [user]);
+
+  // Lazy load past leaves when tab opened if not present
+  useEffect(() => {
+    const employeeId = user?.employeeId || JSON.parse(localStorage.getItem('user') || '{}')?.employeeId;
+    if (activeTab !== 'past' || !employeeId) return;
+    if (allLeaves && allLeaves.length > 0) return;
+    const loadPast = async () => {
+      setPastLeavesLoading(true);
+      setPastLeavesError(null);
+      try {
+        const data = await leaveAPI.getEmployeeLeaves(employeeId);
+        setAllLeaves(Array.isArray(data) ? data : []);
+      } catch (err) {
+        console.error('Failed to load past leaves:', err);
+        setPastLeavesError('Failed to load past leaves');
+      } finally {
+        setPastLeavesLoading(false);
+      }
+    };
+    loadPast();
+  }, [activeTab, user]);
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsSubmitting(true);
     setMessage('');
 
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      setMessage('Leave application submitted successfully! You will receive a confirmation email shortly.');
+      const employeeId = user?.employeeId || JSON.parse(localStorage.getItem('user') || '{}')?.employeeId;
+      if (!employeeId) {
+        throw new Error('Missing employee ID. Please log in again.');
+      }
+
+      const response = await leaveAPI.applyLeave({
+        employee_id: employeeId,
+        leave_type: leaveData.leaveType,
+        reason: leaveData.reason,
+        start_date: leaveData.startDate,
+        end_date: leaveData.endDate,
+        half_day: leaveData.halfDay,
+      });
+
+      const days = response?.totalDays ?? calculateDays();
+      setMessage(`Leave application submitted successfully for ${days} day(s).`);
       
       // Reset form after success
       setTimeout(() => {
@@ -59,6 +187,7 @@ const ApplyLeave = () => {
           startDate: '',
           endDate: '',
           reason: '',
+          halfDay: false,
         });
         setMessage('');
       }, 3000);
@@ -71,33 +200,204 @@ const ApplyLeave = () => {
 
   return (
     <div className="max-w-2xl mx-auto">
-      <div className="bg-card rounded-lg shadow-sm border p-6">
-        <div className="flex items-center gap-3 mb-6">
-          <div className="p-2 bg-green-100 rounded-lg">
-            <Send className="h-6 w-6 text-green-600" />
-          </div>
-          <div>
-            <h2 className="text-xl font-semibold text-card-foreground">Apply for Leave</h2>
-            <p className="text-sm text-muted-foreground">Submit your leave application</p>
-          </div>
-        </div>
+      {/* Leave balance status bars - placed outside the form card */}
+      <div className="mb-6">
+        {balancesLoading ? (
+          <div className="text-sm text-muted-foreground">Loading leave balances...</div>
+        ) : balancesError ? (
+          <div className="text-sm text-red-600">{balancesError}</div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Sick Leave */}
+            <div className="bg-white rounded-lg p-4">
+              <div className="mb-2 font-medium text-gray-800">Sick Leave</div>
+              {(() => {
+                const { allocated, available, applied } = balances.sick;
+                const totalPct = allocated > 0 ? 100 : 0;
+                const availPct = allocated > 0 ? Math.min(100, (available / allocated) * 100) : 0;
+                const appliedPct = allocated > 0 ? Math.min(100, (applied / allocated) * 100) : 0;
+                return (
+                  <div className="space-y-3">
+                    <div>
+                      <div className="flex justify-between text-xs text-gray-600 mb-1">
+                        <span>Total Allocated</span>
+                        <span>{allocated}</span>
+                      </div>
+                      <div className="h-2 bg-gray-200 rounded">
+                        <div className="h-2 rounded" style={{ width: `${totalPct}%`, backgroundColor: 'rgb(236, 241, 102)' }} />
+                      </div>
+                    </div>
+                    <div>
+                      <div className="flex justify-between text-xs text-gray-600 mb-1">
+                        <span>Available</span>
+                        <span>{available}</span>
+                      </div>
+                      <div className="h-2 bg-gray-200 rounded">
+                          <div className="h-2 rounded" style={{ width: `${availPct}%`, backgroundColor: 'rgb(116, 209, 234)' }} />
+                      </div>
+                    </div>
+                    <div>
+                      <div className="flex justify-between text-xs text-gray-600 mb-1">
+                        <span>Applied</span>
+                        <span>{applied}</span>
+                      </div>
+                      <div className="h-2 bg-gray-200 rounded">
+                          <div className="h-2 rounded" style={{ width: `${appliedPct}%`, backgroundColor: 'rgb(255, 114, 118)' }} />
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
 
-        {message && (
-          <div className={`mb-4 p-3 rounded-lg flex items-center gap-2 ${
-            message.includes('success') 
-              ? 'bg-green-50 text-green-700 border border-green-200' 
-              : 'bg-red-50 text-red-700 border border-red-200'
-          }`}>
-            {message.includes('success') && <CheckCircle className="h-4 w-4" />}
-            {message}
+            {/* Casual Leave */}
+            <div className="bg-white rounded-lg p-4">
+              <div className="mb-2 font-medium text-gray-800">Casual Leave</div>
+              {(() => {
+                const { allocated, available, applied } = balances.casual;
+                const totalPct = allocated > 0 ? 100 : 0;
+                const availPct = allocated > 0 ? Math.min(100, (available / allocated) * 100) : 0;
+                const appliedPct = allocated > 0 ? Math.min(100, (applied / allocated) * 100) : 0;
+                return (
+                  <div className="space-y-3">
+                    <div>
+                      <div className="flex justify-between text-xs text-gray-600 mb-1">
+                        <span>Total Allocated</span>
+                        <span>{allocated}</span>
+                      </div>
+                      <div className="h-2 bg-gray-200 rounded">
+                        <div className="h-2 rounded" style={{ width: `${totalPct}%`, backgroundColor: 'rgb(236, 241, 102)' }} />
+                      </div>
+                    </div>
+                    <div>
+                      <div className="flex justify-between text-xs text-gray-600 mb-1">
+                        <span>Available</span>
+                        <span>{available}</span>
+                      </div>
+                      <div className="h-2 bg-gray-200 rounded">
+                          <div className="h-2 rounded" style={{ width: `${availPct}%`, backgroundColor: 'rgb(116, 209, 234)' }} />
+                      </div>
+                    </div>
+                    <div>
+                      <div className="flex justify-between text-xs text-gray-600 mb-1">
+                        <span>Applied</span>
+                        <span>{applied}</span>
+                      </div>
+                      <div className="h-2 bg-gray-200 rounded">
+                          <div className="h-2 rounded" style={{ width: `${appliedPct}%`, backgroundColor: 'rgb(255, 114, 118)' }} />
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+
+            {/* Annual Leave */}
+            <div className="bg-white rounded-lg p-4">
+              <div className="mb-2 font-medium text-gray-800">Annual Leave</div>
+              {(() => {
+                const { allocated, available, applied } = balances.annual;
+                const totalPct = allocated > 0 ? 100 : 0;
+                const availPct = allocated > 0 ? Math.min(100, (available / allocated) * 100) : 0;
+                const appliedPct = allocated > 0 ? Math.min(100, (applied / allocated) * 100) : 0;
+                return (
+                  <div className="space-y-3">
+                    <div>
+                      <div className="flex justify-between text-xs text-gray-600 mb-1">
+                        <span>Total Allocated</span>
+                        <span>{allocated}</span>
+                      </div>
+                      <div className="h-2 bg-gray-200 rounded">
+                        <div className="h-2 rounded" style={{ width: `${totalPct}%`, backgroundColor: 'rgb(236, 241, 102)' }} />
+                      </div>
+                    </div>
+                    <div>
+                      <div className="flex justify-between text-xs text-gray-600 mb-1">
+                        <span>Available</span>
+                        <span>{available}</span>
+                      </div>
+                      <div className="h-2 bg-gray-200 rounded">
+                          <div className="h-2 rounded" style={{ width: `${availPct}%`, backgroundColor: 'rgb(116, 209, 234)' }} />
+                      </div>
+                    </div>
+                    <div>
+                      <div className="flex justify-between text-xs text-gray-600 mb-1">
+                        <span>Applied</span>
+                        <span>{applied}</span>
+                      </div>
+                      <div className="h-2 bg-gray-200 rounded">
+                          <div className="h-2 rounded" style={{ width: `${appliedPct}%`, backgroundColor: 'rgb(255, 114, 118)' }} />
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
           </div>
         )}
+      </div>
+      <div className="bg-card rounded-lg shadow-sm border p-6">
+        {/* Tabs header */}
+        <div className="flex items-center gap-2 mb-6 border-b">
+          <button
+            type="button"
+            onClick={() => setActiveTab('apply')}
+            className={`px-4 py-2 -mb-px border-b-2 ${
+              activeTab === 'apply' ? 'border-green-600 text-green-700' : 'border-transparent text-muted-foreground'
+            }`}
+          >
+            Apply Leave
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('past')}
+            className={`px-4 py-2 -mb-px border-b-2 ${
+              activeTab === 'past' ? 'border-green-600 text-green-700' : 'border-transparent text-muted-foreground'
+            }`}
+          >
+            Past Leaves
+          </button>
+        </div>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
+        {activeTab === 'apply' && (
+          <>
+            <div className="flex items-center gap-3 mb-6">
+              <div className="p-2 bg-green-100 rounded-lg">
+                <Send className="h-6 w-6 text-green-600" />
+              </div>
+              <div>
+                <h2 className="text-xl font-semibold text-card-foreground">Apply for Leave</h2>
+                <p className="text-sm text-muted-foreground">Submit your leave application</p>
+              </div>
+            </div>
+
+            {message && (
+              <div className={`mb-4 p-3 rounded-lg flex items-center gap-2 ${
+                message.includes('success') 
+                  ? 'bg-green-50 text-green-700 border border-green-200' 
+                  : 'bg-red-50 text-red-700 border border-red-200'
+              }`}>
+                {message.includes('success') && <CheckCircle className="h-4 w-4" />}
+                {message}
+              </div>
+            )}
+
+            <form onSubmit={handleSubmit} className="space-y-6">
           <div>
-            <label className="block text-sm font-medium text-card-foreground mb-2">
-              Leave Type *
-            </label>
+            <div className="flex items-center justify-between mb-2">
+              <label className="block text-sm font-medium text-card-foreground">
+                Leave Type *
+              </label>
+              <label className="flex items-center gap-2 text-sm text-muted-foreground">
+                <input
+                  type="checkbox"
+                  checked={leaveData.halfDay}
+                  onChange={(e) => setLeaveData(prev => ({ ...prev, halfDay: e.target.checked }))}
+                  className="h-4 w-4 rounded border-border"
+                />
+                Half Day
+              </label>
+            </div>
             <select
               name="leaveType"
               value={leaveData.leaveType}
@@ -170,7 +470,7 @@ const ApplyLeave = () => {
             />
           </div>
 
-         
+          
 
           <div className="flex gap-3 pt-4">
             <Button
@@ -206,7 +506,97 @@ const ApplyLeave = () => {
             </Button>
           </div>
         </form>
+          </>
+        )}
+
+        {activeTab === 'past' && (
+          <div>
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-2 bg-blue-100 rounded-lg">
+                <Calendar className="h-6 w-6 text-blue-600" />
+              </div>
+              <div>
+                <h2 className="text-lg font-semibold text-card-foreground">Past Leaves</h2>
+                <p className="text-sm text-muted-foreground">Your previous leave applications</p>
+              </div>
+            </div>
+
+            {pastLeavesLoading && (
+              <div className="text-sm text-muted-foreground">Loading past leaves...</div>
+            )}
+            {pastLeavesError && (
+              <div className="text-sm text-red-600 mb-3">{pastLeavesError}</div>
+            )}
+            {!pastLeavesLoading && !pastLeavesError && (
+              <div className="overflow-x-auto">
+                <table className="min-w-full text-sm">
+                  <thead>
+                    <tr className="text-left border-b">
+                      <th className="px-3 py-2">Leave Type</th>
+                      <th className="px-3 py-2">Start</th>
+                      <th className="px-3 py-2">End</th>
+                      <th className="px-3 py-2">Status</th>
+                      <th className="px-3 py-2">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {allLeaves.length === 0 ? (
+                      <tr>
+                        <td className="px-3 py-4 text-muted-foreground" colSpan={5}>No leave records found.</td>
+                      </tr>
+                    ) : (
+                      allLeaves.map((lv) => (
+                        <tr key={lv.id} className="border-b hover:bg-muted/30">
+                          <td className="px-3 py-2">{lv.leave_type}</td>
+                          <td className="px-3 py-2">{new Date(lv.start_date).toLocaleDateString()}</td>
+                          <td className="px-3 py-2">{new Date(lv.end_date).toLocaleDateString()}</td>
+                          <td className="px-3 py-2">{lv.status}</td>
+                          <td className="px-3 py-2">
+                            <button
+                              type="button"
+                              className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-700"
+                              onClick={() => setSelectedLeave(lv)}
+                            >
+                              <Eye className="h-4 w-4" /> View
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
       </div>
+
+      {/* Details modal */}
+      {selectedLeave && (
+        <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50">
+          <div className="bg-white w-full max-w-lg rounded-lg shadow-lg">
+            <div className="flex items-center justify-between p-4 border-b">
+              <h3 className="text-lg font-semibold">Leave Details</h3>
+              <button className="text-muted-foreground hover:text-foreground" onClick={() => setSelectedLeave(null)}>
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="p-4 space-y-2 text-sm">
+              <div className="flex justify-between"><span className="text-muted-foreground">Type:</span><span>{selectedLeave.leave_type}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Reason:</span><span>{selectedLeave.reason || '-'}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Start:</span><span>{new Date(selectedLeave.start_date).toLocaleDateString()}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">End:</span><span>{new Date(selectedLeave.end_date).toLocaleDateString()}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Days:</span><span>{selectedLeave.no_of_days}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Manager Status:</span><span>{selectedLeave.manager_status}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">HR Status:</span><span>{selectedLeave.hr_status}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Final Status:</span><span>{selectedLeave.status}</span></div>
+            </div>
+            <div className="p-4 border-t text-right">
+              <Button variant="outline" onClick={() => setSelectedLeave(null)}>Close</Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

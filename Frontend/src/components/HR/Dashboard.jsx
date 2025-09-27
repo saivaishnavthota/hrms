@@ -1,17 +1,44 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, Legend } from 'recharts';
 import { Users, Building, TrendingUp, Calendar, RefreshCw, Clock, Briefcase, UserCheck, BarChart3 } from 'lucide-react';
+import { userAPI } from '../../lib/api';
 
 const Dashboard = () => {
+  const [totalEmployees, setTotalEmployees] = useState(null);
+  const [isLoadingEmployees, setIsLoadingEmployees] = useState(false);
+  const [employeeError, setEmployeeError] = useState(null);
+
+  const fetchTotalEmployees = async () => {
+    setIsLoadingEmployees(true);
+    setEmployeeError(null);
+    try {
+      const count = await userAPI.getOnboardedEmployeesCount();
+      if (count !== null && count !== undefined) {
+        setTotalEmployees(count);
+      } else {
+        // Fallback: use /users/employees and take length if count missing
+        const employees = await userAPI.getEmployees();
+        setTotalEmployees(Array.isArray(employees) ? employees.length : null);
+      }
+    } catch (err) {
+      setEmployeeError('Failed to load employees');
+    } finally {
+      setIsLoadingEmployees(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchTotalEmployees();
+  }, []);
   // Employee Performance Chart
   const EmployeePerformanceChart = () => (
     <div className="bg-white rounded-lg p-6 border border-gray-200 shadow-sm">
       <div className="flex items-center justify-between mb-6">
         <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
           <BarChart3 className="h-5 w-5 text-blue-500" />
-          Employee Performance
+          Employee Attendance 
         </h3>
-        <span className="text-sm text-gray-500">Last 6 months</span>
+        <span className="text-sm text-gray-500">Last 1 month</span>
       </div>
       <div className="h-80">
         <div className="flex items-end justify-between h-full px-4 pb-8">
@@ -19,48 +46,38 @@ const Dashboard = () => {
           <div className="flex items-end gap-4 h-full w-full">
             <div className="flex flex-col items-center gap-2 flex-1">
               <div className="w-8 h-32 bg-gradient-to-t from-blue-500 to-blue-300 rounded-t"></div>
-              <span className="text-xs text-gray-600">Jan</span>
+              <span className="text-xs text-gray-600">Present</span>
             </div>
             <div className="flex flex-col items-center gap-2 flex-1">
               <div className="w-8 h-40 bg-gradient-to-t from-green-500 to-green-300 rounded-t"></div>
-              <span className="text-xs text-gray-600">Feb</span>
+              <span className="text-xs text-gray-600">WFH</span>
             </div>
             <div className="flex flex-col items-center gap-2 flex-1">
               <div className="w-8 h-36 bg-gradient-to-t from-yellow-500 to-yellow-300 rounded-t"></div>
-              <span className="text-xs text-gray-600">Mar</span>
+              <span className="text-xs text-gray-600">Leave</span>
             </div>
-            <div className="flex flex-col items-center gap-2 flex-1">
-              <div className="w-8 h-48 bg-gradient-to-t from-purple-500 to-purple-300 rounded-t"></div>
-              <span className="text-xs text-gray-600">Apr</span>
-            </div>
-            <div className="flex flex-col items-center gap-2 flex-1">
-              <div className="w-8 h-44 bg-gradient-to-t from-red-500 to-red-300 rounded-t"></div>
-              <span className="text-xs text-gray-600">May</span>
-            </div>
-            <div className="flex flex-col items-center gap-2 flex-1">
-              <div className="w-8 h-52 bg-gradient-to-t from-indigo-500 to-indigo-300 rounded-t"></div>
-              <span className="text-xs text-gray-600">Jun</span>
-            </div>
+
+            
           </div>
         </div>
       </div>
     </div>
   );
 
-  // Department Distribution Pie Chart
-  const DepartmentChart = () => (
+  // Employee Type Pie Chart
+  const EmployeeTypeChart = () => (
     <div className="bg-white rounded-lg p-6 border border-gray-200 shadow-sm">
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-5 mr-6">
         <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
           <PieChart className="h-5 w-5 text-green-500" />
-          Department Distribution
+          Type of the Employee
         </h3>
-        <span className="text-sm text-gray-500">Total: 150 employees</span>
+        <span className="text-sm text-gray-500"> 150 employees</span>
       </div>
       <div className="flex items-center justify-center h-80">
         <div className="relative w-64 h-64">
           <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
-            {/* IT Department - 30% */}
+            {/* Full-time - 60% */}
             <circle
               cx="50"
               cy="50"
@@ -68,21 +85,10 @@ const Dashboard = () => {
               fill="none"
               stroke="#3b82f6"
               strokeWidth="12"
-              strokeDasharray="66 154"
+              strokeDasharray="132 88"
               strokeDashoffset="0"
             />
-            {/* HR Department - 20% */}
-            <circle
-              cx="50"
-              cy="50"
-              r="35"
-              fill="none"
-              stroke="#10b981"
-              strokeWidth="12"
-              strokeDasharray="44 176"
-              strokeDashoffset="-66"
-            />
-            {/* Finance - 25% */}
+            {/* Contract - 30% */}
             <circle
               cx="50"
               cy="50"
@@ -90,21 +96,10 @@ const Dashboard = () => {
               fill="none"
               stroke="#f59e0b"
               strokeWidth="12"
-              strokeDasharray="55 165"
-              strokeDashoffset="-110"
+              strokeDasharray="66 154"
+              strokeDashoffset="-132"
             />
-            {/* Marketing - 15% */}
-            <circle
-              cx="50"
-              cy="50"
-              r="35"
-              fill="none"
-              stroke="#ef4444"
-              strokeWidth="12"
-              strokeDasharray="33 187"
-              strokeDashoffset="-165"
-            />
-            {/* Operations - 10% */}
+            {/* Intern - 10% */}
             <circle
               cx="50"
               cy="50"
@@ -117,26 +112,18 @@ const Dashboard = () => {
             />
           </svg>
           {/* Legend */}
-          <div className="absolute -right-32 top-0 space-y-2 text-sm">
+          <div className="absolute -right-25 top-0 space-y-2 text-sm ">
             <div className="flex items-center gap-2">
               <div className="w-3 h-3 bg-blue-500 rounded"></div>
-              <span>IT (30%)</span>
+              <span>Full-time (60%)</span>
             </div>
             <div className="flex items-center gap-2">
-              <div className="w-3 h-3 bg-green-500 rounded"></div>
-              <span>HR (20%)</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 bg-yellow-500 rounded"></div>
-              <span>Finance (25%)</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 bg-red-500 rounded"></div>
-              <span>Marketing (15%)</span>
+              <div className="w-3 h-3 bg-orange-500 rounded"></div>
+              <span>Contract (30%)</span>
             </div>
             <div className="flex items-center gap-2">
               <div className="w-3 h-3 bg-purple-500 rounded"></div>
-              <span>Operations (10%)</span>
+              <span>Intern (10%)</span>
             </div>
           </div>
         </div>
@@ -237,15 +224,6 @@ const Dashboard = () => {
           <div className="w-full bg-gray-200 rounded-full h-3">
             <div className="bg-red-500 h-3 rounded-full" style={{width: '7.5%'}}></div>
           </div>
-          
-          {/* Cancelled Leaves */}
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-medium text-gray-700">Cancelled</span>
-            <span className="text-sm text-gray-500">5</span>
-          </div>
-          <div className="w-full bg-gray-200 rounded-full h-3">
-            <div className="bg-gray-500 h-3 rounded-full" style={{width: '12.5%'}}></div>
-          </div>
         </div>
         
         {/* Summary */}
@@ -276,7 +254,9 @@ const Dashboard = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-gray-600 mb-1">Total Employees</p>
-              <p className="text-3xl font-bold text-gray-900">10</p>
+              <p className="text-3xl font-bold text-gray-900">
+                {isLoadingEmployees ? '…' : totalEmployees ?? '—'}
+              </p>
               <p className="text-sm text-green-600 mt-1">+10 this month</p>
             </div>
             <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
@@ -285,13 +265,13 @@ const Dashboard = () => {
           </div>
         </div>
 
-        {/* Branches */}
+        {/* Attendance rate ( work from home today ) */}
         <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600 mb-1">Branches</p>
-              <p className="text-3xl font-bold text-gray-900">9</p>
-              <p className="text-sm text-gray-500 mt-1">23 departments</p>
+              <p className="text-sm text-gray-600 mb-1">Attendance rate</p>
+              <p className="text-3xl font-bold text-gray-900">0%</p>
+              <p className="text-sm text-green-500 mt-1"> 2 work from home today</p>
             </div>
             <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
               <Building className="w-6 h-6 text-green-600" />
@@ -305,7 +285,7 @@ const Dashboard = () => {
             <div>
               <p className="text-sm text-gray-600 mb-1">Attendance Rate</p>
               <p className="text-3xl font-bold text-gray-900">0%</p>
-              <p className="text-sm text-gray-500 mt-1">0 present today</p>
+              <p className="text-sm text-green-500 mt-1">0 present today</p>
             </div>
             <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
               <Clock className="w-6 h-6 text-purple-600" />
@@ -319,7 +299,7 @@ const Dashboard = () => {
             <div>
               <p className="text-sm text-gray-600 mb-1">Pending Leaves</p>
               <p className="text-3xl font-bold text-gray-900">0</p>
-              <p className="text-sm text-gray-500 mt-1">60 on leave today</p>
+              <p className="text-sm text-red-500 mt-1">60 on leave today</p>
             </div>
             <div className="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center">
               <Calendar className="w-6 h-6 text-yellow-600" />
@@ -327,13 +307,13 @@ const Dashboard = () => {
           </div>
         </div>
 
-        {/* Active Jobs */}
+        {/* Attendance rate ( leave today ) */}
         <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600 mb-1">Active Jobs</p>
+              <p className="text-sm text-gray-600 mb-1">Attendance rate</p>
               <p className="text-3xl font-bold text-gray-900">6</p>
-              <p className="text-sm text-green-600 mt-1">+8 this month</p>
+              <p className="text-sm text-red-600 mt-1">+8 Leave on today</p>
             </div>
             <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center">
               <Briefcase className="w-6 h-6 text-orange-600" />
@@ -341,13 +321,13 @@ const Dashboard = () => {
           </div>
         </div>
 
-        {/* Total Candidates */}
+        {/* Pending Expenses */}
         <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600 mb-1">Total Candidates</p>
+              <p className="text-sm text-gray-600 mb-1">Pending Expenses</p>
               <p className="text-3xl font-bold text-gray-900">20</p>
-              <p className="text-sm text-green-600 mt-1">+20 this month</p>
+              <p className="text-sm text-red-600 mt-1">+20 this month</p>
             </div>
             <div className="w-12 h-12 bg-indigo-100 rounded-lg flex items-center justify-center">
               <UserCheck className="w-6 h-6 text-indigo-600" />
@@ -359,7 +339,7 @@ const Dashboard = () => {
       {/* Charts Section */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <EmployeePerformanceChart />
-        <DepartmentChart />
+        <EmployeeTypeChart />
         <AttendanceTrendChart />
         <LeaveRequestsChart />
       </div>

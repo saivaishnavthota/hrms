@@ -1,8 +1,39 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent } from '@/components/ui/chart';
+import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer } from 'recharts';
 import { User, Trash2, Eye, X, Search, Filter } from 'lucide-react';
 
 const EmployeeAttendance = () => {
   const [attendanceRecords, setAttendanceRecords] = useState([]);
+  const [summaryMonth, setSummaryMonth] = useState(() => new Date().getMonth() + 1);
+  const [summaryYear, setSummaryYear] = useState(() => new Date().getFullYear());
+
+  const summaryFiltered = useMemo(() => {
+    return attendanceRecords.filter((r) => {
+      const d = new Date(r.date);
+      const m = d.getMonth() + 1;
+      const y = d.getFullYear();
+      return m === summaryMonth && y === summaryYear;
+    });
+  }, [attendanceRecords, summaryMonth, summaryYear]);
+
+  const summaryCounts = useMemo(() => {
+    let present = 0, leave = 0, wfh = 0;
+    for (const r of summaryFiltered) {
+      const s = (r.status || '').toLowerCase();
+      if (s.includes('present')) present += 1;
+      else if (s.includes('leave')) leave += 1;
+      else if (s.includes('wfh') || s.includes('work from home')) wfh += 1;
+    }
+    return { present, leave, wfh };
+  }, [summaryFiltered]);
+
+  const summaryData = [
+    { label: 'Present', value: summaryCounts.present, fill: 'var(--color-present)' },
+    { label: 'Leave', value: summaryCounts.leave, fill: 'var(--color-leave)' },
+    { label: 'WFH', value: summaryCounts.wfh, fill: 'var(--color-wfh)' },
+  ];
   const [selectedRecord, setSelectedRecord] = useState(null);
   const [showModal, setShowModal] = useState(false);
   const [showViewModal, setShowViewModal] = useState(false);
@@ -166,6 +197,56 @@ const EmployeeAttendance = () => {
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900">Employee Attendance</h1>
           <p className="text-gray-600 mt-2">View and manage employee attendance records</p>
+        </div>
+
+        {/* Summary Charts (Present / Leave / WFH) */}
+        <div className="mb-6">
+          <Card>
+            <CardHeader className="flex items-center justify-between">
+              <CardTitle>Monthly Summary</CardTitle>
+              <div className="flex gap-2 items-center">
+                <select className="border rounded px-2 py-1" value={summaryMonth} onChange={(e) => setSummaryMonth(Number(e.target.value))}>
+                  {Array.from({ length: 12 }, (_, i) => i + 1).map(m => (
+                    <option key={m} value={m}>{m}</option>
+                  ))}
+                </select>
+                <select className="border rounded px-2 py-1" value={summaryYear} onChange={(e) => setSummaryYear(Number(e.target.value))}>
+                  {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i).map(y => (
+                    <option key={y} value={y}>{y}</option>
+                  ))}
+                </select>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <ChartContainer
+                config={{
+                  present: { label: 'Present', color: '#10b981' },
+                  leave: { label: 'Leave', color: '#ef4444' },
+                  wfh: { label: 'WFH', color: '#3b82f6' },
+                }}
+                className="h-56 w-full"
+              >
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={summaryData}>
+                    <XAxis dataKey="label" tickLine={false} axisLine={false} />
+                    <YAxis allowDecimals={false} />
+                    <ChartTooltip content={<ChartTooltipContent />} />
+                    <ChartLegend content={<ChartLegendContent />} />
+                    <Bar dataKey="value" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </ChartContainer>
+
+              <div className="grid grid-cols-3 gap-4 mt-4">
+                {summaryData.map((d) => (
+                  <div key={d.label} className="rounded-md border p-4 text-center">
+                    <div className="text-sm text-muted-foreground">{d.label}</div>
+                    <div className="mt-2 text-2xl font-semibold">{d.value}</div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
         {/* Attendance Records Table */}

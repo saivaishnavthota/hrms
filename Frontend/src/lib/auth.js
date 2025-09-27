@@ -35,7 +35,19 @@ export const getCurrentUser = () => {
  * @returns {string|null} - User role or null if not authenticated
  */
 export const getUserRole = () => {
-  return localStorage.getItem('userType');
+  // Prefer explicit key set by login flow
+  const direct = localStorage.getItem('userType');
+  if (direct) return direct;
+
+  // Fallback to stored user object (supports legacy keys `role`/`type`)
+  try {
+    const raw = localStorage.getItem('userData');
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return parsed?.type || parsed?.role || null;
+  } catch {
+    return null;
+  }
 };
 
 /**

@@ -56,22 +56,6 @@ export default function ChangePasswordOnboarding() {
     e.preventDefault();
     setMessage('');
 
-    // Basic validation
-    if (!passwordData.newPassword) {
-      setMessage('Please enter a new password');
-      return;
-    }
-
-    if (!passwordData.confirmPassword) {
-      setMessage('Please confirm your new password');
-      return;
-    }
-
-    if (passwordData.newPassword !== passwordData.confirmPassword) {
-      setMessage('New passwords do not match');
-      return;
-    }
-
     setIsSubmitting(true);
 
     try {
@@ -80,8 +64,15 @@ export default function ChangePasswordOnboarding() {
       // Call the appropriate API based on user type
       let response;
       
-      if (user.onboarding_status) {
-        // For onboarded users (employees) - use reset-password endpoint
+      if (user.onboarding_status && !user.login_status) {
+        // Onboarding complete but not yet logged in: no current password required
+        console.log('Using change-password endpoint for onboarding_status=true and login_status=false');
+        response = await authAPI.changePassword(
+          user.email,
+          passwordData.newPassword
+        );
+      } else if (user.onboarding_status) {
+        // Onboarded and has login status: standard reset (backend may still validate)
         console.log('Using reset-password endpoint for onboarded user');
         response = await authAPI.resetPassword({
           email: user.email,
@@ -215,7 +206,6 @@ export default function ChangePasswordOnboarding() {
                   onChange={handleInputChange}
                   placeholder="Enter your new password"
                   className="w-full bg-slate-700/50 border border-slate-600 rounded-xl px-12 py-4 text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-green-500/50 focus:border-green-500/50 transition-all duration-200"
-                  required
                   disabled={isSubmitting}
                 />
                 <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-5 h-5" />
@@ -237,7 +227,6 @@ export default function ChangePasswordOnboarding() {
                   onChange={handleInputChange}
                   placeholder="Confirm your new password"
                   className="w-full bg-slate-700/50 border border-slate-600 rounded-xl px-12 py-4 text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-green-500/50 focus:border-green-500/50 transition-all duration-200"
-                  required
                   disabled={isSubmitting}
                 />
                 <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-5 h-5" />
@@ -250,9 +239,7 @@ export default function ChangePasswordOnboarding() {
                 </button>
               </div>
               
-              {passwordData.confirmPassword && passwordData.newPassword !== passwordData.confirmPassword && (
-                <p className="text-xs text-red-400 mt-1">Passwords do not match</p>
-              )}
+              {/* Removed client-side mismatch validation message */}
             </div>
 
             <div className="flex gap-3">

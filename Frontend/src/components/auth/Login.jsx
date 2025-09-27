@@ -39,9 +39,11 @@ export default function Login() {
       case 'employee':
         return '/employee';
       case 'hr':
-      case 'manager':
-      case 'account manager':
         return '/hr/dashboard';
+      case 'account manager':
+        return '/account-manager';
+      case 'manager':
+        return '/manager';
       default:
         return '/hr/dashboard';
     }
@@ -254,23 +256,6 @@ export default function Login() {
 
   const handleResetPasswordSubmit = async (e) => {
     e.preventDefault();
-    
-    // Validation
-    if (!newPassword) {
-      setResetPasswordMessage('Please enter a new password');
-      return;
-    }
-    
-    if (!confirmPassword) {
-      setResetPasswordMessage('Please confirm your password');
-      return;
-    }
-    
-    if (newPassword !== confirmPassword) {
-      setResetPasswordMessage('Passwords do not match');
-      return;
-    }
-    
     setResetPasswordLoading(true);
     setResetPasswordMessage('');
     

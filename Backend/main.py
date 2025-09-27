@@ -17,21 +17,23 @@ app = FastAPI(lifespan=lifespan)
 origins = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
-    
+    # Include alternate dev ports to avoid CORS during local testing
+    "http://localhost:5174",
+    "http://127.0.0.1:5174",
 ]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,       # Or ["*"] for all origins
+    allow_origins=origins,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type"],
 )
 
 #changed
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
-add_cors_middleware(app)
+# CORS middleware already added above; avoid adding twice
 
 app.include_router(user_routes.router)
 app.include_router(document_routes.router) 

@@ -157,9 +157,16 @@ async def change_password(req: ChangePasswordRequest, session: Session = Depends
     Change password after OTP verification
     """
     try:
+        # Try matching by company_email first (frontend may submit company email),
+        # then fallback to personal email.
         employee = session.exec(
-            select(User).where(User.email == req.email.lower())
+            select(User).where(User.company_email == req.email.lower())
         ).first()
+
+        if not employee:
+            employee = session.exec(
+                select(User).where(User.email == req.email.lower())
+            ).first()
 
         if not employee:
             raise HTTPException(status_code=404, detail="Email not found")
@@ -167,7 +174,9 @@ async def change_password(req: ChangePasswordRequest, session: Session = Depends
         # Optional: you can require otp_verified flag here if you set it in verify_otp
         employee.password_hash = hash_password(req.new_password)
         employee.reset_otp = None
-        employee.reset_otp_expires_at = None
+        # Some deployments may not have an expires_at column; avoid setting non-existent attributes.
+        # Ensure the user can log in after setting the password during onboarding.
+        employee.login_status = True
 
         session.add(employee)
         session.commit()

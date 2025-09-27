@@ -291,23 +291,40 @@ def get_pending_hr_expenses(
     if current_user.role not in ["HR", "Admin"]:
         raise HTTPException(status_code=403, detail="Access denied. HR role required.")
     
-    # Get HR assignments
-    hr_assignments = session.exec(
-        select(EmployeeHR).where(EmployeeHR.hr_id == current_user.id)
-    ).all()
-    
-    employee_ids = [assignment.employee_id for assignment in hr_assignments]
-    
-    # Get expense requests that are manager approved but HR pending
-    query = select(ExpenseRequest, User).join(
-        User, ExpenseRequest.employee_id == User.id
-    ).where(
-        and_(
-            ExpenseRequest.employee_id.in_(employee_ids) if employee_ids else True,
-            ExpenseRequest.manager_status == "Approved",
-            ExpenseRequest.hr_status == "Pending"
+    # Build employee set for this HR from both sources: EmployeeMaster and EmployeeHR
+    employee_ids_master = session.exec(
+        select(EmployeeMaster.emp_id).where(
+            or_(
+                EmployeeMaster.hr1_id == current_user.id,
+                EmployeeMaster.hr2_id == current_user.id
+            )
         )
-    )
+    ).all()
+
+    employee_ids_assign = session.exec(
+        select(EmployeeHR.employee_id).where(EmployeeHR.hr_id == current_user.id)
+    ).all()
+
+    employee_ids = list(set(employee_ids_master + employee_ids_assign))
+
+    # Get expense requests that are manager approved but HR pending for these employees
+    base_filters = [
+        ExpenseRequest.manager_status == "Approved",
+        ExpenseRequest.hr_status == "Pending"
+    ]
+
+    # Admin can view all pending HR expenses; HR only for their mapped employees
+    if current_user.role == "Admin":
+        query = select(ExpenseRequest, User).join(
+            User, ExpenseRequest.employee_id == User.id
+        ).where(and_(*base_filters))
+    else:
+        # If HR has no mapped employees, return empty list early
+        if not employee_ids:
+            return []
+        query = select(ExpenseRequest, User).join(
+            User, ExpenseRequest.employee_id == User.id
+        ).where(and_(ExpenseRequest.employee_id.in_(employee_ids), *base_filters))
     
     if year:
         query = query.where(extract('year', ExpenseRequest.expense_date) == year)

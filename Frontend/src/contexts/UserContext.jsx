@@ -134,9 +134,11 @@ export const UserProvider = ({ children }) => {
       case 'employee':
         return '/employee';
       case 'hr':
-      case 'manager':
-      case 'account manager':
         return '/hr/dashboard';
+      case 'account manager':
+        return '/account-manager';
+      case 'manager':
+        return '/manager';
       default:
         return '/hr/dashboard';
     }

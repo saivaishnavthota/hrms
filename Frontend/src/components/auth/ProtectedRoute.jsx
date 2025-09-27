@@ -11,9 +11,11 @@ const ProtectedRoute = ({ children, allowedRoles = [] }) => {
   }
   
   const userRole = getUserRole();
-  
-  // If specific roles are required, check if user has the right role
-  if (allowedRoles.length > 0 && !allowedRoles.includes(userRole)) {
+  const normalizedAllowed = allowedRoles.map(r => r.toLowerCase());
+  const normalizedUserRole = (userRole || '').toLowerCase();
+
+  // If specific roles are required, check if user has the right role (case-insensitive)
+  if (normalizedAllowed.length > 0 && !normalizedAllowed.includes(normalizedUserRole)) {
     // Redirect to appropriate dashboard based on user role
     const redirectPath = getRedirectPath(userRole);
     return <Navigate to={redirectPath} replace />;

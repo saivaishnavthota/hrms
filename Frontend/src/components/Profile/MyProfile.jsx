@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '@/lib/api';
 import { 
   User, 
   Mail, 
@@ -36,9 +36,14 @@ const MyProfile = () => {
       setError(null);
       
       // Use employeeId from UserContext if available, otherwise fallback to localStorage
-      const employeeId = user?.employeeId || localStorage.getItem('userId') || 50;
-      
-      const response = await axios.get(`http://localhost:8000/users/${employeeId}`);
+      const employeeId = user?.employeeId || JSON.parse(localStorage.getItem('userData'))?.employeeId;
+      if (!employeeId) {
+        setError('Missing employee ID. Please re-login.');
+        setLoading(false);
+        return;
+      }
+
+      const response = await api.get(`/users/${employeeId}`);
       setProfileData(response.data);
     } catch (error) {
       console.error('Error fetching employee profile:', error);

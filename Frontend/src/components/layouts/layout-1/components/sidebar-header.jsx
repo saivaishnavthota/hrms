@@ -14,7 +14,7 @@ export function SidebarHeader() {
 
   return (
     <div className="sidebar-header hidden lg:flex items-center relative justify-between px-3 lg:px-6 shrink-0">
-      <Link to="/layout-1">
+      <Link to="/hr/dashboard">
         <div className="dark:hidden flex items-center gap-2">
           <img
             src={toAbsoluteUrl('/media/app/Nxzen.png')}

@@ -8,6 +8,13 @@ from models.user_model import User
 from database import get_session
 from typing import Annotated, Literal
 from functools import wraps
+import json
+
+# Optional session store (used for candidate logins)
+try:
+    from utils.redis_client import redis_client
+except Exception:
+    redis_client = None
 
 SECRET_KEY = "super-secret-key"
 ALGORITHM = "HS256"
@@ -43,37 +50,75 @@ def verify_token(token: str):
     except JWTError:
         return None
     
-#changed
 def get_current_user(request: Request, db: Session = Depends(get_session)):
-    token = request.headers.get("Authorization")
-    if not token:
+    """Resolve current user from Authorization header.
+
+    Supports both:
+    - Plain JWTs with `sub` (onboarded employees)
+    - Session-based JWTs with `session_id` (candidates)
+
+    Returns a `User` ORM instance for downstream route logic.
+    """
+    auth_header = request.headers.get("Authorization")
+    if not auth_header:
         raise HTTPException(status_code=401, detail="Missing token")
+
+    # Accept both raw token and `Bearer <token>` formats
+    token = auth_header.strip()
+    if token.lower().startswith("bearer "):
+        token = token[7:].strip()
 
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        session_id: str = payload.get("session_id")
-        if not session_id:
-            raise HTTPException(status_code=401, detail="Invalid token")
+    except JWTError:
+        raise HTTPException(status_code=403, detail="Invalid or expired token")
 
-        # ✅ Check Redis
-        data = redis_client.get(session_id)
-        if data:
-            return json.loads(data)
+    # Candidate/session-based tokens carry `session_id`
+    session_id: str | None = payload.get("session_id")
+    if session_id:
+        # Try Redis first if available
+        if redis_client:
+            try:
+                data = redis_client.get(session_id)
+                if data:
+                    parsed = json.loads(data)
+                    user_id = parsed.get("user_id")
+                    user = db.get(User, user_id) if user_id else None
+                    if user:
+                        return user
+            except Exception:
+                # Ignore Redis errors and fallback to DB
+                pass
 
-        # 🔄 Fallback DB check
+        # Fallback to DB sessions table
         result = db.exec(
-            """SELECT user_id, role, user_type, expires_at, is_active
-               FROM sessions WHERE session_id = :sid""",
+            """
+            SELECT user_id, role, user_type, expires_at, is_active
+            FROM sessions WHERE session_id = :sid
+            """,
             {"sid": session_id}
         ).first()
 
         if not result or result.expires_at < datetime.utcnow() or not result.is_active:
             raise HTTPException(status_code=401, detail="Invalid or expired session")
 
-        return {"user_id": result.user_id, "role": result.role, "user_type": result.user_type}
+        user = db.get(User, result.user_id)
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+        return user
 
-    except JWTError:
-        raise HTTPException(status_code=403, detail="Invalid or expired token")
+    # Employee tokens carry `sub` (email)
+    email = payload.get("sub")
+    if not email:
+        raise HTTPException(status_code=401, detail="Invalid token: missing subject")
+
+    user = db.exec(select(User).where(User.company_email == email)).first()
+    if not user:
+        # Fallback to personal email if needed
+        user = db.exec(select(User).where(User.email == email)).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    return user
 
 
 

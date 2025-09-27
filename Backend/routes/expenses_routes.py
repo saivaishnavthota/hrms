@@ -289,13 +289,26 @@ def list_hr_expenses(
     month: int = Query(..., description="Month of expenses"),
     session: Session = Depends(get_session),
 ):
-    # employees under this HR
-    employee_links = session.exec(
+    # employees under this HR from EmployeeMaster (hr1_id/hr2_id)
+    employee_links_master = session.exec(
         select(EmployeeMaster.emp_id).where(
             (EmployeeMaster.hr1_id == hr_id) |
             (EmployeeMaster.hr2_id == hr_id)
         )
     ).all()
+
+    # employees under this HR from EmployeeHR (assignment table)
+    employee_links_assign = session.exec(
+        select(EmployeeHR.employee_id).where(
+            EmployeeHR.hr_id == hr_id
+        )
+    ).all()
+
+    # normalize potential tuple results and de-dupe
+    def _normalize(ids):
+        return [i[0] if isinstance(i, tuple) else i for i in ids]
+
+    employee_links = list(set(_normalize(employee_links_master) + _normalize(employee_links_assign)))
 
     if not employee_links:
         return []
@@ -311,8 +324,8 @@ def list_hr_expenses(
                 "approved",
                 "carried_forward"
             ]),
-            extract("year", ExpenseRequest.created_at) == year,
-            extract("month", ExpenseRequest.created_at) == month
+            extract("year", ExpenseRequest.expense_date) == year,
+            extract("month", ExpenseRequest.expense_date) == month
         )
         .order_by(ExpenseRequest.created_at.desc())
     ).all()

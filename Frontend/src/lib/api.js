@@ -49,12 +49,12 @@ api.interceptors.response.use(
 export const authAPI = {
   // POST /users/login - User authentication/login
   login: async (credentials) => {
-    // Backend expects OAuth2PasswordRequestForm (form data)
-    const formData = new FormData();
-    formData.append('username', credentials.email);
-    formData.append('password', credentials.password);
-    
-    const response = await api.post('/users/login', formData, {
+    // Backend expects OAuth2PasswordRequestForm (x-www-form-urlencoded)
+    const form = new URLSearchParams();
+    form.append('username', credentials.email.trim());
+    form.append('password', credentials.password);
+
+    const response = await api.post('/users/login', form, {
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
       },

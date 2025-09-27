@@ -36,27 +36,6 @@ const SetPassword = () => {
     e.preventDefault();
     setMessage('');
 
-    // Basic validation
-    if (!passwordData.currentPassword) {
-      setMessage('Please enter your current password');
-      return;
-    }
-
-    if (!passwordData.newPassword) {
-      setMessage('Please enter a new password');
-      return;
-    }
-
-    if (!passwordData.confirmPassword) {
-      setMessage('Please confirm your new password');
-      return;
-    }
-
-    if (passwordData.newPassword !== passwordData.confirmPassword) {
-      setMessage('New passwords do not match');
-      return;
-    }
-
     setIsSubmitting(true);
 
     try {
@@ -123,7 +102,6 @@ const SetPassword = () => {
                 onChange={handleInputChange}
                 placeholder="Enter your current password"
                 className="w-full px-3 py-2 pr-10 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                required
               />
               <button
                 type="button"
@@ -149,7 +127,6 @@ const SetPassword = () => {
                 onChange={handleInputChange}
                 placeholder="Enter your new password"
                 className="w-full px-3 py-2 pr-10 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                required
               />
               <button
                 type="button"
@@ -175,7 +152,6 @@ const SetPassword = () => {
                 onChange={handleInputChange}
                 placeholder="Confirm your new password"
                 className="w-full px-3 py-2 pr-10 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                required
               />
               <button
                 type="button"

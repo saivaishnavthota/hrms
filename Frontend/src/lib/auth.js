@@ -72,13 +72,16 @@ export const logout = () => {
  * @returns {string} - Redirect path
  */
 export const getRedirectPath = (userType) => {
-  switch (userType) {
-    case 'Employee':
+  const role = (userType || '').toLowerCase();
+  switch (role) {
+    case 'employee':
       return '/employee';
-    case 'Hr':
-        return '/hr/dashboard';
-    case 'Manager':
+    case 'hr':
       return '/hr/dashboard';
+    case 'account manager':
+      return '/account-manager';
+    case 'manager':
+      return '/manager';
     default:
       return '/login';
   }

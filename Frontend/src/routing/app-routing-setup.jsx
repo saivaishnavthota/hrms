@@ -3,6 +3,8 @@ import { Navigate, Route, Routes } from 'react-router';
 import { Layout1 } from '@/components/layouts/layout-1';
 // Employee layout now uses Layout1 with employee-specific menu
 import { MENU_SIDEBAR_EMPLOYEE } from '@/config/employee-layout.config';
+import { MENU_SIDEBAR_MANAGER } from '@/config/manager-layout.config';
+import { MENU_SIDEBAR_ACCOUNT_MANAGER } from '@/config/account-manager-layout.config';
 import EmployeeManagement from '@/components/HR/EmployeeManagement';
 import Dashboard from '@/components/HR/Dashboard';
 import ChangePassword from '@/components/HR/ChangePassword';
@@ -29,6 +31,14 @@ import ApplyLeave from '@/components/Employee/ApplyLeave';
 import SubmitExpense from '@/components/Employee/SubmitExpense';
 import UploadDocuments from '@/components/Employee/UploadDocuments';
 import SetPassword from '@/components/Employee/SetPassword';
+// Manager components
+import AccountManagerDashboard from '@/components/AccountManager/Dashboard';
+import ManagerEmployees from '@/components/Manager/Employees';
+import ManagerLeaveRequests from '@/components/Manager/LeaveRequests';
+import AccountManagerExpenseManagement from '@/components/AccountManager/ExpenseManagement';
+import Projects from '@/components/AccountManager/Projects';
+import ManagerDashboard from '@/components/Manager/Dashboard';
+import ManagerExpenseManagement from '@/components/Manager/ExpenseManagement';
 
 
 export const AppRoutingSetup = () => {
@@ -36,13 +46,12 @@ export const AppRoutingSetup = () => {
     <Routes>
       {/* Public routes */}
       <Route path="/login" element={<Login />} />
-      <Route path="/change-password" element={<ChangePasswordOnboarding />} />
       <Route path="/change-password-onboarding" element={<ChangePasswordOnboarding />} />
       <Route path="/new-user-details" element={<NewUserDetails />} />
       <Route path="/upload-documents" element={<NewUserUploadDocs />} />
       
       {/* Protected HR routes */}
-      <Route path="/hr" element={<ProtectedRoute><Layout1 /></ProtectedRoute>}>
+      <Route path="/hr" element={<ProtectedRoute allowedRoles={["Hr"]}><Layout1 /></ProtectedRoute>}>
         <Route index element={<Dashboard />} />
         <Route path="dashboard" element={<Dashboard />} />
         <Route path="employee-management" element={<EmployeeManagement />} />
@@ -52,7 +61,7 @@ export const AppRoutingSetup = () => {
         <Route path="document-collection" element={<DocumentCollection />} />
         <Route path="pending-requests" element={<PendingRequests />} />
         <Route path="view-leave-application" element={<ViewLeaveApplication />} />
-         <Route path="change-password-onboarding" element={<ChangePasswordOnboarding />} />
+         <Route path="reset-password" element={< ChangePassword/>} />
         <Route path="leave-requests" element={<LeaveRequests />} />
         <Route path="assign-leaves" element={<AssignLeaves />} />
         <Route path="add-attendance" element={<AddAttendance />} />
@@ -61,7 +70,7 @@ export const AppRoutingSetup = () => {
       </Route>
       
       {/* Protected Employee routes using Layout1 with employee menu */}
-      <Route path="/employee" element={<ProtectedRoute><Layout1 menu={MENU_SIDEBAR_EMPLOYEE} /></ProtectedRoute>}>
+      <Route path="/employee" element={<ProtectedRoute allowedRoles={["Employee"]}><Layout1 menu={MENU_SIDEBAR_EMPLOYEE} /></ProtectedRoute>}>
         <Route index element={<EmployeePage />} />
         <Route path="add-attendance" element={<EmployeeAddAttendance />} />
         <Route path="apply-leave" element={<ApplyLeave />} />
@@ -73,6 +82,28 @@ export const AppRoutingSetup = () => {
       {/* Layout-1 route */}
       <Route path="/layout-1" element={<ProtectedRoute><Layout1Page /></ProtectedRoute>} />
       
+      {/* Protected Manager routes using Layout1 with manager menu */}
+      <Route path="/manager" element={<ProtectedRoute allowedRoles={["Manager"]}><Layout1 menu={MENU_SIDEBAR_MANAGER} /></ProtectedRoute>}>
+        <Route index element={<ManagerDashboard />} />
+        <Route path="dashboard" element={<ManagerDashboard />} />
+        <Route path="add-attendance" element={<EmployeeAddAttendance />} />
+        <Route path="employees-attendance" element={<EmployeeAttendance />} />
+        <Route path="employees" element={<ManagerEmployees />} />
+        <Route path="apply-leave" element={<ApplyLeave />} />
+        <Route path="leave-requests" element={<ManagerLeaveRequests />} />
+        <Route path="expense-management" element={<ManagerExpenseManagement />} />
+        <Route path="change-password" element={<SetPassword />} />
+      </Route>
+
+      {/* Protected Account Manager routes using Layout1 with account manager menu */}
+      <Route path="/account-manager" element={<ProtectedRoute allowedRoles={["Account Manager"]}><Layout1 menu={MENU_SIDEBAR_ACCOUNT_MANAGER} /></ProtectedRoute>}>
+        <Route index element={<AccountManagerDashboard />} />
+        <Route path="dashboard" element={<AccountManagerDashboard />} />
+        <Route path="expense-management" element={<AccountManagerExpenseManagement />} />
+        <Route path="projects" element={<Projects />} />
+        <Route path="change-password" element={<SetPassword />} />
+      </Route>
+
       {/* My Profile route */}
       <Route path="/my-profile" element={<ProtectedRoute><MyProfile /></ProtectedRoute>} />
       

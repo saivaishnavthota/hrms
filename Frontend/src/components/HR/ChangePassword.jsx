@@ -15,7 +15,6 @@ const ChangePassword = () => {
     confirm: false
   });
   
-  const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleInputChange = (e) => {
@@ -24,14 +23,6 @@ const ChangePassword = () => {
       ...prev,
       [name]: value
     }));
-    
-    // Clear error when user starts typing
-    if (errors[name]) {
-      setErrors(prev => ({
-        ...prev,
-        [name]: ''
-      }));
-    }
   };
 
   const togglePasswordVisibility = (field) => {
@@ -41,39 +32,11 @@ const ChangePassword = () => {
     }));
   };
 
-  const validateForm = () => {
-    const newErrors = {};
-
-    if (!formData.currentPassword) {
-      newErrors.currentPassword = 'Current password is required';
-    }
-
-    if (!formData.newPassword) {
-      newErrors.newPassword = 'New password is required';
-    } else if (formData.newPassword.length < 8) {
-      newErrors.newPassword = 'New password must be at least 8 characters long';
-    }
-
-    if (!formData.confirmPassword) {
-      newErrors.confirmPassword = 'Please confirm your new password';
-    } else if (formData.newPassword !== formData.confirmPassword) {
-      newErrors.confirmPassword = 'Passwords do not match';
-    }
-
-    if (formData.currentPassword === formData.newPassword) {
-      newErrors.newPassword = 'New password must be different from current password';
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
+  // Removed client-side validation logic
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
-    if (!validateForm()) {
-      return;
-    }
+    // Skip client-side validations; submit directly
 
     setIsSubmitting(true);
     
@@ -128,9 +91,7 @@ const ChangePassword = () => {
                   name="currentPassword"
                   value={formData.currentPassword}
                   onChange={handleInputChange}
-                  className={`block w-full pl-9 pr-10 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                    errors.currentPassword ? 'border-red-300' : 'border-gray-300'
-                  }`}
+                  className={`block w-full pl-9 pr-10 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 border-gray-300`}
                   placeholder="Enter your current password"
                 />
                 <button
@@ -145,9 +106,7 @@ const ChangePassword = () => {
                   )}
                 </button>
               </div>
-              {errors.currentPassword && (
-                <p className="mt-1 text-xs text-red-600">{errors.currentPassword}</p>
-              )}
+              {/* Removed client-side error message */}
             </div>
 
             {/* New Password */}
@@ -165,9 +124,7 @@ const ChangePassword = () => {
                   name="newPassword"
                   value={formData.newPassword}
                   onChange={handleInputChange}
-                  className={`block w-full pl-9 pr-10 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                    errors.newPassword ? 'border-red-300' : 'border-gray-300'
-                  }`}
+                  className={`block w-full pl-9 pr-10 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 border-gray-300`}
                   placeholder="Enter your new password"
                 />
                 <button
@@ -182,12 +139,7 @@ const ChangePassword = () => {
                   )}
                 </button>
               </div>
-              {errors.newPassword && (
-                <p className="mt-1 text-xs text-red-600">{errors.newPassword}</p>
-              )}
-              <p className="mt-1 text-xs text-gray-500">
-                Password must be at least 8 characters long
-              </p>
+              {/* Removed client-side error and hint text */}
             </div>
 
             {/* Confirm Password */}
@@ -205,9 +157,7 @@ const ChangePassword = () => {
                   name="confirmPassword"
                   value={formData.confirmPassword}
                   onChange={handleInputChange}
-                  className={`block w-full pl-9 pr-10 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                    errors.confirmPassword ? 'border-red-300' : 'border-gray-300'
-                  }`}
+                  className={`block w-full pl-9 pr-10 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 border-gray-300`}
                   placeholder="Confirm your new password"
                 />
                 <button
@@ -222,9 +172,7 @@ const ChangePassword = () => {
                   )}
                 </button>
               </div>
-              {errors.confirmPassword && (
-                <p className="mt-1 text-xs text-red-600">{errors.confirmPassword}</p>
-              )}
+              {/* Removed client-side error message */}
             </div>
 
             {/* Submit Button */}

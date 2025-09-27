@@ -279,6 +279,147 @@ PUT    /leave/leave-balance/{employee_id}
        - Returns updated balance information
 
 ======================================================================
+💸 EXPENSE MANAGEMENT APIs (/expenses)
+======================================================================
+
+POST   /expenses/submit-exp
+       - Submits a new expense request
+       - Multipart form fields: employee_id, category, amount, currency,
+         description (optional), expense_date (YYYY-MM-DD), tax_included (bool),
+         file (optional UploadFile)
+       - Returns created request with request_id, request_code, status, attachments
+
+GET    /expenses/my-expenses
+       - Gets expenses for a specific employee
+       - Query params: employee_id (required), year (optional), month (optional)
+       - Returns list with attachments and history entries
+
+GET    /expenses/mgr-exp-list
+       - Manager view: expenses for assigned employees
+       - Query params: manager_id, year, month
+       - Statuses included: pending_manager_approval, pending_hr_approval,
+         mgr_rejected, approved
+
+PUT    /expenses/mgr-upd-status/{request_id}
+       - Manager approves or rejects an expense
+       - Multipart form fields: manager_id, status ("Pending" | "Approved" | "Rejected"),
+         reason (optional)
+       - Status mapping:
+         - "Pending"  → pending_manager_approval
+         - "Approved" → pending_hr_approval
+         - "Rejected" → mgr_rejected
+       - Returns: message, request_id, new_status
+
+GET    /expenses/hr-exp-list
+       - HR view: expenses for employees assigned to this HR
+       - Query params: hr_id, year, month
+       - Statuses included: pending_hr_approval, pending_account_mgr_approval,
+         hr_rejected, approved, carried_forward
+
+PUT    /expenses/hr-upd-status/{request_id}
+       - HR approves or rejects an expense
+       - Multipart form fields: hr_id, status ("Pending" | "Approved" | "Rejected"),
+         reason (optional)
+       - Status mapping:
+         - "Pending"  → pending_hr_approval
+         - "Approved" → pending_account_mgr_approval
+         - "Rejected" → hr_rejected
+       - Returns: message, request_id, new_status
+
+GET    /expenses/acc-mgr-exp-list
+       - Account Manager view: expenses for employees at same location
+       - Query params: acc_mgr_id, year, month
+       - Statuses included: pending_account_mgr_approval, approved, acc_mgr_rejected
+
+PUT    /expenses/acc-mgr-upd-status/{request_id}
+       - Account Manager approves or rejects an expense
+       - Multipart form fields: acc_mgr_id, status ("Pending" | "Approved" | "Rejected"),
+         reason (optional)
+       - Status mapping:
+         - "Pending"  → pending_account_mgr_approval
+         - "Approved" → approved
+         - "Rejected" → acc_mgr_rejected
+       - Returns: message, request_id, new_status
+
+Notes:
+- Attachment URLs in responses use Base URL: http://127.0.0.1:8000
+- History entries record action_by, action_role, action, and reason
+
+======================================================================
+🧾 EXPENSE MANAGEMENT (Unified) APIs (/expense-management)
+======================================================================
+
+POST   /expense-management/submit
+       - Submits a new expense request (Employee)
+       - Multipart form fields:
+         - category (string)
+         - amount (float)
+         - currency (string)
+         - description (string, optional)
+         - expense_date (YYYY-MM-DD)
+         - tax_included (bool, default false)
+         - file (UploadFile, optional; single attachment)
+       - Returns created request with request_id, request_code, status,
+         manager_status, hr_status, account_manager_status, attachments
+       - Attachment public URL uses Base URL: http://127.0.0.1:8000
+
+GET    /expense-management/my-expenses
+       - Gets current authenticated user's expense requests
+       - Optional query params: year, month, status
+       - Returns list with attachment metadata
+
+GET    /expense-management/pending-manager
+       - Manager view: expenses pending manager action for assigned employees
+       - Optional query params: year, month
+       - Returns list with current statuses and attachments
+
+PUT    /expense-management/manager-approval/{request_id}
+       - Manager approves or rejects an expense
+       - JSON body: { action: "Approved" | "Rejected", reason?: string }
+       - Updates manager_status; if Rejected, sets final status to "Rejected"
+       - Records history with action_by, action, reason
+
+GET    /expense-management/pending-hr
+       - HR view: expenses pending HR action (after manager approval)
+       - Optional query params: year, month
+       - Returns list with current statuses and attachments
+
+PUT    /expense-management/hr-approval/{request_id}
+       - HR approves or rejects an expense
+       - Role required: HR or Admin
+       - JSON body: { action: "Approved" | "Rejected", reason?: string }
+       - Updates hr_status; if Approved, sets status to
+         "Pending Account Manager Approval"
+
+GET    /expense-management/all-expenses
+       - HR/Admin view: all expenses with filters
+       - Optional query params: status, employee_id, category, year, month
+       - Returns list with attachment metadata
+
+GET    /expense-management/{request_id}
+       - Gets a single expense request by ID
+       - Returns full details including attachment info
+
+DELETE /expense-management/{request_id}
+       - Cancels an expense request (owner only)
+       - Returns success message on deletion
+
+GET    /expense-management/categories/list
+       - Lists available expense categories
+
+GET    /expense-management/statistics/summary
+       - Returns summary statistics for expenses
+       - Optional query params: year, month
+
+Notes:
+- This module returns attachment URLs relative to Base URL: http://127.0.0.1:8000
+- Status fields:
+  - manager_status and hr_status are "Approved" | "Rejected" strings
+  - overall status transitions include "Rejected" and
+    "Pending Account Manager Approval" after HR approval
+- Every approval action appends an entry in history: action_by, action, reason
+
+======================================================================
 🔧 ADDITIONAL ENDPOINTS
 ======================================================================
 

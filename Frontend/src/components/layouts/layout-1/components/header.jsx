@@ -18,7 +18,7 @@ import { UserDropdownMenu } from '@/components/layouts/layout-1/shared/topbar/us
 // Removed MegaMenu and MegaMenuMobile imports as they are no longer used
 import { SidebarMenu } from './sidebar-menu';
 
-export function Header() {
+export function Header({ menu }) {
   const [isSidebarSheetOpen, setIsSidebarSheetOpen] = useState(false);
 
   const { pathname } = useLocation();
@@ -68,7 +68,7 @@ export function Header() {
                 >
                   <SheetHeader className="p-0 space-y-0" />
                   <SheetBody className="p-0 overflow-y-auto">
-                    <SidebarMenu />
+                    <SidebarMenu menu={menu} />
                   </SheetBody>
                 </SheetContent>
               </Sheet>

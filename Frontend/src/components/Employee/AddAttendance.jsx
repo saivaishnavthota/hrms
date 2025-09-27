@@ -1,7 +1,22 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '@/lib/api';
 import { Calendar, Clock, Plus, X, Save, ChevronLeft, ChevronRight, Trash2, Edit3, Search, Filter, Eye, Briefcase } from 'lucide-react';
 import { useUser } from '../../contexts/UserContext';
+
+// Local date helpers to avoid UTC offsets
+const formatDateLocal = (date) => {
+  const d = new Date(date);
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const parseDateLocal = (dateStr) => {
+  if (!dateStr) return new Date(NaN);
+  const [year, month, day] = dateStr.split('-').map(Number);
+  return new Date(year, (month || 1) - 1, day || 1);
+};
 
 const AddAttendance = () => {
   const { user } = useUser();
@@ -15,6 +30,7 @@ const AddAttendance = () => {
   const [selectedRowIndex, setSelectedRowIndex] = useState(null);
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
+  const [weekOffDays, setWeekOffDays] = useState([]);
   
   // Filter states for daily attendance
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
@@ -48,18 +64,19 @@ const AddAttendance = () => {
     const initialData = {};
     
     weekDates.forEach((date, index) => {
-      const dateStr = date.toISOString().split('T')[0];
+      const dateStr = formatDateLocal(date);
       initialData[index] = {
         date: dateStr,
         day: date.toLocaleDateString('en-US', { weekday: 'long' }),
         status: '',
         hours: 0,
-        projects: []
+        projects: [],
+        submitted: false
       };
     });
     
     setAttendanceData(initialData);
-    fetchWeeklyAttendance(weekDates[0], weekDates[6]);
+    fetchWeeklyAttendance();
   }, [currentWeek]);
 
   // Fetch projects from backend
@@ -87,20 +104,17 @@ const AddAttendance = () => {
     
     // Filter by month and year
     filtered = filtered.filter(record => {
-      const recordDate = new Date(record.date);
+      const recordDate = parseDateLocal(record.date);
       return recordDate.getMonth() === selectedMonth && recordDate.getFullYear() === selectedYear;
     });
     
     // Filter by search date if provided
     if (searchDate) {
-      filtered = filtered.filter(record => {
-        const recordDate = new Date(record.date).toISOString().split('T')[0];
-        return recordDate.includes(searchDate);
-      });
+      filtered = filtered.filter(record => record.date === searchDate);
     }
     
     // Sort by date (newest first)
-    filtered.sort((a, b) => new Date(b.date) - new Date(a.date));
+    filtered.sort((a, b) => parseDateLocal(b.date) - parseDateLocal(a.date));
     
     setFilteredDailyAttendance(filtered);
   };
@@ -117,7 +131,7 @@ const AddAttendance = () => {
       const year = selectedYear || currentDate.getFullYear();
       const month = selectedMonth || (currentDate.getMonth() + 1);
       
-      const response = await axios.get('http://localhost:8000/attendance/daily', {
+      const response = await api.get('/attendance/daily', {
         params: { 
           employee_id: user.employeeId,
           year: year,
@@ -165,7 +179,7 @@ const AddAttendance = () => {
         return;
       }
       
-      const response = await axios.get('http://localhost:8000/attendance/active-projects', {
+      const response = await api.get('/attendance/active-projects', {
         params: { employee_id: user.employeeId }
       });
       setProjects(response.data || []);
@@ -176,33 +190,50 @@ const AddAttendance = () => {
   };
 
   // Fetch weekly attendance from backend
-  const fetchWeeklyAttendance = async (startDate, endDate) => {
+  const fetchWeeklyAttendance = async () => {
     try {
       if (!user?.employeeId) return;
       
       setLoading(true);
-      const response = await axios.get('http://localhost:8000/attendance/weekly', {
+      const weekDates = getWeekDates(currentWeek);
+      const baseData = {};
+      weekDates.forEach((date, index) => {
+        const dateStr = formatDateLocal(date);
+        baseData[index] = {
+          date: dateStr,
+          day: date.toLocaleDateString('en-US', { weekday: 'long' }),
+          status: '',
+          hours: 0,
+          projects: [],
+          submitted: false
+        };
+      });
+
+      const response = await api.get('/attendance/weekly', {
         params: { employee_id: user.employeeId }
       });
       
       if (response.data) {
-        const updatedData = { ...attendanceData };
+        const updatedData = { ...baseData };
         Object.keys(response.data).forEach(dateStr => {
           const attendance = response.data[dateStr];
           const rowIndex = Object.keys(updatedData).find(key => 
             updatedData[key].date === dateStr
           );
           
-          if (rowIndex) {
+          if (rowIndex !== undefined) {
             updatedData[rowIndex] = {
               ...updatedData[rowIndex],
               status: attendance.action,
               hours: attendance.hours,
-              projects: attendance.projects || []
+              projects: attendance.projects || [],
+              submitted: true
             };
           }
         });
         setAttendanceData(updatedData);
+      } else {
+        setAttendanceData(baseData);
       }
     } catch (error) {
       console.error('Error fetching weekly attendance:', error);
@@ -268,6 +299,49 @@ const AddAttendance = () => {
     setCurrentWeek(newDate);
   };
 
+  const toggleWeekOff = (day) => {
+    setWeekOffDays(prev => {
+      if (prev.includes(day)) {
+        return prev.filter(d => d !== day);
+      }
+      if (prev.length >= 2) {
+        setMessage("You can select up to 2 week-off days");
+        setTimeout(() => setMessage(''), 2500);
+        return prev;
+      }
+      return [...prev, day];
+    });
+  };
+
+  const submitWeekOffs = async () => {
+    try {
+      if (!user?.employeeId) {
+        setMessage('Employee ID not found');
+        return;
+      }
+
+      const week_start = formatDateLocal(weekDates[0]);
+      const week_end = formatDateLocal(weekDates[6]);
+
+      const payload = {
+        employee_id: user.employeeId,
+        week_start,
+        week_end,
+        off_days: weekOffDays
+      };
+
+      setLoading(true);
+      await api.post('/weekoffs/', payload);
+      setMessage('Week-off saved successfully');
+      setTimeout(() => setMessage(''), 3000);
+    } catch (error) {
+      console.error('Error saving week-offs:', error);
+      setMessage('Error saving week-offs');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const submitAttendance = async () => {
     try {
       if (!user?.employeeId) {
@@ -279,21 +353,25 @@ const AddAttendance = () => {
       const dataToSubmit = {};
       
       Object.values(attendanceData).forEach(row => {
-        if (row.status && row.projects.length > 0) {
-          const projectIds = row.projects.map(p => p.project_id).filter(Boolean);
-          const subTasks = row.projects.map(p => p.subtasks || []).flat();
-          
+        // Include any row where the user provided status, hours, or projects
+        if (row.status || (row.hours && row.hours > 0) || row.projects.length > 0) {
+          const project_ids = row.projects
+            .map(p => (p.projectId ? parseInt(p.projectId, 10) : null))
+            .filter(id => Number.isInteger(id));
+          const sub_tasks = row.projects.map(p => p.subtasks || []).flat();
+
+          // Conform to backend AttendanceCreate schema
           dataToSubmit[row.date] = {
             date: row.date,
-            action: row.status,
-            hours: row.hours,
-            project_ids: projectIds,
-            sub_tasks: subTasks
+            action: row.status || '',
+            hours: row.hours || 0,
+            project_ids: project_ids,
+            sub_tasks: sub_tasks
           };
         }
       });
 
-      const response = await axios.post('http://localhost:8000/attendance/', dataToSubmit, {
+      const response = await api.post('/attendance/', dataToSubmit, {
         params: { employee_id: user.employeeId }
       });
 
@@ -302,8 +380,7 @@ const AddAttendance = () => {
         setTimeout(() => setMessage(''), 3000);
         
         // Don't clear the attendance data, just refresh from backend
-        const weekDates = getWeekDates(currentWeek);
-        fetchWeeklyAttendance(weekDates[0], weekDates[6]);
+        fetchWeeklyAttendance();
         
         // Update daily attendance tab
         await fetchDailyAttendance();
@@ -532,6 +609,39 @@ const AddAttendance = () => {
                 </button>
               </div>
 
+              {/* Week-off Selection */}
+              <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-4">
+                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                  <div className="md:w-1/4">
+                    <h4 className="text-md font-semibold text-gray-800">Select your week-off's</h4>
+                    <p className="text-xs text-gray-500 mt-1">Choose up to 2 days</p>
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex flex-wrap gap-3">
+                      {['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'].map((day) => (
+                        <label key={day} className="inline-flex items-center gap-2 px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-sm cursor-pointer select-none">
+                          <input
+                            type="checkbox"
+                            checked={weekOffDays.includes(day)}
+                            onChange={() => toggleWeekOff(day)}
+                          />
+                          <span className="text-gray-800">{day}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="md:w-1/4 flex md:justify-end">
+                    <button
+                      onClick={submitWeekOffs}
+                      disabled={loading || weekOffDays.length === 0}
+                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+                    >
+                      Save Week-Offs
+                    </button>
+                  </div>
+                </div>
+              </div>
+
               {/* Attendance Table */}
               <div className="bg-white rounded-xl shadow-lg overflow-hidden border border-gray-200">
                 <div className="overflow-x-auto">
@@ -541,8 +651,11 @@ const AddAttendance = () => {
                         <th className="px-4 py-4 text-left font-semibold">Day</th>
                         <th className="px-4 py-4 text-left font-semibold">Date</th>
                         <th className="px-4 py-4 text-left font-semibold">Status</th>
+                        <th className="px-4 py-4 text-left font-semibold">Action</th>
                         <th className="px-4 py-4 text-left font-semibold">Hours</th>
                         <th className="px-4 py-4 text-left font-semibold">Projects & Subtasks</th>
+                        <th className="px-4 py-4 text-left font-semibold">Actions</th>
+                        <th className="px-4 py-4 text-left font-semibold">Details</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-200">
@@ -566,6 +679,26 @@ const AddAttendance = () => {
                               <option value="Leave">Leave</option>
                               <option value="WFH">Work From Home</option>
                             </select>
+                          </td>
+                          {/* Action column mirrors the selected status */}
+                          <td className="px-4 py-4">
+                            {row.status ? (
+                              <span
+                                className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                                  row.status === 'Present'
+                                    ? 'bg-green-100 text-green-800 border border-green-200'
+                                    : row.status === 'WFH' || row.status === 'Work From Home'
+                                    ? 'bg-blue-100 text-blue-800 border border-blue-200'
+                                    : row.status === 'Leave'
+                                    ? 'bg-red-100 text-red-800 border border-red-200'
+                                    : 'bg-gray-100 text-gray-800 border border-gray-200'
+                                }`}
+                              >
+                                {row.status}
+                              </span>
+                            ) : (
+                              <span className="text-gray-400 text-sm">No Action</span>
+                            )}
                           </td>
                           <td className="px-4 py-4">
                             <input
@@ -617,6 +750,23 @@ const AddAttendance = () => {
                                 {row.projects.length > 0 ? 'Edit Projects' : 'Add Projects'}
                               </button>
                             </div>
+                          </td>
+                          <td className="px-4 py-4">
+                            <div className="flex items-center gap-3">
+                              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${row.submitted ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
+                                {row.submitted ? 'Submitted' : 'Not Submitted'}
+                              </span>
+                            </div>
+                          </td>
+                          {/* Details column with eye icon */}
+                          <td className="px-4 py-4">
+                            <button
+                              title="View details"
+                              onClick={() => handleShowProjects({ date: row.date, projects: row.projects, hours: row.hours, status: row.status })}
+                              className="inline-flex items-center justify-center p-2 bg-blue-100 text-blue-800 rounded-full hover:bg-blue-200"
+                            >
+                              <Eye className="h-4 w-4" />
+                            </button>
                           </td>
                         </tr>
                       ))}
@@ -718,9 +868,9 @@ const AddAttendance = () => {
                     
                     // Generate 42 days (6 weeks) for the calendar
                     for (let i = 0; i < 42; i++) {
-                      const dateStr = currentDate.toISOString().split('T')[0];
+                      const dateStr = formatDateLocal(currentDate);
                       const isCurrentMonth = currentDate.getMonth() === selectedMonth;
-                      const isToday = dateStr === new Date().toISOString().split('T')[0];
+                      const isToday = dateStr === formatDateLocal(new Date());
                       
                       // Find attendance record for this date
                       const attendanceRecord = dailyAttendance.find(record => record.date === dateStr);
@@ -937,19 +1087,15 @@ const AddAttendance = () => {
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="text-sm text-gray-900">
-                              {record.projects && record.projects.length > 0 ? (
-                                <button
-                                  onClick={() => handleShowProjects(record)}
-                                  className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 hover:bg-blue-200 transition-colors duration-200"
-                                >
-                                  <Eye className="h-3 w-3 mr-1" />
-                                  View Projects ({record.projects.length})
-                                </button>
-                              ) : (
-                                <span className="text-gray-400 text-xs">No projects</span>
-                              )}
+                              <button
+                                onClick={() => handleShowProjects(record)}
+                                className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 hover:bg-blue-200 transition-colors duration-200"
+                              >
+                                <Eye className="h-3 w-3 mr-1" />
+                                View Details
+                              </button>
                             </div>
-                          </td>
+                         </td>
                         </tr>
                       ))}
                     </tbody>
@@ -992,6 +1138,26 @@ const AddAttendance = () => {
             </div>
             
             <div className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-sm">
+                <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+                  <div className="text-gray-500">Date</div>
+                  <div className="font-medium text-gray-800">
+                    {new Date(selectedRecord.date).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}
+                  </div>
+                </div>
+                <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+                  <div className="text-gray-500">Hours</div>
+                  <div className="font-medium text-gray-800">{(selectedRecord.hours ?? selectedRecord.total_hours ?? 0)}</div>
+                </div>
+                <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+                  <div className="text-gray-500">Status</div>
+                  <div className="font-medium text-gray-800">{selectedRecord.status ?? 'Not set'}</div>
+                </div>
+                <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+                  <div className="text-gray-500">Projects</div>
+                  <div className="font-medium text-gray-800">{selectedRecord.projects?.length ?? 0}</div>
+                </div>
+              </div>
               {selectedRecord.projects && selectedRecord.projects.length > 0 ? (
                 selectedRecord.projects.map((project, index) => (
                   <div key={index} className="border border-gray-200 rounded-lg p-4">

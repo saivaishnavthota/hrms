@@ -16,7 +16,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
-export function SidebarMenu() {
+export function SidebarMenu({ menu }) {
   const { pathname } = useLocation();
 
   // Memoize matchPath to prevent unnecessary re-renders
@@ -197,6 +197,9 @@ export function SidebarMenu() {
     return <AccordionMenuLabel key={index}>{item.heading}</AccordionMenuLabel>;
   };
 
+  // Use provided menu config or default to HR menu
+  const menuConfig = Array.isArray(menu) && menu.length > 0 ? menu : MENU_SIDEBAR;
+
   return (
     <ScrollArea className="flex grow shrink-0 py-5 px-5 lg:h-[calc(100vh-5.5rem)]">
       <AccordionMenu
@@ -206,7 +209,7 @@ export function SidebarMenu() {
         collapsible
         classNames={classNames}
       >
-        {buildMenu(MENU_SIDEBAR)}
+        {buildMenu(menuConfig)}
       </AccordionMenu>
     </ScrollArea>
   );

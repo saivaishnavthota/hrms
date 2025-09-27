@@ -2,7 +2,7 @@ import { Helmet } from 'react-helmet-async';
 import { LayoutProvider } from './components/context';
 import { Main } from './components/main';
 
-export function Layout1() {
+export function Layout1({ menu }) {
   return (
     <>
       <Helmet>
@@ -10,7 +10,7 @@ export function Layout1() {
       </Helmet>
 
       <LayoutProvider>
-        <Main />
+        <Main menu={menu} />
       </LayoutProvider>
     </>
   );

@@ -6,7 +6,7 @@ import { Footer } from './footer';
 import { Header } from './header';
 import { Sidebar } from './sidebar';
 
-export function Main() {
+export function Main({ menu }) {
   const isMobile = useIsMobile();
   const { sidebarCollapse } = useLayout();
 
@@ -45,10 +45,10 @@ export function Main() {
 
   return (
     <>
-      {!isMobile && <Sidebar />}
+      {!isMobile && <Sidebar menu={menu} />}
 
       <div className="wrapper flex grow flex-col">
-        <Header />
+        <Header menu={menu} />
 
         <main className="grow pt-5" role="content">
           <Outlet />

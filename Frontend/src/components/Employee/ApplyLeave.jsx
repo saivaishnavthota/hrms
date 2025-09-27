@@ -18,10 +18,9 @@ const ApplyLeave = () => {
   const leaveTypes = [
     'Annual Leave',
     'Sick Leave',
-    'Personal Leave',
-    'Emergency Leave',
-    'Maternity/Paternity Leave',
-    'Bereavement Leave'
+    'Casual Leave',
+    'Maternity Leave',
+    'Paternity Leave'
   ];
 
   const handleInputChange = (e) => {

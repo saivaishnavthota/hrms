@@ -4,7 +4,7 @@ import { useLayout } from './context';
 import { SidebarHeader } from './sidebar-header';
 import { SidebarMenu } from './sidebar-menu';
 
-export function Sidebar() {
+export function Sidebar({ menu }) {
   const { sidebarTheme } = useLayout();
   const { pathname } = useLocation();
 
@@ -19,7 +19,7 @@ export function Sidebar() {
       <SidebarHeader />
       <div className="overflow-hidden">
         <div className="w-(--sidebar-default-width)">
-          <SidebarMenu />
+          <SidebarMenu menu={menu} />
         </div>
       </div>
     </div>

@@ -1,7 +1,8 @@
 import { Layout1Page } from '@/pages/layout-1/page';
 import { Navigate, Route, Routes } from 'react-router';
 import { Layout1 } from '@/components/layouts/layout-1';
-import { EmployeeLayout } from '@/components/layouts/employee-layout';
+// Employee layout now uses Layout1 with employee-specific menu
+import { MENU_SIDEBAR_EMPLOYEE } from '@/config/employee-layout.config';
 import EmployeeManagement from '@/components/HR/EmployeeManagement';
 import Dashboard from '@/components/HR/Dashboard';
 import ChangePassword from '@/components/HR/ChangePassword';
@@ -59,8 +60,8 @@ export const AppRoutingSetup = () => {
         <Route path="holidays" element={<Holidays />} />
       </Route>
       
-      {/* Protected Employee routes */}
-      <Route path="/employee" element={<ProtectedRoute><EmployeeLayout /></ProtectedRoute>}>
+      {/* Protected Employee routes using Layout1 with employee menu */}
+      <Route path="/employee" element={<ProtectedRoute><Layout1 menu={MENU_SIDEBAR_EMPLOYEE} /></ProtectedRoute>}>
         <Route index element={<EmployeePage />} />
         <Route path="add-attendance" element={<EmployeeAddAttendance />} />
         <Route path="apply-leave" element={<ApplyLeave />} />

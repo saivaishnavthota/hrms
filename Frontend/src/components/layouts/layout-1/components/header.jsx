@@ -90,8 +90,8 @@ export function Header({ menu }) {
 
         {/* Centered Welcome Message */}
         <div className="hidden lg:flex items-center justify-center flex-1">
-          <h1 className="text-1xl font-semibold text-gray-900 text-center">
-            {`Welcome to ${getPortalLabel(pathname)} - ${user?.name || ''}`}
+          <h1 className="text-2xl font-semibold text-gray-900 text-center ">
+            {`Welcome to ${getPortalLabel(pathname)} `}
           </h1>
         </div>
 

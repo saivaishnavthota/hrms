@@ -5,6 +5,7 @@ import PendingRequests from './PendingRequests';
 import { useUser } from '@/contexts/UserContext';
 import axios from 'axios';
 import { avatarBg } from '../../lib/avatarColors';
+import { markDeleted, filterListByDeleted } from '../../lib/localDelete';
 
 const LeaveRequests = () => {
   const { user } = useUser();
@@ -42,7 +43,7 @@ const LeaveRequests = () => {
         hr_status: item.hr_status,
         final_status: item.status,
       }));
-      setLeaveRequests(mapped);
+      setLeaveRequests(filterListByDeleted('leaveRequests', mapped));
     } catch (err) {
       console.error('Error fetching HR leave requests:', err);
       setError('Failed to fetch leave requests. Please try again.');
@@ -273,6 +274,14 @@ const LeaveRequests = () => {
                       <button 
                         className="text-red-600 hover:text-red-900 p-1 rounded hover:bg-red-50"
                         title="Delete"
+                        onClick={() => {
+                          try {
+                            markDeleted('leaveRequests', request.id);
+                          } catch (e) {
+                            console.error('Error marking leave request deleted locally:', e);
+                          }
+                          setLeaveRequests(prev => prev.filter(r => r.id !== request.id));
+                        }}
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>

@@ -1,7 +1,7 @@
 export const AVATAR_BG_CLASSES = [
   'bg-[rgb(141,233,113)]', // R141 G233 B113
   'bg-[rgb(173,150,220)]', // R173 G150 B220
-  'bg-[rgb(246,242,244)]', // R246 G242 B244
+  'bg-black', // changed to black
 ];
 
 export function avatarBg(seed = '') {

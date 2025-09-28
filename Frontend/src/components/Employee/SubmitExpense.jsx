@@ -81,6 +81,39 @@ const SubmitExpense = () => {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
+  const mapStatus = (item) => {
+    const s = (item.manager_status || item.status || '').toLowerCase();
+    switch (s) {
+
+      case 'pending':
+      case 'pending_manager_approval':
+        return 'Pending Manager Approval';
+
+      case 'approved':
+      case 'pending_hr_approval':
+        return 'Pending HR Approval';
+
+      case 'approved':
+      case 'pending_account_mgr_approval':
+        return 'Pending Account Manager Approval';
+
+        case 'rejected':
+      case 'hr_rejected':
+        return 'HR Rejected';
+
+      case 'rejected':
+      case 'mgr_rejected':
+        return 'Manager Rejected';
+
+       case 'rejected':
+      case 'acc_mgr_rejected':
+        return 'AccountManager Rejected';
+
+      default:
+        return item.manager_status || item.status || 'Pending';
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsSubmitting(true);
@@ -167,7 +200,7 @@ const SubmitExpense = () => {
               amount: item.amount,
               currency: item.currency,
               description: item.description || '',
-              status: item.status,
+                status: item.status,
               approvals,
             };
           });
@@ -213,7 +246,7 @@ const SubmitExpense = () => {
                   name: h.action_by_name || h.action_role,
                   role: h.action_role,
                   reason: h.reason || '-',
-                  status: h.action,
+                   status: h.action,
                 }))
             : [];
           return {
@@ -223,7 +256,7 @@ const SubmitExpense = () => {
             amount: item.amount,
             currency: item.currency,
             description: item.description || '',
-            status: item.status,
+             status: mapStatus(item),
             approvals,
           };
         });
@@ -534,7 +567,7 @@ const SubmitExpense = () => {
                       <TableCell>
                         <Dialog>
                           <DialogTrigger asChild>
-                            <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground">
+                            <Button variant="ghost" size="sm" className="text-blue-800">
                               <Eye className="h-4 w-4" />
                             </Button>
                           </DialogTrigger>

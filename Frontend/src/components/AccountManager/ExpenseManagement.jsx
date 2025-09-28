@@ -3,7 +3,6 @@ import {
   Eye,
   Search,
   Filter,
-  Plus,
   CheckCircle,
   XCircle,
   Clock,
@@ -37,28 +36,46 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { useUser } from '@/contexts/UserContext';
+import { useNavigate } from 'react-router-dom';
+import api from '@/lib/api';
 import { avatarBg } from '../../lib/avatarColors';
 
-const BASE_URL = 'http://localhost:8000';
-
 const AccountManagerExpenseManagement = () => {
-  const { user } = useUser();
+  const navigate = useNavigate();
+  const [userId, setUserId] = useState(localStorage.getItem('userId')); // Fetch userId from localStorage
   const [activeTab, setActiveTab] = useState('pending');
   const [expenses, setExpenses] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [perPage, setPerPage] = useState('10');
+  const [page, setPage] = useState(1);
   const [selectedExpense, setSelectedExpense] = useState(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  const token = useMemo(() => localStorage.getItem('authToken'), []);
-
+  // Compute current year/month to satisfy backend validation
   const now = new Date();
   const year = now.getFullYear();
   const month = now.getMonth() + 1;
+  const [selectedYear, setSelectedYear] = useState(String(year));
+  const [selectedMonth, setSelectedMonth] = useState(String(month));
+
+  const years = Array.from({ length: 6 }, (_, i) => String(year - i));
+  const months = [
+    { value: '1', label: 'January' },
+    { value: '2', label: 'February' },
+    { value: '3', label: 'March' },
+    { value: '4', label: 'April' },
+    { value: '5', label: 'May' },
+    { value: '6', label: 'June' },
+    { value: '7', label: 'July' },
+    { value: '8', label: 'August' },
+    { value: '9', label: 'September' },
+    { value: '10', label: 'October' },
+    { value: '11', label: 'November' },
+    { value: '12', label: 'December' },
+  ];
 
   const getAvatarColor = (name) => avatarBg(name);
 
@@ -80,72 +97,84 @@ const AccountManagerExpenseManagement = () => {
     }
   };
 
-  const mapStatus = (item) => {
-    const s = (item.manager_status || item.status || '').toLowerCase();
+  const mapStatus = (status) => {
+    const s = (status || '').toLowerCase();
     switch (s) {
-      case 'pending':
-      case 'pending_manager_approval':
+      case 'pending_account_mgr_approval':
         return 'Pending';
       case 'approved':
-      case 'pending_hr_approval':
         return 'Approved';
-      case 'rejected':
-      case 'mgr_rejected':
+      case 'acc_mgr_rejected':
         return 'Rejected';
       default:
-        return item.manager_status || item.status || 'Pending';
+        return status || 'Pending';
     }
   };
 
-  const mapExpense = (item) => ({
-    id: item.request_id || item.id,
-    requestId: item.request_id || item.id,
-    employee: {
-      name: item.employeeName || item.employee_name || item.employee || 'Unknown',
-      email: item.employeeEmail || item.employee_email || item.email || '',
-      avatar: getInitials(
-        item.employeeName || item.employee_name || item.employee || 'U'
-      ),
-    },
-    category: item.category,
-    amount: Number(item.amount || 0),
-    details: item.description || '',
-    submittedOn: formatDate(
-      item.submitted_at || item.created_at || item.expense_date || item.date
-    ),
-    status: mapStatus(item),
-    attachments:
-      item.attachments ||
-      (item.attachment
-        ? [{ file_name: 'Attachment', file_path: item.attachment }]
-        : item.attachment_url
-        ? [{ file_name: 'Attachment', file_path: item.attachment_url }]
-        : []),
-  });
+  const mapExpense = (item) => {
+    try {
+      return {
+        id: item.id || item.request_id,
+        requestId: item.id || item.request_id,
+        employee: {
+          name: item.employeeName || item.employee_name || 'Unknown',
+          email: item.employeeEmail || item.employee_email || '',
+          avatar: getInitials(item.employeeName || item.employee_name || 'U'),
+        },
+        category: item.category || '',
+        amount: Number(item.amount || 0),
+        details: item.description || '',
+        submittedOn: formatDate(item.submitted_at || item.expense_date || item.date),
+        status: mapStatus(item.status),
+        attachments: item.attachment
+          ? [{ file_name: 'Attachment', file_path: item.attachment }]
+          : item.attachments
+          ? typeof item.attachments === 'string'
+            ? [{ file_name: 'Attachment', file_path: item.attachments }]
+            : item.attachments.map((att) => ({
+                file_name: att.file_name || 'Attachment',
+                file_path: att.file_path,
+              }))
+          : [],
+      };
+    } catch (err) {
+      console.error('Error mapping expense:', item, err);
+      throw err;
+    }
+  };
 
   const fetchPendingExpenses = async () => {
-    if (!user?.employeeId) {
-      setError('Missing manager id');
+    const userId = localStorage.getItem('userId');
+    if (!userId) {
+      setError('Missing account manager ID. Please log in.');
+      navigate('/login', { replace: true });
       return;
     }
     setLoading(true);
     setError(null);
     try {
-      const url = `${BASE_URL}/expenses/mgr-exp-list?manager_id=${encodeURIComponent(
-        user.employeeId
-      )}&year=${year}&month=${month}`;
-      const res = await fetch(url, {
-        headers: {
-          Authorization: token ? `Bearer ${token}` : '',
+      console.log('Fetching pending expenses with params:', {
+        acc_mgr_id: userId,
+        year: Number(selectedYear),
+        month: Number(selectedMonth),
+      });
+      const response = await api.get('/expenses/acc-mgr-exp-list', {
+        params: {
+          acc_mgr_id: userId,
+          year: Number(selectedYear),
+          month: Number(selectedMonth),
         },
       });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-      const mapped = (data || []).map(mapExpense);
-      setExpenses(mapped.filter((e) => (e.status || '').toLowerCase() === 'pending'));
+      console.log('Raw response:', response);
+      const data = Array.isArray(response.data) ? response.data : response.data?.results || [];
+      console.log('Parsed data:', data);
+      const mapped = data.map(mapExpense);
+      console.log('Mapped expenses:', mapped);
+      setExpenses(mapped.filter((e) => e.status.toLowerCase() === 'pending'));
+      console.log('Filtered pending expenses:', mapped.filter((e) => e.status.toLowerCase() === 'pending'));
     } catch (err) {
-      console.error('Error fetching mgr-exp-list (pending):', err);
-      setError('Failed to fetch pending requests.');
+      console.error('Error in fetchPendingExpenses:', err, err.response?.data);
+      setError(`Failed to fetch pending requests: ${err.message}`);
       setExpenses([]);
     } finally {
       setLoading(false);
@@ -153,45 +182,53 @@ const AccountManagerExpenseManagement = () => {
   };
 
   const fetchAllExpenses = async () => {
-    if (!user?.employeeId) {
-      setError('Missing manager id');
+    const userId = localStorage.getItem('userId');
+    if (!userId) {
+      setError('Missing account manager ID. Please log in.');
+      navigate('/login', { replace: true });
       return;
     }
     setLoading(true);
     setError(null);
     try {
-      const url = `${BASE_URL}/expenses/acc-mgr-exp-list?acc_mgr_id=${encodeURIComponent(
-        user.employeeId
-      )}&year=${year}&month=${month}`;
-      const res = await fetch(url, {
-        headers: {
-          Authorization: token ? `Bearer ${token}` : '',
+      console.log('Fetching all expenses with params:', {
+        acc_mgr_id: userId,
+        year: Number(selectedYear),
+        month: Number(selectedMonth),
+      });
+      const response = await api.get('/expenses/acc-mgr-exp-list', {
+        params: {
+          acc_mgr_id: userId,
+          year: Number(selectedYear),
+          month: Number(selectedMonth),
         },
       });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-      setExpenses((data || []).map(mapExpense));
+      console.log('Raw response:', response);
+      const data = Array.isArray(response.data) ? response.data : response.data?.results || [];
+      console.log('Parsed data:', data);
+      const mapped = data.map(mapExpense);
+      console.log('Mapped expenses:', mapped);
+
+    setExpenses(mapped.filter((e) => 
+      e.status.toLowerCase() === 'approved' || e.status.toLowerCase() === 'rejected'
+    ));
+
     } catch (err) {
-      console.error('Error fetching mgr-exp-list:', err);
-      setError('Failed to fetch expense list.');
+      console.error('Error in fetchAllExpenses:', err, err.response?.data);
+      setError(`Failed to fetch expense list: ${err.message}`);
       setExpenses([]);
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => {
-    if (activeTab === 'pending') fetchPendingExpenses();
-    else fetchAllExpenses();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab, user?.employeeId]);
-
-  const handleViewDetails = (expense) => {
-    setSelectedExpense(expense);
-    setIsDetailsOpen(true);
-  };
-
   const handleApprove = async (expense) => {
+    const userId = localStorage.getItem('userId');
+    if (!userId) {
+      setError('Missing account manager ID. Please log in.');
+      navigate('/login', { replace: true });
+      return;
+    }
     try {
       const { isConfirmed, value } = await Swal.fire({
         title: 'Approve Expense',
@@ -204,24 +241,30 @@ const AccountManagerExpenseManagement = () => {
       });
       if (!isConfirmed) return;
       const reason = (value || '-').trim() || '-';
+      const accMgrId = parseInt(userId, 10);
+      if (isNaN(accMgrId)) {
+        throw new Error('Invalid account manager ID');
+      }
 
-      // Use backend's manager status update endpoint with form-data
       const form = new FormData();
-      form.append('acc_mgr_id', String(user.employeeId || ''));
+      form.append('acc_mgr_id', accMgrId.toString());
       form.append('status', 'Approved');
       form.append('reason', reason);
-      const res = await fetch(
-        `${BASE_URL}/expenses/acc-mgr-upd-status/${expense.requestId}`,
-        {
-          method: 'PUT',
-          headers: {
-            // Let the browser set multipart/form-data boundary automatically
-            Authorization: token ? `Bearer ${token}` : '',
-          },
-          body: form,
-        }
-      );
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      
+      // Log FormData contents
+      console.log('FormData for approve:', {
+        acc_mgr_id: form.get('acc_mgr_id'),
+        status: form.get('status'),
+        reason: form.get('reason'),
+      });
+
+      const response = await api.put(`/expenses/acc-mgr-upd-status/${expense.requestId}`, form, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      console.log('Approve response:', response.data);
+
       setExpenses((prev) =>
         activeTab === 'pending'
           ? prev.filter((e) => e.requestId !== expense.requestId)
@@ -229,13 +272,21 @@ const AccountManagerExpenseManagement = () => {
               e.requestId === expense.requestId ? { ...e, status: 'Approved' } : e
             )
       );
+      Swal.fire('Success', 'Expense approved successfully', 'success');
     } catch (err) {
-      console.error('Approve failed:', err);
-      setError('Failed to approve expense.');
+      console.error('Approve failed:', err, err.response?.data);
+      setError(`Failed to approve expense: ${err.message}`);
+      Swal.fire('Error', `Failed to approve expense: ${err.message}`, 'error');
     }
   };
 
   const handleReject = async (expense) => {
+    const userId = localStorage.getItem('userId');
+    if (!userId) {
+      setError('Missing account manager ID. Please log in.');
+      navigate('/login', { replace: true });
+      return;
+    }
     try {
       const { isConfirmed, value } = await Swal.fire({
         title: 'Reject Expense',
@@ -248,23 +299,30 @@ const AccountManagerExpenseManagement = () => {
       });
       if (!isConfirmed) return;
       const reason = (value || '-').trim() || '-';
+      const accMgrId = parseInt(userId, 10);
+      if (isNaN(accMgrId)) {
+        throw new Error('Invalid account manager ID');
+      }
 
-      // Use backend's manager status update endpoint with form-data
       const form = new FormData();
-      form.append('acc_mgr_id', String(user.employeeId || ''));
+      form.append('acc_mgr_id', accMgrId.toString());
       form.append('status', 'Rejected');
       form.append('reason', reason);
-      const res = await fetch(
-        `${BASE_URL}/expenses/acc-mgr-upd-status/${expense.requestId}`,
-        {
-          method: 'PUT',
-          headers: {
-            Authorization: token ? `Bearer ${token}` : '',
-          },
-          body: form,
-        }
-      );
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      
+      // Log FormData contents
+      console.log('FormData for reject:', {
+        acc_mgr_id: form.get('acc_mgr_id'),
+        status: form.get('status'),
+        reason: form.get('reason'),
+      });
+
+      const response = await api.put(`/expenses/acc-mgr-upd-status/${expense.requestId}`, form, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      console.log('Reject response:', response.data);
+
       setExpenses((prev) =>
         activeTab === 'pending'
           ? prev.filter((e) => e.requestId !== expense.requestId)
@@ -272,26 +330,44 @@ const AccountManagerExpenseManagement = () => {
               e.requestId === expense.requestId ? { ...e, status: 'Rejected' } : e
             )
       );
+      Swal.fire('Success', 'Expense rejected successfully', 'success');
     } catch (err) {
-      console.error('Reject failed:', err);
-      setError('Failed to reject expense.');
+      console.error('Reject failed:', err, err.response?.data);
+      setError(`Failed to reject expense: ${err.message}`);
+      Swal.fire('Error', `Failed to reject expense: ${err.message}`, 'error');
     }
   };
 
-  const filteredExpenses = expenses.filter((expense) => {
-    const q = searchTerm.toLowerCase();
-    const matchesSearch =
-      (expense.employee.name || '').toLowerCase().includes(q) ||
-      (expense.employee.email || '').toLowerCase().includes(q) ||
-      (expense.category || '').toLowerCase().includes(q) ||
-      (expense.details || '').toLowerCase().includes(q);
-    const matchesStatus =
-      statusFilter === 'all' ||
-      (expense.status || '').toLowerCase() === statusFilter.toLowerCase();
-    const excludePendingInAll =
-      activeTab === 'all' ? (expense.status || '').toLowerCase() !== 'pending' : true;
-    return matchesSearch && matchesStatus && excludePendingInAll;
-  });
+  const filteredExpenses = useMemo(() => {
+    const filtered = expenses.filter((expense) => {
+      const q = searchTerm.toLowerCase();
+      const matchesSearch =
+        (expense.employee.name || '').toLowerCase().includes(q) ||
+        (expense.employee.email || '').toLowerCase().includes(q) ||
+        (expense.category || '').toLowerCase().includes(q) ||
+        (expense.details || '').toLowerCase().includes(q);
+      const matchesStatus =
+        statusFilter === 'all' ||
+        (expense.status || '').toLowerCase() === statusFilter.toLowerCase();
+      return matchesSearch && matchesStatus;
+    });
+    console.log('Filtered expenses:', filtered);
+    return filtered;
+  }, [expenses, searchTerm, statusFilter]);
+
+  // Client-side pagination
+  const totalPages = Math.ceil(filteredExpenses.length / Number(perPage));
+  const paginatedExpenses = filteredExpenses.slice(
+    (page - 1) * Number(perPage),
+    page * Number(perPage)
+  );
+  console.log('Paginated expenses:', paginatedExpenses);
+
+  const handlePageChange = (newPage) => {
+    if (newPage >= 1 && newPage <= totalPages) {
+      setPage(newPage);
+    }
+  };
 
   const getStatusBadge = (status) => {
     switch ((status || '').toLowerCase()) {
@@ -304,7 +380,7 @@ const AccountManagerExpenseManagement = () => {
         );
       case 'rejected':
         return (
-          <Badge className="bg-red-100 text-red-700 hover:bg-red-100">
+          <Badge className="bg-red-100 text-red-700 hover:bg-green-100">
             <XCircle className="h-3 w-3 mr-1" />
             Rejected
           </Badge>
@@ -321,6 +397,24 @@ const AccountManagerExpenseManagement = () => {
     }
   };
 
+  useEffect(() => {
+    const userId = localStorage.getItem('userId');
+    console.log('useEffect - userId:', userId);
+    if (!userId) {
+      setError('Missing account manager ID. Please log in.');
+      navigate('/login', { replace: true });
+      return;
+    }
+    setUserId(userId);
+    if (activeTab === 'pending') fetchPendingExpenses();
+    else if (activeTab === 'all') fetchAllExpenses();
+  }, [activeTab, selectedYear, selectedMonth, navigate]);
+
+  const handleViewDetails = (expense) => {
+    setSelectedExpense(expense);
+    setIsDetailsOpen(true);
+  };
+
   return (
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
@@ -328,12 +422,11 @@ const AccountManagerExpenseManagement = () => {
           <h1 className="text-2xl font-semibold text-gray-900">Expense Management</h1>
           <p className="text-gray-600 mt-1">Review and approve team expense claims</p>
         </div>
-       
       </div>
 
       <div className="mb-2">
         <div className="border-b border-gray-200">
-          <nav className="-mb-px flex space-x-8">
+          <nav className="-mb-px flex space-x-8" role="tablist">
             <button
               onClick={() => setActiveTab('pending')}
               className={`py-2 px-1 border-b-2 font-medium text-sm ${
@@ -341,6 +434,8 @@ const AccountManagerExpenseManagement = () => {
                   ? 'border-blue-500 text-blue-600'
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
               }`}
+              role="tab"
+              aria-selected={activeTab === 'pending'}
             >
               Pending Requests
             </button>
@@ -351,8 +446,10 @@ const AccountManagerExpenseManagement = () => {
                   ? 'border-blue-500 text-blue-600'
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
               }`}
+              role="tab"
+              aria-selected={activeTab === 'all'}
             >
-              All Expense Request
+              All Expense Requests
             </button>
           </nav>
         </div>
@@ -367,10 +464,11 @@ const AccountManagerExpenseManagement = () => {
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-10"
+              aria-label="Search expenses"
             />
           </div>
           <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-40">
+            <SelectTrigger className="w-40" aria-label="Filter by status">
               <SelectValue placeholder="Filter by status" />
             </SelectTrigger>
             <SelectContent>
@@ -380,17 +478,40 @@ const AccountManagerExpenseManagement = () => {
               <SelectItem value="rejected">Rejected</SelectItem>
             </SelectContent>
           </Select>
+          <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+            <SelectTrigger className="w-40" aria-label="Filter by month">
+              <SelectValue placeholder="Month" />
+            </SelectTrigger>
+            <SelectContent>
+              {months.map((m) => (
+                <SelectItem key={m.value} value={m.value}>
+                  {m.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={selectedYear} onValueChange={setSelectedYear}>
+            <SelectTrigger className="w-32" aria-label="Filter by year">
+              <SelectValue placeholder="Year" />
+            </SelectTrigger>
+            <SelectContent>
+              {years.map((y) => (
+                <SelectItem key={y} value={y}>
+                  {y}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <Button variant="outline" className="gap-2">
             <Filter className="h-4 w-4" />
             More Filters
           </Button>
         </div>
-
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2 text-sm text-gray-600">
             <span>Per Page:</span>
             <Select value={perPage} onValueChange={setPerPage}>
-              <SelectTrigger className="w-16 h-8">
+              <SelectTrigger className="w-16 h-8" aria-label="Items per page">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -424,9 +545,11 @@ const AccountManagerExpenseManagement = () => {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredExpenses.map((expense, index) => (
+              {paginatedExpenses.map((expense, index) => (
                 <TableRow key={expense.id} className="border-b border-gray-200 hover:bg-gray-50">
-                  <TableCell className="text-center text-gray-600 px-6 py-4">{index + 1}</TableCell>
+                  <TableCell className="text-center text-gray-600 px-6 py-4">
+                    {(page - 1) * Number(perPage) + index + 1}
+                  </TableCell>
                   <TableCell className="px-6 py-4">
                     <div className="flex items-center gap-3">
                       <div
@@ -436,9 +559,7 @@ const AccountManagerExpenseManagement = () => {
                       </div>
                       <div>
                         <div className="font-medium text-gray-900">{expense.employee.name}</div>
-                        <div className="text-sm text-gray-500">
-                          <span>{expense.employee.email}</span>
-                        </div>
+                        <div className="text-sm text-gray-500">{expense.employee.email}</div>
                       </div>
                     </div>
                   </TableCell>
@@ -450,25 +571,14 @@ const AccountManagerExpenseManagement = () => {
                       size="sm"
                       className="h-7 px-3 text-xs bg-blue-50 text-blue-600 border-blue-200 hover:bg-blue-100"
                       onClick={() => handleViewDetails(expense)}
+                      aria-label={`View details for ${expense.category}`}
                     >
                       <FileText className="h-3 w-3 mr-1" />
                       View
                     </Button>
                   </TableCell>
                   <TableCell className="px-6 py-4 text-gray-700">{expense.submittedOn}</TableCell>
-                  <TableCell className="px-6 py-4">
-                    <span
-                      className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${
-                        expense.status === 'Pending'
-                          ? 'bg-yellow-100 text-yellow-800'
-                          : expense.status === 'Approved'
-                          ? 'bg-green-100 text-green-800'
-                          : 'bg-red-100 text-red-800'
-                      }`}
-                    >
-                      {expense.status}
-                    </span>
-                  </TableCell>
+                  <TableCell className="px-6 py-4">{getStatusBadge(expense.status)}</TableCell>
                   <TableCell className="px-6 py-4">
                     <div className="flex items-center gap-2">
                       <Button
@@ -476,6 +586,7 @@ const AccountManagerExpenseManagement = () => {
                         size="sm"
                         className="h-8 w-8 p-0 text-blue-600 hover:bg-blue-50"
                         onClick={() => handleViewDetails(expense)}
+                        aria-label={`View details for expense ${expense.requestId}`}
                       >
                         <Eye className="h-4 w-4" />
                       </Button>
@@ -485,6 +596,7 @@ const AccountManagerExpenseManagement = () => {
                         className="h-8 w-8 p-0 text-green-600 hover:bg-green-50"
                         onClick={() => handleApprove(expense)}
                         disabled={expense.status !== 'Pending'}
+                        aria-label={`Approve expense ${expense.requestId}`}
                       >
                         <Check className="h-4 w-4" />
                       </Button>
@@ -494,6 +606,7 @@ const AccountManagerExpenseManagement = () => {
                         className="h-8 w-8 p-0 text-red-600 hover:bg-red-50"
                         onClick={() => handleReject(expense)}
                         disabled={expense.status !== 'Pending'}
+                        aria-label={`Reject expense ${expense.requestId}`}
                       >
                         <X className="h-4 w-4" />
                       </Button>
@@ -507,17 +620,25 @@ const AccountManagerExpenseManagement = () => {
       </div>
 
       <div className="flex items-center justify-between text-sm text-gray-600">
-        <span>
-          Showing {filteredExpenses.length} of {expenses.length} expenses
-        </span>
+        <span>Showing {paginatedExpenses.length} of {filteredExpenses.length} expenses</span>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" disabled>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={page === 1}
+            onClick={() => handlePageChange(page - 1)}
+            aria-label="Previous page"
+          >
             Previous
           </Button>
-          <Button variant="outline" size="sm" className="bg-blue-50 text-blue-600">
-            1
-          </Button>
-          <Button variant="outline" size="sm" disabled>
+          <span>Page {page} of {totalPages}</span>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={page === totalPages}
+            onClick={() => handlePageChange(page + 1)}
+            aria-label="Next page"
+          >
             Next
           </Button>
         </div>
@@ -527,9 +648,7 @@ const AccountManagerExpenseManagement = () => {
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Expense Details</DialogTitle>
-            <DialogDescription>
-              Complete information about the expense request
-            </DialogDescription>
+            <DialogDescription>Complete information about the expense request</DialogDescription>
           </DialogHeader>
           {selectedExpense && (
             <div className="space-y-4">
@@ -543,7 +662,6 @@ const AccountManagerExpenseManagement = () => {
                   <p className="text-sm text-gray-900">{selectedExpense.category}</p>
                 </div>
               </div>
-
               <div>
                 <label className="text-sm font-medium text-gray-500">Employee</label>
                 <div className="flex items-center gap-2 mt-1">
@@ -558,7 +676,6 @@ const AccountManagerExpenseManagement = () => {
                   </div>
                 </div>
               </div>
-
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="text-sm font-medium text-gray-500">Amount</label>
@@ -569,19 +686,16 @@ const AccountManagerExpenseManagement = () => {
                   <div className="mt-1">{getStatusBadge(selectedExpense.status)}</div>
                 </div>
               </div>
-
               <div>
                 <label className="text-sm font-medium text-gray-500">Submitted On</label>
                 <p className="text-sm text-gray-900">{selectedExpense.submittedOn}</p>
               </div>
-
               <div>
                 <label className="text-sm font-medium text-gray-500">Details</label>
                 <p className="text-sm text-gray-900 bg-gray-50 p-3 rounded-md border">
                   {selectedExpense.details}
                 </p>
               </div>
-
               {selectedExpense.attachments?.length ? (
                 <div>
                   <label className="text-sm font-medium text-gray-500">Attachments</label>
@@ -593,6 +707,7 @@ const AccountManagerExpenseManagement = () => {
                         target="_blank"
                         rel="noreferrer"
                         className="text-blue-600 text-sm underline"
+                        aria-label={`Download attachment ${att.file_name}`}
                       >
                         {att.file_name || `Attachment ${idx + 1}`}
                       </a>

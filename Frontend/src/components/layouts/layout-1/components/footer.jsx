@@ -10,48 +10,30 @@ export function Footer() {
           <div className="flex order-2 md:order-1  gap-2 font-normal text-sm">
             <span className="text-muted-foreground">{currentYear} &copy;</span>
             <a
-              href="https://keenthemes.com"
+              href="https://nxzen.com"
               target="_blank"
               className="text-secondary-foreground hover:text-primary"
             >
-              Keenthemes Inc.
+              Nxzen
             </a>
           </div>
           <nav className="flex order-1 md:order-2 gap-4 font-normal text-sm text-muted-foreground">
+          
+          
+        
             <a
-              href={generalSettings.docsLink}
+              href="https://www.nxzen.com/about-us"
               target="_blank"
               className="hover:text-primary"
             >
-              Docs
+              About Us
             </a>
             <a
-              href={generalSettings.purchaseLink}
+              href="https://www.nxzen.com/our-solutions"
               target="_blank"
               className="hover:text-primary"
             >
-              Purchase
-            </a>
-            <a
-              href={generalSettings.faqLink}
-              target="_blank"
-              className="hover:text-primary"
-            >
-              FAQ
-            </a>
-            <a
-              href="https://devs.keenthemes.com"
-              target="_blank"
-              className="hover:text-primary"
-            >
-              Support
-            </a>
-            <a
-              href={generalSettings.licenseLink}
-              target="_blank"
-              className="hover:text-primary"
-            >
-              License
+              Our Solutions
             </a>
           </nav>
         </div>

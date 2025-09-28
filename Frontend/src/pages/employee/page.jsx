@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useLocation } from 'react-router-dom';
 import { format, startOfMonth, endOfMonth } from 'date-fns';
 import { Calendar, ChevronDown, Clock, DollarSign } from 'lucide-react';
@@ -23,6 +23,7 @@ import UploadDocuments from '@/components/Employee/UploadDocuments';
 import SubmitExpense from '@/components/Employee/SubmitExpense';
 import SetPassword from '@/components/Employee/SetPassword';
 import { useUser } from '@/contexts/UserContext';
+import api, { leaveAPI } from '@/lib/api';
 
 const EmployeePage = () => {
   const location = useLocation();
@@ -70,25 +71,123 @@ const EmployeePage = () => {
 
   const pageInfo = getPageInfo(location.pathname);
 
-  // Dashboard analytics sample data (replace with API data later)
-  const attendanceWeekly = [
-    { day: 'Mon', hours: 8 },
-    { day: 'Tue', hours: 7.5 },
-    { day: 'Wed', hours: 8 },
-    { day: 'Thu', hours: 8 },
-    { day: 'Fri', hours: 7 },
-    { day: 'Sat', hours: 6 },
-    { day: 'Sun', hours: 0 },
-  ];
+  // Dashboard analytics state (backend-driven)
+  const [attendanceWeekly, setAttendanceWeekly] = useState([]);
+  const [leavesData, setLeavesData] = useState([]);
+  const leavesColors = useMemo(() => ['#3b82f6', '#22c55e', '#f59e0b'], []); // blue, green, amber
+  const [appliedLeavesCount, setAppliedLeavesCount] = useState(0);
+  const [documentsStatus, setDocumentsStatus] = useState({ completed: 0, required: 0 });
+  const documentsPercent = useMemo(() => {
+    const { completed, required } = documentsStatus;
+    if (!required) return 0;
+    return Math.round((completed / required) * 100);
+  }, [documentsStatus]);
 
-  const leavesData = [
-    { name: 'Used', value: 6 },
-    { name: 'Remaining', value: 14 },
-  ];
-  const leavesColors = ['#3b82f6', '#22c55e'];
+  // Helpers
+  const formatDateLocal = (d) => {
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
 
-  const documentsStatus = { completed: 8, required: 10 };
-  const documentsPercent = Math.round((documentsStatus.completed / documentsStatus.required) * 100);
+  const getWeekStartMonday = (d) => {
+    const date = new Date(d);
+    const day = date.getDay(); // 0=Sun, 1=Mon, ...
+    const diffToMonday = (day + 6) % 7; // Sun->6, Mon->0, ...
+    const monday = new Date(date);
+    monday.setDate(date.getDate() - diffToMonday);
+    monday.setHours(0, 0, 0, 0);
+    return monday;
+  };
+
+  const dayLabel = (d) => d.toLocaleDateString('en-US', { weekday: 'short' }); // Mon, Tue, ...
+
+  // Fetchers
+  const fetchWeeklyAttendance = async () => {
+    try {
+      if (!user?.employeeId) return;
+      const response = await api.get('/attendance/weekly', {
+        params: { employee_id: user.employeeId }
+      });
+      const data = response?.data || {};
+
+      // Build a 7-day series for current week (Mon-Sun)
+      const monday = getWeekStartMonday(new Date());
+      const series = Array.from({ length: 7 }, (_, i) => {
+        const d = new Date(monday);
+        d.setDate(monday.getDate() + i);
+        const key = formatDateLocal(d);
+        const rec = data[key] || {};
+        const hours = Number(rec.hours || 0);
+        return { day: dayLabel(d), hours };
+      });
+      setAttendanceWeekly(series);
+    } catch (err) {
+      // Fallback sample data on error
+      setAttendanceWeekly([
+        { day: 'Mon', hours: 0 },
+        { day: 'Tue', hours: 0 },
+        { day: 'Wed', hours: 0 },
+        { day: 'Thu', hours: 0 },
+        { day: 'Fri', hours: 0 },
+        { day: 'Sat', hours: 0 },
+        { day: 'Sun', hours: 0 },
+      ]);
+    }
+  };
+
+  const fetchLeavesStats = async () => {
+    try {
+      if (!user?.employeeId) return;
+      const list = await leaveAPI.getEmployeeLeaves(user.employeeId);
+      const items = Array.isArray(list) ? list : (list?.data || list?.items || []);
+      let sick = 0, casual = 0, annual = 0;
+      for (const lv of items) {
+        const t = String(lv?.leave_type || lv?.type || lv?.category || '').toLowerCase();
+        if (t.includes('sick')) sick += 1;
+        else if (t.includes('casual')) casual += 1;
+        else if (t.includes('annual') || t.includes('earned') || t.includes('vacation')) annual += 1;
+      }
+
+      setLeavesData([
+        { name: 'Sick', value: sick },
+        { name: 'Casual', value: casual },
+        { name: 'Annual', value: annual },
+      ]);
+      setAppliedLeavesCount(items?.length || 0);
+    } catch (err) {
+      setLeavesData([
+        { name: 'Sick', value: 0 },
+        { name: 'Casual', value: 0 },
+        { name: 'Annual', value: 0 },
+      ]);
+      setAppliedLeavesCount(0);
+    }
+  };
+
+  const fetchDocumentsStatus = async () => {
+    try {
+      if (!user?.employeeId) return;
+      const resp = await api.get(`/documents/emp/${user.employeeId}`);
+      const map = resp?.data || {};
+      const required = Object.keys(map).length;
+      const completed = Object.values(map).filter(Boolean).length;
+      setDocumentsStatus({ completed, required });
+    } catch (err) {
+      setDocumentsStatus({ completed: 0, required: 0 });
+    }
+  };
+
+  // Fetch backend data only for dashboard view
+  useEffect(() => {
+    if (!pageInfo.content) {
+      fetchWeeklyAttendance();
+      fetchLeavesStats();
+      fetchDocumentsStatus();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pageInfo.content, user?.employeeId]);
 
   // Date range picker component
   const DateRangePicker = () => (
@@ -112,10 +211,8 @@ const EmployeePage = () => {
         <div className="employee-dashboard-content">
           {/* Welcome Section */}
           <div className="employee-welcome-banner">
-            <h2 className="text-xl font-semibold mb-2">
-              {`Welcome to Employee Portal - ${user?.name || ''}`}
-            </h2>
-            <p className="text-blue-100">Overview of your weekly attendance, leaves, and documents.</p>
+            
+            <p className="text-blue-500 ml-4 mb-4">Overview of your weekly attendance, leaves, and documents.</p>
           </div>
 
           {/* Analytics Grid */}
@@ -144,13 +241,13 @@ const EmployeePage = () => {
             <div className="bg-white rounded-lg border p-6">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="font-semibold text-gray-900">Leaves</h3>
-                <span className="text-sm text-gray-600">Balance: {leavesData[1].value} days</span>
+                <span className="text-sm text-gray-600">Applied: {appliedLeavesCount}</span>
               </div>
               <div className="h-64">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie data={leavesData} dataKey="value" nameKey="name" innerRadius={50} outerRadius={80} label>
-                      {leavesData.map((entry, index) => (
+                      {(leavesData || []).map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={leavesColors[index % leavesColors.length]} />
                       ))}
                     </Pie>
@@ -179,45 +276,7 @@ const EmployeePage = () => {
             </div>
           </div>
 
-          {/* Recent Activity */}
-          <div className="employee-recent-activity mt-6">
-            <div className="p-6 border-b">
-              <h3 className="font-semibold text-gray-900">Recent Activity</h3>
-            </div>
-            <div className="p-6">
-              <div className="space-y-4">
-                <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-                  <div className="p-2 bg-green-100 rounded-full">
-                    <Clock className="h-4 w-4 text-green-600" />
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-sm font-medium text-gray-900">Attendance recorded</p>
-                    <p className="text-xs text-gray-600">Today at 9:00 AM</p>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-                  <div className="p-2 bg-blue-100 rounded-full">
-                    <Calendar className="h-4 w-4 text-blue-600" />
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-sm font-medium text-gray-900">Leave application submitted</p>
-                    <p className="text-xs text-gray-600">Yesterday at 2:30 PM</p>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-                  <div className="p-2 bg-orange-100 rounded-full">
-                    <DollarSign className="h-4 w-4 text-orange-600" />
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-sm font-medium text-gray-900">Expense report approved</p>
-                    <p className="text-xs text-gray-600">2 days ago</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
+          {/* Recent Activity removed as requested */}
         </div>
       )}
     </div>

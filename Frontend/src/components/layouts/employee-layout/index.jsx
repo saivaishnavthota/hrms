@@ -31,7 +31,7 @@ export function EmployeeLayout() {
               </div>
 
               {/* Employee Portal Title */}
-              <h1 className="text-xl font-semibold text-gray-900">Employee Portal</h1>
+              
 
               {/* Profile - From Layout1 */}
               <div className="flex items-center">
@@ -60,7 +60,7 @@ export function EmployeeLayout() {
         <footer className="employee-footer">
           <div className="employee-footer-container">
             <div className="employee-footer-content">
-              © 2024 Employee Portal. All rights reserved.
+              © 2025 Employee Portal. All rights reserved.
             </div>
           </div>
         </footer>

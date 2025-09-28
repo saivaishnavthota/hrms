@@ -3,8 +3,47 @@ import { Calendar, FileText, Send, CheckCircle, Eye, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useUser } from '@/contexts/UserContext';
 import { leaveAPI } from '@/lib/api';
+import ViewLeaveApplication from '@/components/HR/ViewLeaveApplication';
 
 const ApplyLeave = () => {
+  const formatStatus = (status) => {
+    const s = String(status || '').toLowerCase();
+    if (s.includes('approve')) return 'Approved';
+    if (s.includes('reject')) return 'Rejected';
+    if (s.includes('pending')) return 'Pending';
+    return s ? s.charAt(0).toUpperCase() + s.slice(1) : 'Pending';
+  };
+
+  const getStatusClass = (status) => {
+    const s = String(status || '').toLowerCase();
+    if (s.includes('approve')) return 'bg-green-100 text-green-800 border-green-200';
+    if (s.includes('reject')) return 'bg-red-100 text-red-800 border-red-200';
+    if (s.includes('pending')) return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+    return 'bg-gray-100 text-gray-800 border-gray-200';
+  };
+
+  const formatLeaveType = (type) => {
+    const t = String(type || '').toLowerCase();
+    if (t === 'sick') return 'Sick';
+    if (t === 'casual') return 'Casual';
+    if (t === 'earned' || t === 'annual') return 'Annual';
+    if (t === 'unpaid') return 'Unpaid';
+    if (t === 'wfh') return 'WFH';
+    if (t === 'maternity') return 'Maternity';
+    if (t === 'paternity') return 'Paternity';
+    return type || 'Leave';
+  };
+
+  const getLeaveTypeClass = (type) => {
+    const t = String(type || '').toLowerCase();
+    if (t === 'sick') return 'bg-red-50 text-red-700 border-red-200';
+    if (t === 'casual') return 'bg-blue-50 text-blue-700 border-blue-200';
+    if (t === 'earned' || t === 'annual') return 'bg-green-50 text-green-700 border-green-200';
+    if (t === 'unpaid') return 'bg-gray-100 text-gray-800 border-gray-200';
+    if (t === 'wfh') return 'bg-indigo-50 text-indigo-700 border-indigo-200';
+    if (t === 'maternity' || t === 'paternity') return 'bg-pink-50 text-pink-700 border-pink-200';
+    return 'bg-purple-50 text-purple-700 border-purple-200';
+  };
   const [activeTab, setActiveTab] = useState('apply'); // 'apply' | 'past'
   const [leaveData, setLeaveData] = useState({
     leaveType: '',
@@ -547,10 +586,18 @@ const ApplyLeave = () => {
                     ) : (
                       allLeaves.map((lv) => (
                         <tr key={lv.id} className="border-b hover:bg-muted/30">
-                          <td className="px-3 py-2">{lv.leave_type}</td>
+                          <td className="px-3 py-2">
+                            <span className={`px-3 py-1 rounded-full text-xs font-medium border ${getLeaveTypeClass(lv.leave_type)}`}>
+                              {formatLeaveType(lv.leave_type)}
+                            </span>
+                          </td>
                           <td className="px-3 py-2">{new Date(lv.start_date).toLocaleDateString()}</td>
                           <td className="px-3 py-2">{new Date(lv.end_date).toLocaleDateString()}</td>
-                          <td className="px-3 py-2">{lv.status}</td>
+                          <td className="px-3 py-2">
+                            <span className={`px-3 py-1 rounded-full text-xs font-medium border ${getStatusClass(lv.status)}`}>
+                              {formatStatus(lv.status)}
+                            </span>
+                          </td>
                           <td className="px-3 py-2">
                             <button
                               type="button"
@@ -571,32 +618,12 @@ const ApplyLeave = () => {
         )}
       </div>
 
-      {/* Details modal */}
-      {selectedLeave && (
-        <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50">
-          <div className="bg-white w-full max-w-lg rounded-lg shadow-lg">
-            <div className="flex items-center justify-between p-4 border-b">
-              <h3 className="text-lg font-semibold">Leave Details</h3>
-              <button className="text-muted-foreground hover:text-foreground" onClick={() => setSelectedLeave(null)}>
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-            <div className="p-4 space-y-2 text-sm">
-              <div className="flex justify-between"><span className="text-muted-foreground">Type:</span><span>{selectedLeave.leave_type}</span></div>
-              <div className="flex justify-between"><span className="text-muted-foreground">Reason:</span><span>{selectedLeave.reason || '-'}</span></div>
-              <div className="flex justify-between"><span className="text-muted-foreground">Start:</span><span>{new Date(selectedLeave.start_date).toLocaleDateString()}</span></div>
-              <div className="flex justify-between"><span className="text-muted-foreground">End:</span><span>{new Date(selectedLeave.end_date).toLocaleDateString()}</span></div>
-              <div className="flex justify-between"><span className="text-muted-foreground">Days:</span><span>{selectedLeave.no_of_days}</span></div>
-              <div className="flex justify-between"><span className="text-muted-foreground">Manager Status:</span><span>{selectedLeave.manager_status}</span></div>
-              <div className="flex justify-between"><span className="text-muted-foreground">HR Status:</span><span>{selectedLeave.hr_status}</span></div>
-              <div className="flex justify-between"><span className="text-muted-foreground">Final Status:</span><span>{selectedLeave.status}</span></div>
-            </div>
-            <div className="p-4 border-t text-right">
-              <Button variant="outline" onClick={() => setSelectedLeave(null)}>Close</Button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* View popup card */}
+      <ViewLeaveApplication
+        isOpen={!!selectedLeave}
+        onClose={() => setSelectedLeave(null)}
+        leaveData={selectedLeave}
+      />
     </div>
   );
 };

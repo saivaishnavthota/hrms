@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Eye, Edit, Plus, X, Trash2 } from 'lucide-react';
 import { avatarBg } from '../../lib/avatarColors';
+import { markDeleted, filterListByDeleted } from '../../lib/localDelete';
 
 // Helper to get current user (manager) from localStorage
 const getCurrentUser = () => {
@@ -101,7 +102,7 @@ const ManagerEmployees = () => {
           };
         });
 
-        setEmployees(normalized);
+        setEmployees(filterListByDeleted('managerEmployees', normalized));
       } catch (err) {
         setError(err?.message || 'Failed to load manager employees');
       } finally {
@@ -261,7 +262,18 @@ const ManagerEmployees = () => {
                     <button className={`${iconBtn} ${iconEdit}`} onClick={() => openEdit(emp)} title="Edit Projects">
                       <Edit size={16} />
                     </button>
-                    <button className={`${iconBtn} ${iconDelete}`} onClick={() => clearProjects(emp)} title="Delete / Clear Projects">
+                    <button
+                      className={`${iconBtn} ${iconDelete}`}
+                      onClick={() => {
+                        try {
+                          markDeleted('managerEmployees', emp.id);
+                        } catch (e) {
+                          console.error('Error marking employee deleted locally:', e);
+                        }
+                        setEmployees(prev => prev.filter(e => e.id !== emp.id));
+                      }}
+                      title="Delete Employee (local)"
+                    >
                       <Trash2 size={16} />
                     </button>
                   </div>
@@ -274,13 +286,13 @@ const ManagerEmployees = () => {
 
       {/* View Modal */}
       {viewOpen && selectedEmployee && (
-        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40">
-          <div className="w-full max-w-lg bg-white rounded-lg shadow-lg">
-            <div className="flex items-center justify-between px-4 py-3 border-b">
-              <h2 className="text-lg font-semibold">Employee Details</h2>
-              <button className="p-1" onClick={() => setViewOpen(false)} aria-label="Close"><X size={18} /></button>
+        <div className="fixed inset-0 bg-transparent backdrop-blur-[2px] flex items-center justify-center z-50">
+          <div className="bg-gradient-to-br from-white via-gray-50 to-blue-50 rounded-xl shadow-2xl w-full max-w-lg mx-4 border border-gray-200">
+            <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-gradient-to-r from-gray-600 to-blue-600 rounded-t-xl">
+              <h2 className="text-lg font-semibold text-white">Employee Details</h2>
+              <button className="text-blue-100 hover:text-white transition-colors p-1 rounded-full hover:bg-blue-500" onClick={() => setViewOpen(false)} aria-label="Close"><X size={18} /></button>
             </div>
-            <div className="p-4 space-y-2">
+            <div className="p-6 space-y-4">
               <div>
                 <div className="text-sm text-gray-500">Name</div>
                 <div className="font-medium">{selectedEmployee.name}</div>
@@ -311,8 +323,8 @@ const ManagerEmployees = () => {
                 </div>
               )}
             </div>
-            <div className="px-4 py-3 border-t flex justify-end">
-              <button className={btnGhost} onClick={() => setViewOpen(false)}>Close</button>
+            <div className="flex justify-end gap-3 p-6 border-t border-gray-200 bg-white/60 rounded-b-xl">
+              <button className="px-4 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 transition-colors duration-200" onClick={() => setViewOpen(false)}>Close</button>
             </div>
           </div>
         </div>
@@ -322,13 +334,13 @@ const ManagerEmployees = () => {
 
       {/* Projects Modal */}
       {projectsOpen && selectedEmployee && (
-        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40">
-          <div className="w-full max-w-xl bg-white rounded-lg shadow-lg">
-            <div className="flex items-center justify-between px-4 py-3 border-b">
-              <h2 className="text-lg font-semibold">Assign Projects</h2>
-              <button className="p-1" onClick={() => setProjectsOpen(false)} aria-label="Close"><X size={18} /></button>
+        <div className="fixed inset-0 bg-transparent backdrop-blur-[2px] flex items-center justify-center z-50">
+          <div className="bg-gradient-to-br from-white via-gray-50 to-blue-50 rounded-xl shadow-2xl w-full max-w-xl mx-4 border border-gray-200">
+            <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-gradient-to-r from-gray-600 to-blue-600 rounded-t-xl">
+              <h2 className="text-lg font-semibold text-white">Assign Projects</h2>
+              <button className="text-blue-100 hover:text-white transition-colors p-1 rounded-full hover:bg-blue-500" onClick={() => setProjectsOpen(false)} aria-label="Close"><X size={18} /></button>
             </div>
-            <div className="p-4">
+            <div className="p-6">
               <div className="text-sm text-gray-600 mb-2">Select one or more projects for {selectedEmployee.name}:</div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 {allProjects.length === 0 && (
@@ -346,9 +358,9 @@ const ManagerEmployees = () => {
                 ))}
               </div>
             </div>
-            <div className="px-4 py-3 border-t flex justify-end gap-2">
-              <button className={btnGhost} onClick={() => setProjectsOpen(false)}>Cancel</button>
-              <button className={btnPrimary} onClick={saveProjects}>Save</button>
+            <div className="flex justify-end gap-3 p-6 border-t border-gray-200 bg-white/60 rounded-b-xl">
+              <button className="px-4 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 transition-colors duration-200" onClick={() => setProjectsOpen(false)}>Cancel</button>
+              <button className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors duration-200" onClick={saveProjects}>Save</button>
             </div>
           </div>
         </div>
@@ -356,13 +368,13 @@ const ManagerEmployees = () => {
 
       {/* Projects Summary Popup */}
       {projectsSummaryOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="w-full max-w-md bg-white rounded-lg shadow-lg">
-            <div className="flex items-center justify-between px-4 py-3 border-b">
-              <h2 className="text-lg font-semibold">Projects Assigned</h2>
-              <button className="p-1" onClick={() => setProjectsSummaryOpen(false)} aria-label="Close"><X size={18} /></button>
+        <div className="fixed inset-0 bg-transparent backdrop-blur-[2px] flex items-center justify-center z-50">
+          <div className="bg-gradient-to-br from-white via-gray-50 to-blue-50 rounded-xl shadow-2xl w-full max-w-md mx-4 border border-gray-200">
+            <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-gradient-to-r from-gray-600 to-blue-600 rounded-t-xl">
+              <h2 className="text-lg font-semibold text-white">Projects Assigned</h2>
+              <button className="text-blue-100 hover:text-white transition-colors p-1 rounded-full hover:bg-blue-500" onClick={() => setProjectsSummaryOpen(false)} aria-label="Close"><X size={18} /></button>
             </div>
-            <div className="p-4">
+            <div className="p-6">
               <div className="text-sm text-gray-600">{projectsSummary.employeeName} has been assigned:</div>
               <div className="flex flex-wrap gap-2 mt-3">
                 {(projectsSummary.projects || []).length > 0 ? (
@@ -372,8 +384,8 @@ const ManagerEmployees = () => {
                 )}
               </div>
             </div>
-            <div className="px-4 py-3 border-t flex justify-end">
-              <button className={btnPrimary} onClick={() => setProjectsSummaryOpen(false)}>OK</button>
+            <div className="flex justify-end gap-3 p-6 border-t border-gray-200 bg-white/60 rounded-b-xl">
+              <button className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors duration-200" onClick={() => setProjectsSummaryOpen(false)}>OK</button>
             </div>
           </div>
         </div>

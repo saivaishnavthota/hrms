@@ -1,11 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { Search, Plus, Edit, Trash2, Eye, X } from 'lucide-react';
+import { markDeleted, filterListByDeleted } from '../../lib/localDelete';
 
 const Holidays = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [entriesPerPage, setEntriesPerPage] = useState(10);
   const [showModal, setShowModal] = useState(false);
+  const [showLocationModal, setShowLocationModal] = useState(false);
+  const [newLocationName, setNewLocationName] = useState('');
   const [selectedLocation, setSelectedLocation] = useState('');
   const [locations, setLocations] = useState([]);
   const [holidays, setHolidays] = useState([]);
@@ -38,6 +41,9 @@ const Holidays = () => {
       );
     }
     
+    // Apply localStorage-based deletion filter
+    filtered = filterListByDeleted('holidays', filtered);
+    
     setFilteredHolidays(filtered);
     setCurrentPage(1);
   }, [holidays, selectedLocation, searchTerm]);
@@ -51,6 +57,29 @@ const Holidays = () => {
       }
     } catch (error) {
       console.error('Error fetching locations:', error);
+    }
+  };
+
+  const handleAddLocation = async (e) => {
+    e.preventDefault();
+    if (!newLocationName.trim()) return;
+    try {
+      const response = await fetch('http://localhost:8000/locations', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ name: newLocationName.trim() }),
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        const created = result.data; // { id, name }
+        setLocations(prev => [...prev, created]);
+        setNewLocationName('');
+        setShowLocationModal(false);
+      }
+    } catch (error) {
+      console.error('Error adding location:', error);
     }
   };
 
@@ -173,21 +202,30 @@ const Holidays = () => {
             <span>Entries</span>
           </div>
           
-          <div className="flex items-center gap-2">
-            <span>Location:</span>
-            <select
-              value={selectedLocation}
-              onChange={(e) => setSelectedLocation(e.target.value)}
-              className="border border-gray-300 rounded px-3 py-1"
-            >
-              <option value="">All Locations</option>
-              {locations.map(location => (
-                <option key={location.id} value={location.id}>
-                  {location.name}
-                </option>
-              ))}
-            </select>
-          </div>
+        <div className="flex items-center gap-2">
+          <span>Location:</span>
+          <select
+            value={selectedLocation}
+            onChange={(e) => setSelectedLocation(e.target.value)}
+            className="border border-gray-300 rounded px-3 py-1"
+          >
+            <option value="">All Locations</option>
+            {locations.map(location => (
+              <option key={location.id} value={location.id}>
+                {location.name}
+              </option>
+            ))}
+          </select>
+          <button
+            type="button"
+            onClick={() => setShowLocationModal(true)}
+            className="ml-2 flex items-center gap-1 px-2 py-1 border border-gray-300 rounded text-gray-700 hover:bg-gray-50"
+            title="Add Location"
+          >
+            <Plus size={14} />
+            <span className="text-sm">Add Location</span>
+          </button>
+        </div>
         </div>
 
         <div className="relative">
@@ -232,7 +270,17 @@ const Holidays = () => {
                     <button className="text-blue-600 hover:text-blue-800">
                       <Edit size={16} />
                     </button>
-                    <button className="text-red-600 hover:text-red-800">
+                    <button
+                      className="text-red-600 hover:text-red-800"
+                      onClick={() => {
+                        try {
+                          markDeleted('holidays', holiday.id);
+                        } catch (e) {
+                          console.error('Error marking deleted locally:', e);
+                        }
+                        setHolidays(prev => prev.filter(h => h.id !== holiday.id));
+                      }}
+                    >
                       <Trash2 size={16} />
                     </button>
                     <button className="text-gray-600 hover:text-gray-800">
@@ -382,6 +430,53 @@ const Holidays = () => {
                 </div>
               </form>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add Location Modal */}
+      {showLocationModal && (
+        <div className="fixed inset-0 bg-transparent backdrop-blur-[2px] flex items-center justify-center z-50">
+          <div className="bg-gradient-to-br from-white via-gray-50 to-blue-50 rounded-xl shadow-2xl max-w-sm w-full mx-4 overflow-hidden border border-gray-200">
+            <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-gradient-to-r from-gray-600 to-blue-600 rounded-t-xl">
+              <h3 className="text-lg font-semibold text-white">Add Location</h3>
+              <button
+                onClick={() => setShowLocationModal(false)}
+                className="text-blue-100 hover:text-white transition-colors p-1 rounded-full hover:bg-blue-500"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            <form onSubmit={handleAddLocation} className="p-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Location Name *
+                </label>
+                <input
+                  type="text"
+                  value={newLocationName}
+                  onChange={(e) => setNewLocationName(e.target.value)}
+                  required
+                  className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                  placeholder="Enter location name"
+                />
+              </div>
+              <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-gray-200">
+                <button
+                  type="button"
+                  onClick={() => setShowLocationModal(false)}
+                  className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-orange-500 text-white rounded-md hover:bg-orange-600 transition-colors"
+                >
+                  Add Location
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

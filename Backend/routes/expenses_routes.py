@@ -280,59 +280,51 @@ def update_expense_status(
         "new_status": expense.status
     }
  
- 
+  
 @router.get("/hr-exp-list", response_model=List[dict])
-def list_hr_expenses(
+def list_all_expenses(
     request: Request,
-    hr_id: int = Query(..., description="HR ID from frontend"),  # use frontend HR ID
+    session: Session = Depends(get_session),
+    hr_id: int = Query(..., description="HR ID"),
     year: int = Query(..., description="Year of expenses"),
     month: int = Query(..., description="Month of expenses"),
-    session: Session = Depends(get_session),
 ):
-    # employees under this HR
-    employee_links = session.exec(
-        select(EmployeeMaster.emp_id).where(
-            (EmployeeMaster.hr1_id == hr_id) |
-            (EmployeeMaster.hr2_id == hr_id)
-        )
+    # Get employees reporting to the manager
+    employee_ids = session.exec(
+        select(EmployeeHR.employee_id).where(EmployeeHR.hr_id == hr_id)
     ).all()
  
+    employee_links = [e[0] if isinstance(e, tuple) else e for e in employee_ids]
     if not employee_links:
         return []
  
     expenses = session.exec(
-        select(ExpenseRequest)
-        .where(
+        select(ExpenseRequest).where(
             ExpenseRequest.employee_id.in_(employee_links),
-            ExpenseRequest.status.in_([
-                "pending_hr_approval",
-                "pending_account_mgr_approval",
-                "hr_rejected",
-                "approved",
-                "carried_forward"
-            ]),
-            extract("year", ExpenseRequest.created_at) == year,
-            extract("month", ExpenseRequest.created_at) == month
-        )
-        .order_by(ExpenseRequest.created_at.desc())
+
+           ExpenseRequest.status.in_([
+    "pending_account_mgr_approval",
+    "pending_hr_approval",
+    "hr_rejected",
+    "approved",
+    "carried_forward"
+]),
+
+            func.extract("year", ExpenseRequest.created_at) == year,
+            func.extract("month", ExpenseRequest.created_at) == month
+        ).order_by(ExpenseRequest.created_at.desc())
     ).all()
  
     result = []
+ 
     for exp in expenses:
         employee = session.get(User, exp.employee_id)
  
-        attachments = [
-            {
-                "attachment_id": att.attachment_id,
-                "file_name": att.file_name,
-                "file_path": request.base_url + att.file_path.replace("\\", "/"),
- 
- 
-                "file_type": att.file_type,
-                "file_size": att.file_size,
-            }
-            for att in exp.attachments
-        ]
+        attachment_url = None
+        if exp.attachments:
+            att = exp.attachments[0]
+            rel_path = att.file_path.replace("\\", "/").split("uploads/")[-1]
+            attachment_url = f"{request.base_url}uploads/{rel_path}"
  
         history_entries = session.exec(
             select(ExpenseHistory)
@@ -356,14 +348,15 @@ def list_hr_expenses(
                 "status": exp.status,
                 "description": exp.description,
                 "date": exp.expense_date.strftime("%Y-%m-%d"),
-                "submitted_at": exp.created_at.strftime("%Y-%m-%d"),
                 "taxIncluded": exp.tax_included,
-                "attachments": attachments,
+                "submitted_at": exp.created_at.strftime("%Y-%m-%d"),
+                "attachment": attachment_url,
                 "reason": hr_reason or "-",
+                
             }
         )
- 
     return result
+ 
  
 @router.put("/hr-upd-status/{request_id}")
 def update_hr_status(
@@ -426,16 +419,21 @@ def list_acc_mgr_expenses(
  
     #Filter expenses for employees in the same location
     expenses = session.exec(
-        select(ExpenseRequest)
-        .join(User, User.id == ExpenseRequest.employee_id)
-        .where(
-            User.location_id == acc_mgr.id,
-            ExpenseRequest.status.in_(["pending_account_mgr_approval", "approved", "acc_mgr_rejected"]),
-            extract("year", ExpenseRequest.created_at) == year,
-            extract("month", ExpenseRequest.created_at) == month
-        )
-        .order_by(ExpenseRequest.created_at.desc())
-    ).all()
+    select(ExpenseRequest)
+    .join(User, User.id == ExpenseRequest.employee_id)
+    .where(
+        User.location_id == acc_mgr.location_id,  # <-- FIXED
+        ExpenseRequest.status.in_([
+            "pending_account_mgr_approval", 
+            "approved", 
+            "acc_mgr_rejected"  # Make sure this matches your DB
+        ]),
+        extract("year", ExpenseRequest.created_at) == year,
+        extract("month", ExpenseRequest.created_at) == month
+    )
+    .order_by(ExpenseRequest.created_at.desc())
+).all()
+
  
     result = []
     for exp in expenses:

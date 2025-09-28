@@ -168,6 +168,8 @@ const NewExpenseForm = ({ employeeIdOverride, onSuccess, onCancel }) => {
               <SelectItem value="INR">INR</SelectItem>
               <SelectItem value="USD">USD</SelectItem>
               <SelectItem value="EUR">EUR</SelectItem>
+              <SelectItem value="GBP">GBP</SelectItem>
+              <SelectItem value="JPY">JPY</SelectItem>
             </SelectContent>
           </Select>
         </div>

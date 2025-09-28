@@ -609,7 +609,7 @@ const ManagerExpenseManagement = () => {
                     </div>
                   </TableCell>
                   <TableCell className="px-6 py-4 text-gray-700">{expense.category}</TableCell>
-                  <TableCell className="px-6 py-4 font-medium text-gray-900">${expense.amount.toFixed(2)}</TableCell>
+                  <TableCell className="px-6 py-4 font-medium text-gray-900">{new Intl.NumberFormat(undefined, { style: 'currency', currency: expense.currency || 'INR' }).format(expense.amount)}</TableCell>
                   <TableCell className="px-6 py-4 text-gray-700">
                     <Button
                       variant="outline"
@@ -729,7 +729,7 @@ const ManagerExpenseManagement = () => {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="text-sm font-medium text-gray-500">Amount</label>
-                  <p className="text-lg font-bold text-gray-900">${selectedExpense.amount.toFixed(2)}</p>
+                  <p className="text-lg font-bold text-gray-900">{new Intl.NumberFormat(undefined, { style: 'currency', currency: selectedExpense.currency || 'INR' }).format(selectedExpense.amount)}</p>
                 </div>
                 <div>
                   <label className="text-sm font-medium text-gray-500">Status</label>

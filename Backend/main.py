@@ -39,7 +39,7 @@ app.include_router(user_routes.router)
 app.include_router(document_routes.router) 
 app.include_router(attendance_routes.router)
 app.include_router(leave_routes.router)
-app.include_router(expense_management_routes.router)
+
 app.include_router(onboarding_routes.router)
 app.include_router(locations_routes.router)
 app.include_router(calendar_routes.router)

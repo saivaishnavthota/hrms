@@ -23,6 +23,16 @@ const Dashboard = () => {
       })()
     );
   }, [user]);
+  const hrName = useMemo(() => {
+    try {
+      return (
+        user?.name || user?.fullName || user?.username ||
+        JSON.parse(localStorage.getItem('userData') || '{}')?.name || null
+      );
+    } catch {
+      return null;
+    }
+  }, [user]);
   const [month, setMonth] = useState(() => new Date().getMonth()+1);
   const [year, setYear] = useState(() => new Date().getFullYear());
   const [attMonthCounts, setAttMonthCounts] = useState({ present: 0, wfh: 0, leave: 0, total: 0 });
@@ -159,62 +169,94 @@ useEffect(() => {
       setAttMonthCounts({ present, wfh, leave, total });
       setAttTodayCounts({ present: todayPresent, wfh: todayWfh, leave: todayLeave, date: latestDate });
 
-      // Leave requests counts for this month
-      try {
-        const resLeaves = await api.get(`/leave/hr/leave-requests/${hrId}`);
-        if (resLeaves.status >= 200 && resLeaves.status < 300) {
-          const items = Array.isArray(resLeaves.data) ? resLeaves.data : (Array.isArray(resLeaves.data?.items) ? resLeaves.data.items : []);
-          let approved = 0, pending = 0, rejected = 0;
-          const start = new Date(year, month - 1, 1);
-          const end = new Date(year, month, 0, 23, 59, 59);
-          if (Array.isArray(items)) {
-            items.forEach((lv) => {
-              const created = new Date(lv.created_at || lv.request_date || lv.start_date || Date.now());
-              if (created >= start && created <= end) {
-                const s = String(lv.status || lv.hr_status || '').toLowerCase();
-                if (s.includes('approve')) approved += 1; else if (s.includes('reject')) rejected += 1; else pending += 1;
-              }
-            });
+    try {
+  const resLeaves = await api.get(`/leave/hr/leave-requests/${hrId}`);
+  if (resLeaves.status >= 200 && resLeaves.status < 300) {
+    const items = Array.isArray(resLeaves.data)
+      ? resLeaves.data
+      : (Array.isArray(resLeaves.data?.items) ? resLeaves.data.items : []);
+
+    let approved = 0, pending = 0, rejected = 0;
+
+    const start = new Date(year, month - 1, 1); // first day of month
+    const end = new Date(year, month, 0, 23, 59, 59); // last day of month
+
+    if (Array.isArray(items)) {
+      items.forEach((lv) => {
+        // Use leave start_date for filtering
+        const leaveStart = new Date(lv.start_date);
+        const leaveEnd = new Date(lv.end_date);
+
+        // check if leave falls inside the selected month range
+        if ((leaveStart >= start && leaveStart <= end) || (leaveEnd >= start && leaveEnd <= end)) {
+          const status = String(lv.hr_status || '').toLowerCase();
+          if (status.includes('approved')) {
+            approved += 1;
+          } else if (status.includes('rejected')) {
+            rejected += 1;
+          } else if (status.includes('pending')) {
+            pending += 1;
           }
-          const totalLeaves = approved + pending + rejected;
-          setLeaveCounts({ approved, pending, rejected, total: totalLeaves });
         }
-      } catch (e) {
-        // ignore errors
-      }
+      });
+    }
 
-      // Employee type distribution (full-time, contract, intern) - scoped to employees assigned to this HR
-      try {
-        const resEmp = await api.get('/users/employees');
-        const listRaw = Array.isArray(resEmp.data?.employees) ? resEmp.data.employees : (Array.isArray(resEmp.data) ? resEmp.data : []);
+    const totalLeaves = approved + pending + rejected;
+    setLeaveCounts({ approved, pending, rejected, total: totalLeaves });
+  }
+} catch (e) {
+  console.error("Error fetching leaves:", e);
+}
 
-        const matchesHr = (hrItem) => {
-          const val = typeof hrItem === 'object' ? (hrItem?.id || hrItem?.employee_id || hrItem?.emp_id) : hrItem;
-          return String(val) === String(hrId);
-        };
-        const isAssignedToHR = (emp) => {
-          const hrList = emp?.hr_list || emp?.hrs || emp?.hr || [];
-          if (Array.isArray(hrList) && hrList.some(matchesHr)) return true;
-          if (Array.isArray(emp?.hr_ids) && emp.hr_ids.some((id) => String(id) === String(hrId))) return true;
-          if (emp?.hr1_id && String(emp.hr1_id) === String(hrId)) return true;
-          if (emp?.hr2_id && String(emp.hr2_id) === String(hrId)) return true;
-          return false;
-        };
 
-        const list = Array.isArray(listRaw) ? listRaw.filter(isAssignedToHR) : [];
-        let full = 0, contract = 0, intern = 0;
-        list.forEach((emp) => {
-          const t = String(emp.type || emp.employment_type || '').toLowerCase();
-          if (t.includes('full')) full += 1; else if (t.includes('contract')) contract += 1; else if (t.includes('intern')) intern += 1;
-        });
-        const tot = full + contract + intern;
-        setEmployeeTypeCounts({ fullTime: full, contract, intern, total: tot });
+     try {
+  const resEmp = await api.get('/users/onboarded-employees');
+  const listRaw = Array.isArray(resEmp.data?.employees)
+    ? resEmp.data.employees
+    : (Array.isArray(resEmp.data?.data) ? resEmp.data.data : (Array.isArray(resEmp.data) ? resEmp.data : []));
 
-        // Also keep total employees in sync using the scoped list
-        setTotalEmployees(list.length);
-      } catch (e) {
-        // ignore errors
-      }
+  const matchesHr = (hrItem) => {
+    // Support both HR id/object and HR name strings from backend
+    if (typeof hrItem === 'string') {
+      return hrName ? String(hrItem).toLowerCase() === String(hrName).toLowerCase() : false;
+    }
+    const val = typeof hrItem === 'object' ? (hrItem?.id || hrItem?.employee_id || hrItem?.emp_id) : hrItem;
+    return hrId ? String(val) === String(hrId) : false;
+  };
+
+  const isAssignedToHR = (emp) => {
+    const hrList = emp?.hr_list || emp?.hrs || emp?.hr || [];
+    if (Array.isArray(hrList) && hrList.some(matchesHr)) return true;
+    if (Array.isArray(emp?.hr_ids) && hrId && emp.hr_ids.some((id) => String(id) === String(hrId))) return true;
+    if (hrId && emp?.hr1_id && String(emp.hr1_id) === String(hrId)) return true;
+    if (hrId && emp?.hr2_id && String(emp.hr2_id) === String(hrId)) return true;
+    // Fallback: if we cannot determine assignment, include the employee so charts aren’t empty
+    return !hrId || !hrName;
+  };
+
+  const list = Array.isArray(listRaw) ? listRaw.filter(isAssignedToHR) : [];
+
+  let full = 0, contract = 0, intern = 0;
+  list.forEach((emp) => {
+    const t = String(emp.type || emp.employment_type || '').toLowerCase().replace('-', '_').trim();
+
+    if (t.includes('full_time')) {
+      full += 1;
+    } else if (t.includes('contract')) {
+      contract += 1;
+    } else if (t.includes('intern')) {
+      intern += 1;
+    }
+  });
+
+  const tot = full + contract + intern;
+  setEmployeeTypeCounts({ fullTime: full, contract, intern, total: tot });
+
+  // Also sync total employees for this HR
+  setTotalEmployees(list.length);
+} catch (e) {
+  console.error("Error fetching employees:", e);
+}
 
       // Expenses summary for HR (current month)
       try {
@@ -247,38 +289,67 @@ useEffect(() => {
 
   useLivePoll(fetchHRMetrics, 5000);
   // Employee Performance Chart
-  const EmployeePerformanceChart = () => (
-    <div className="bg-white rounded-lg p-6 border border-gray-200 shadow-sm">
-      <div className="flex items-center justify-between mb-6">
-        <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-          <BarChart3 className="h-5 w-5 text-blue-500" />
-          Employee Attendance 
-        </h3>
-        <span className="text-sm text-gray-500">Current month</span>
-      </div>
-      <div className="h-80">
-        <div className="flex items-end justify-between h-full px-4 pb-8">
-          {/* Bar Chart */}
-          <div className="flex items-end gap-4 h-full w-full">
-            <div className="flex flex-col items-center gap-2 flex-1">
-              <div className="w-8 bg-gradient-to-t from-blue-500 to-blue-300 rounded-t" style={{ height: `${attMonthCounts.total ? Math.max(5, Math.round((attMonthCounts.present / attMonthCounts.total) * 100)) : 0}%` }}></div>
-              <span className="text-xs text-gray-600">Present</span>
-            </div>
-            <div className="flex flex-col items-center gap-2 flex-1">
-              <div className="w-8 bg-gradient-to-t from-green-500 to-green-300 rounded-t" style={{ height: `${attMonthCounts.total ? Math.max(5, Math.round((attMonthCounts.wfh / attMonthCounts.total) * 100)) : 0}%` }}></div>
-              <span className="text-xs text-gray-600">WFH</span>
-            </div>
-            <div className="flex flex-col items-center gap-2 flex-1">
-              <div className="w-8 bg-gradient-to-t from-yellow-500 to-yellow-300 rounded-t" style={{ height: `${attMonthCounts.total ? Math.max(5, Math.round((attMonthCounts.leave / attMonthCounts.total) * 100)) : 0}%` }}></div>
-              <span className="text-xs text-gray-600">Leave</span>
-            </div>
+  const EmployeePerformanceChart = () => {
+    const present = attMonthCounts.present || 0;
+    const wfh = attMonthCounts.wfh || 0;
+    const leave = attMonthCounts.leave || 0;
+    const yStep = 2;
+    const maxCount = Math.max(present, wfh, leave);
+    const topScale = Math.max(yStep, Math.ceil(maxCount / yStep) * yStep);
+    const ticks = Array.from({ length: topScale / yStep + 1 }, (_, i) => i * yStep);
 
-            
+    return (
+      <div className="bg-white rounded-lg p-6 border border-gray-200 shadow-sm">
+        <div className="flex items-center justify-between mb-6">
+          <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+            <BarChart3 className="h-5 w-5 text-blue-500" />
+            Employee Attendance 
+          </h3>
+          <span className="text-sm text-gray-500">Current month</span>
+        </div>
+        <div className="h-96">
+          <div className="flex items-end h-full px-4 pb-8">
+            {/* Y Axis */}
+            <div className="flex flex-col justify-between items-end pr-3 w-10 h-full text-[10px] text-gray-500">
+              {ticks.slice().reverse().map((t) => (
+                <div key={t} className="flex items-center gap-1 w-full">
+                  <span>{t}</span>
+                  <div className="flex-1 border-t border-gray-200"></div>
+                </div>
+              ))}
+            </div>
+            {/* Bars */}
+              <div className="flex items-end gap-6 h-full w-full">
+              {maxCount === 0 && (
+                <div className="absolute inset-x-0 bottom-10 flex items-center justify-center text-gray-500 text-sm">No attendance data</div>
+              )}
+              <div className="flex flex-col items-center gap-2 flex-1 h-full">
+                <span className="text-xs font-medium text-gray-800">{present}</span>
+                <div className="w-8 h-full flex items-end">
+                  <div className="w-full bg-blue-500 rounded-t shadow-sm border border-blue-400" style={{ height: `${topScale ? Math.round((present / topScale) * 100) : 0}%` }}></div>
+                </div>
+                <span className="text-xs text-gray-600">Present</span>
+              </div>
+              <div className="flex flex-col items-center gap-2 flex-1 h-full">
+                <span className="text-xs font-medium text-gray-800">{wfh}</span>
+                <div className="w-8 h-full flex items-end">
+                  <div className="w-full bg-green-500 rounded-t shadow-sm border border-green-400" style={{ height: `${topScale ? Math.round((wfh / topScale) * 100) : 0}%` }}></div>
+                </div>
+                <span className="text-xs text-gray-600">WFH</span>
+              </div>
+              <div className="flex flex-col items-center gap-2 flex-1 h-full">
+                <span className="text-xs font-medium text-gray-800">{leave}</span>
+                <div className="w-8 h-full flex items-end">
+                  <div className="w-full bg-yellow-500 rounded-t shadow-sm border border-yellow-400" style={{ height: `${topScale ? Math.round((leave / topScale) * 100) : 0}%` }}></div>
+                </div>
+                <span className="text-xs text-gray-600">Leave</span>
+              </div>
+            </div>
           </div>
         </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   // Employee Type Pie Chart
   const EmployeeTypeChart = () => (
@@ -292,6 +363,9 @@ useEffect(() => {
       </div>
       <div className="flex items-center justify-center h-80">
         <div className="relative w-64 h-64">
+          {!employeeTypeCounts.total && (
+            <div className="absolute inset-0 flex items-center justify-center text-gray-500 text-sm">No data</div>
+          )}
           <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
             {/* Full-time - 60% */}
             <circle
@@ -328,7 +402,7 @@ useEffect(() => {
             />
           </svg>
           {/* Legend */}
-          <div className="absolute -right-25 top-0 space-y-2 text-sm ">
+          <div className="absolute -right-20 top-0 space-y-2 text-sm ">
             <div className="flex items-center gap-2">
               <div className="w-3 h-3 bg-blue-500 rounded"></div>
               <span>Full-time ({employeeTypeCounts.total ? Math.round((employeeTypeCounts.fullTime / employeeTypeCounts.total) * 100) : 0}%)</span>
@@ -500,7 +574,6 @@ useEffect(() => {
             <div>
               <p className="text-sm text-gray-600 mb-1">Pending Leaves</p>
               <p className="text-3xl font-bold text-gray-900">{leaveCounts.pending || 0}</p>
-              <p className="text-sm text-red-500 mt-1">{attTodayCounts.leave || 0} on leave today</p>
             </div>
             <div className="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center">
               <Calendar className="w-6 h-6 text-yellow-600" />

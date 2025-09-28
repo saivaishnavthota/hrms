@@ -27,12 +27,13 @@ const Dashboard = () => {
   };
 
   const fetchData = useCallback(async () => {
-    if (!user?.employeeId) return;
+    const accMgrId = user?.employeeId || localStorage.getItem('userId');
+    if (!accMgrId) return;
     setLoading(true);
     setError(null);
     try {
-      const url = `${BASE_URL}/expenses/mgr-exp-list?manager_id=${encodeURIComponent(
-        user.employeeId
+      const url = `${BASE_URL}/expenses/acc-mgr-exp-list?acc_mgr_id=${encodeURIComponent(
+        accMgrId
       )}&year=${year}&month=${month}`;
       const res = await fetch(url, {
         headers: {
@@ -41,8 +42,9 @@ const Dashboard = () => {
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const json = await res.json();
+      const list = Array.isArray(json) ? json : json?.results || [];
       const counts = { Pending: 0, Approved: 0, Rejected: 0 };
-      (json || []).forEach((item) => {
+      (list || []).forEach((item) => {
         const s = mapStatus(item);
         if (counts[s] !== undefined) counts[s] += 1;
       });
@@ -64,17 +66,13 @@ const Dashboard = () => {
   useLivePoll(fetchData, { intervalMs: 5000, deps: [user?.employeeId, token, year, month] });
 
   const chartConfig = {
-    Pending: { label: 'Pending', color: 'hsl(var(--chart-2))' },
-    Approved: { label: 'Approved', color: 'hsl(var(--chart-1))' },
-    Rejected: { label: 'Rejected', color: 'hsl(var(--chart-4))' },
+    Pending: { label: 'Pending', color: 'orange' },
+    Approved: { label: 'Approved', color: 'green' },
+    Rejected: { label: 'Rejected', color: 'red' },
   };
 
   return (
     <div className="p-6 space-y-6">
-      <h1 className="text-2xl font-semibold">
-        {`Welcome to Account Manager Portal - ${user?.name || ''}`}
-      </h1>
-
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <Card>
           <CardHeader>

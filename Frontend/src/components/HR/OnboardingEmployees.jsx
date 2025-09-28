@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Eye, Trash2, X, FileText, Download, Check, XCircle, User } from 'lucide-react';
 import Swal from 'sweetalert2';
 import { avatarBg } from '../../lib/avatarColors';
+import { markDeleted, filterListByDeleted } from '../../lib/localDelete';
 
 const OnboardingEmployees = () => {
   const [showDocumentsModal, setShowDocumentsModal] = useState(false);
@@ -45,7 +46,7 @@ const OnboardingEmployees = () => {
             return { ...employee, document_count: count };
           })
         );
-        setEmployees(employeesWithDocCount);
+        setEmployees(filterListByDeleted('onboardingEmployees', employeesWithDocCount));
       } else {
         throw new Error('Failed to fetch employees');
       }
@@ -264,7 +265,20 @@ const OnboardingEmployees = () => {
                   <td className="px-6 py-4 whitespace-nowrap">{getStatusBadge(emp.status)}</td>
                   <td className="px-6 py-4 whitespace-nowrap flex items-center space-x-2">
                     <button onClick={() => handleViewEmployeeDetails(emp)} className="p-2 text-green-600 hover:text-green-700 hover:bg-green-50 rounded-full transition-colors" title="View Employee Details"><User className="w-4 h-4" /></button>
-                    <button onClick={() => console.log('Delete', emp.id)} className="p-2 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-full transition-colors" title="Delete Employee"><Trash2 className="w-4 h-4" /></button>
+                    <button
+                      onClick={() => {
+                        try {
+                          markDeleted('onboardingEmployees', emp.id);
+                        } catch (e) {
+                          console.error('Error marking employee deleted locally:', e);
+                        }
+                        setEmployees(prev => prev.filter(e => e.id !== emp.id));
+                      }}
+                      className="p-2 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-full transition-colors"
+                      title="Delete Employee"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
                   </td>
                 </tr>
               ))}

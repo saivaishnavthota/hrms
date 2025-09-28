@@ -64,12 +64,14 @@ export const AppRoutingSetup = () => {
         <Route path="document-collection" element={<DocumentCollection />} />
         <Route path="pending-requests" element={<PendingRequests />} />
         <Route path="view-leave-application" element={<ViewLeaveApplication />} />
-         <Route path="reset-password" element={< ChangePassword/>} />
+         <Route path="change-password" element={< ChangePassword/>} />
         <Route path="leave-requests" element={<LeaveRequests />} />
         <Route path="assign-leaves" element={<AssignLeaves />} />
         <Route path="add-attendance" element={<HRAddAttendance />} />
         <Route path="employees-attendance" element={<EmployeeAttendance />} />
         <Route path="holidays" element={<Holidays />} />
+         <Route path="reset-password" element={< ChangePassword/>} />
+        
       </Route>
       
       {/* Protected Employee routes using Layout1 with employee menu */}

@@ -8,7 +8,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 
-export function DropdownMenu8({ trigger }) {
+export function DropdownMenu8({ trigger, onDelete }) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>{trigger}</DropdownMenuTrigger>
@@ -33,7 +33,7 @@ export function DropdownMenu8({ trigger }) {
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem asChild>
-          <Link to="#">
+          <Link to="#" onClick={(e) => { e.preventDefault(); onDelete && onDelete(); }}>
             <Trash2 />
             <span>Delete</span>
           </Link>

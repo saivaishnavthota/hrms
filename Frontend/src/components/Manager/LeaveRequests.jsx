@@ -276,9 +276,11 @@ const ManagerLeaveRequests = () => {
         )}
       </div>
 
-      {isModalOpen && (
-        <ViewLeaveApplication leave={selectedLeave} onClose={handleCloseModal} />
-      )}
+      <ViewLeaveApplication
+        isOpen={isModalOpen}
+        onClose={handleCloseModal}
+        leaveData={selectedLeave}
+      />
     </div>
   );
 };

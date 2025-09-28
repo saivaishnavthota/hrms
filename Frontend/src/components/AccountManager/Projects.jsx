@@ -12,6 +12,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { Eye, Edit, Trash2 } from 'lucide-react';
 import api from '@/lib/api';
 import { toast } from 'react-toastify';
+import { markDeleted, filterListByDeleted } from '@/lib/localDelete';
 
 const Projects = ({ viewOnly = false }) => {
   const location = useLocation();
@@ -22,6 +23,7 @@ const Projects = ({ viewOnly = false }) => {
   const [selectedProject, setSelectedProject] = useState(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
+  const storageKey = 'accountManagerProjects';
 
   const form = useForm({
     defaultValues: {
@@ -75,27 +77,37 @@ const Projects = ({ viewOnly = false }) => {
     try {
       const res = await api.get('/projects/get_projects');
       const data = Array.isArray(res.data) ? res.data : [];
-      setProjects(
-        data.map((p) => ({
-          id: p.project_id,
-          name: p.project_name,
-          objective: p.project_objective,
-          requirements: p.client_requirements,
-          budget: p.budget,
-          startDate: p.start_date,
-          endDate: p.end_date,
-          skills: p.skills_required,
-          status: p.status,
-          createdAt: p.created_at,
-          assignments: p.assignments || [],
-        }))
-      );
+      const mapped = data.map((p) => ({
+        id: p.project_id,
+        name: p.project_name,
+        objective: p.project_objective,
+        requirements: p.client_requirements,
+        budget: p.budget,
+        startDate: p.start_date,
+        endDate: p.end_date,
+        skills: p.skills_required,
+        status: p.status,
+        createdAt: p.created_at,
+        assignments: p.assignments || [],
+      }));
+      setProjects(filterListByDeleted(storageKey, mapped));
     } catch (err) {
       console.error('Error fetching projects:', err);
       setError('Failed to load projects');
       setProjects([]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDeleteProject = (project) => {
+    try {
+      markDeleted(storageKey, project.id);
+      setProjects((prev) => prev.filter((p) => p.id !== project.id));
+      toast.success('Project deleted locally');
+    } catch (err) {
+      console.error('Error deleting project locally:', err);
+      toast.error('Failed to delete project locally');
     }
   };
 
@@ -304,25 +316,26 @@ const Projects = ({ viewOnly = false }) => {
                                     variant="outline" 
                                     size="sm" 
                                     onClick={() => { setSelectedProject(p); setIsDetailsOpen(true); }}
-                                    className="text-blue-600 color-blue-600 hover:text-blue-900 hover:bg-blue-50"
+                                    className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium text-blue-800 transition-colors duration-200 border-none"
+                          
                                   >
                                     <Eye className="h-4 w-4" />
                                   </Button>
                                 </TooltipTrigger>
                                 <TooltipContent>View</TooltipContent>
                               </Tooltip>
-                             <Tooltip>
+                              <Tooltip>
                                 <TooltipTrigger asChild>
                                   <Button 
                                     variant="outline" 
                                     size="sm" 
-                                    disabled 
-                                    className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                    onClick={() => handleDeleteProject(p)}
+                                    className="text-red-600 hover:text-red-700 hover:bg-red-50 border-none"
                                   >
                                     <Trash2 className="h-4 w-4" />
                                   </Button>
                                 </TooltipTrigger>
-                                <TooltipContent>Delete (Not available)</TooltipContent>
+                                <TooltipContent>Delete</TooltipContent>
                               </Tooltip>
                             </div>
                           </TableCell>

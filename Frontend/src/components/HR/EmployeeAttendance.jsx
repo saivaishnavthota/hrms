@@ -144,6 +144,8 @@ const EmployeeAttendance = () => {
     );
   };
 
+   const getAvatarColor = (name) => avatarBg(name);
+
   return (
     <div className="min-h-screen bg-gray-50 p-6">
       <div className="max-w-7xl mx-auto">
@@ -293,17 +295,17 @@ const EmployeeAttendance = () => {
                 {filteredRecords.map((record) => (
                   <tr key={record.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center">
-                        <div className="flex-shrink-0 h-10 w-10">
-                          <div className={`h-10 w-10 rounded-full ${avatarBg(record.employee.name)} flex items-center justify-center`}>
-                            <User className="h-5 w-5 text-black" />
-                          </div>
-                        </div>
-                        <div className="ml-4">
-                          <div className="text-sm font-medium text-gray-900">{record.employee.name}</div>
-                          <div className="text-sm text-gray-500">{record.employee.email}</div>
-                        </div>
+    
+                          <div className="flex items-center gap-3">
+       <div className={`flex-shrink-0 h-10 w-10 rounded-full ${getAvatarColor(record.employee.name)} flex items-center justify-center`}>
+                        <span className="text-sm font-medium text-white">
+                          {record.employee.name.split(' ').map(n => n[0]).join('')}
+                        </span>
                       </div>
+                          <div className="text-sm font-medium text-gray-900">{record.employee.name}<br/>
+                          <span className="text-sm text-gray-500">{record.employee.email}</span>
+                    </div>
+               </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm text-gray-900">{record.type}</div>

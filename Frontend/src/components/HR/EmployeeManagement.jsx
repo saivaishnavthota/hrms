@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '@/lib/api';
 import { 
   Eye, 
   Edit, 
@@ -104,10 +104,10 @@ import { avatarBg } from '../../lib/avatarColors';
       
       // Fetch all data in parallel
       const [employeesRes, managersRes, hrsRes, locationsRes] = await Promise.all([
-        axios.get('http://127.0.0.1:8000/users/employees'),
-        axios.get('http://127.0.0.1:8000/users/managers'),
-        axios.get('http://127.0.0.1:8000/users/hrs'),
-        axios.get('http://127.0.0.1:8000/locations/')
+        api.get('/users/employees'),
+        api.get('/users/managers'),
+        api.get('/users/hrs'),
+        api.get('/locations/')
       ]);
 
       // Process employees data (supports multiple response shapes)

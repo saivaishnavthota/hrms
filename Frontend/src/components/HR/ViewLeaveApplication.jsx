@@ -32,14 +32,14 @@ const ViewLeaveApplication = ({ isOpen, onClose, leaveData }) => {
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 bg-transparent backdrop-blur-[2px] flex items-center justify-center z-50">
+      <div className="bg-gradient-to-br from-white via-gray-50 to-blue-50 rounded-xl shadow-2xl max-w-3xl w-full mx-4 max-h-[80vh] overflow-y-auto border border-gray-200">
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200">
-          <h2 className="text-xl font-semibold text-gray-900">Leave Application Details</h2>
+        <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-gradient-to-r from-gray-600 to-blue-600 rounded-t-xl">
+          <h2 className="text-xl font-semibold text-white">Leave Application Details</h2>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 transition-colors"
+            className="text-blue-100 hover:text-white transition-colors p-1 rounded-full hover:bg-blue-500"
           >
             <X className="w-6 h-6" />
           </button>
@@ -48,9 +48,11 @@ const ViewLeaveApplication = ({ isOpen, onClose, leaveData }) => {
         {/* Content */}
         <div className="p-6 space-y-6">
           {/* Employee Information */}
-          <div className="bg-gray-50 rounded-lg p-4">
+          <div className="bg-white/70 backdrop-blur-sm border border-gray-200 rounded-xl p-4 shadow-md">
             <div className="flex items-center gap-3 mb-3">
-              <User className="w-5 h-5 text-blue-600" />
+              <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-blue-100 text-blue-600 ring-1 ring-blue-200">
+                <User className="w-4 h-4" />
+              </span>
               <h3 className="text-lg font-medium text-gray-900">Employee Information</h3>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -58,17 +60,16 @@ const ViewLeaveApplication = ({ isOpen, onClose, leaveData }) => {
                 <label className="block text-sm font-medium text-gray-700 mb-1">Employee Name</label>
                 <p className="text-gray-900">{leaveData.employee || leaveData.employee_name || 'N/A'}</p>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Employee ID</label>
-                <p className="text-gray-900">{leaveData.employee_id || 'N/A'}</p>
-              </div>
+              
             </div>
           </div>
 
           {/* Leave Details */}
-          <div className="bg-blue-50 rounded-lg p-4">
+          <div className="bg-white/70 backdrop-blur-sm border border-gray-200 rounded-xl p-4 shadow-md">
             <div className="flex items-center gap-3 mb-3">
-              <Calendar className="w-5 h-5 text-blue-600" />
+              <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-indigo-100 text-indigo-600 ring-1 ring-indigo-200">
+                <Calendar className="w-4 h-4" />
+              </span>
               <h3 className="text-lg font-medium text-gray-900">Leave Details</h3>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -101,9 +102,11 @@ const ViewLeaveApplication = ({ isOpen, onClose, leaveData }) => {
 
           {/* Reason */}
           {(leaveData.reason || leaveData.description) && (
-            <div className="bg-green-50 rounded-lg p-4">
+            <div className="bg-white/70 backdrop-blur-sm border border-gray-200 rounded-xl p-4 shadow-md">
               <div className="flex items-center gap-3 mb-3">
-                <FileText className="w-5 h-5 text-green-600" />
+                <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-green-100 text-green-600 ring-1 ring-green-200">
+                  <FileText className="w-4 h-4" />
+                </span>
                 <h3 className="text-lg font-medium text-gray-900">Reason for Leave</h3>
               </div>
               <p className="text-gray-900 whitespace-pre-wrap">
@@ -114,9 +117,11 @@ const ViewLeaveApplication = ({ isOpen, onClose, leaveData }) => {
 
           {/* Additional Information */}
           {(leaveData.emergencyContact || leaveData.handoverNotes || leaveData.comments) && (
-            <div className="bg-yellow-50 rounded-lg p-4">
+            <div className="bg-white/70 backdrop-blur-sm border border-gray-200 rounded-xl p-4 shadow-md">
               <div className="flex items-center gap-3 mb-3">
-                <Clock className="w-5 h-5 text-yellow-600" />
+                <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-yellow-100 text-yellow-600 ring-1 ring-yellow-200">
+                  <Clock className="w-4 h-4" />
+                </span>
                 <h3 className="text-lg font-medium text-gray-900">Additional Information</h3>
               </div>
               <div className="space-y-3">
@@ -144,9 +149,11 @@ const ViewLeaveApplication = ({ isOpen, onClose, leaveData }) => {
 
           {/* Approval Information */}
           {(leaveData.approved_by || leaveData.rejected_by || leaveData.manager_comments) && (
-            <div className="bg-purple-50 rounded-lg p-4">
+            <div className="bg-white/70 backdrop-blur-sm border border-gray-200 rounded-xl p-4 shadow-md">
               <div className="flex items-center gap-3 mb-3">
-                <User className="w-5 h-5 text-purple-600" />
+                <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-purple-100 text-purple-600 ring-1 ring-purple-200">
+                  <User className="w-4 h-4" />
+                </span>
                 <h3 className="text-lg font-medium text-gray-900">Approval Information</h3>
               </div>
               <div className="space-y-3">
@@ -174,10 +181,10 @@ const ViewLeaveApplication = ({ isOpen, onClose, leaveData }) => {
         </div>
 
         {/* Footer */}
-        <div className="flex justify-end gap-3 p-6 border-t border-gray-200">
+        <div className="flex justify-end gap-3 p-6 border-t border-gray-200 bg-white/60 rounded-b-xl">
           <button
             onClick={onClose}
-            className="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+            className="px-4 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 transition-colors duration-200"
           >
             Close
           </button>

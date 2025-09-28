@@ -10,7 +10,7 @@ import { useEffect, useRef } from 'react';
  * @param {number} options.intervalMs - polling interval in ms (default 5000)
  * @param {Array} options.deps - dependencies that should restart polling when changed
  */
-export default function useLivePoll(callback, { intervalMs = 5000, deps = [] } = {}) {
+export default function useLivePoll(callback, { intervalMs = 8000, deps = [] } = {}) {
   const cbRef = useRef(callback);
 
   // Keep latest callback without re-registering the interval on every render

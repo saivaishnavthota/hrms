@@ -124,6 +124,83 @@ def update_project_status(
         session.rollback()
         raise HTTPException(status_code=500, detail=str(e))
 
+# Update Project details (AM/Manager/HR)
+@router.put("/{project_id}", response_model=ProjectRead)
+def update_project(
+    project_id: int,
+    project: ProjectCreate,
+    session: Session = Depends(get_session),
+):
+    try:
+        # Update core project fields; status is managed via status route
+        update_query = text(
+            """
+            UPDATE projects SET
+                project_name = :project_name,
+                project_objective = :project_objective,
+                client_requirements = :client_requirements,
+                budget = :budget,
+                start_date = :start_date,
+                end_date = :end_date,
+                skills_required = :skills_required
+            WHERE project_id = :project_id
+            RETURNING project_id, project_name, project_objective, client_requirements,
+                      budget, start_date, end_date, skills_required, status, created_at
+            """
+        )
+
+        params = project.dict(exclude={"assignments", "status_logs", "status"})
+        params["project_id"] = project_id
+        updated = session.execute(update_query, params).fetchone()
+        if not updated:
+            session.rollback()
+            raise HTTPException(status_code=404, detail="Project not found")
+
+        # Fetch employees assigned to this project for response consistency
+        rows = session.execute(text(
+            """
+            SELECT e.id AS employee_id, e.name, e.email, e.role,
+                   ep.assignment_id, ep.assigned_by, ep.assigned_at
+            FROM employees e
+            JOIN employee_project_assignments ep ON e.id = ep.employee_id
+            WHERE ep.project_id = :proj_id
+            """
+        ), {"proj_id": updated.project_id}).fetchall()
+
+        employee_list = [
+            {
+                "assignment_id": r.assignment_id,
+                "employee_id": r.employee_id,
+                "name": r.name,
+                "email": r.email,
+                "role": r.role,
+                "assigned_by": r.assigned_by,
+                "assigned_at": r.assigned_at,
+            }
+            for r in rows
+        ]
+
+        session.commit()
+        return ProjectRead(
+            project_id=updated.project_id,
+            project_name=updated.project_name,
+            project_objective=updated.project_objective,
+            client_requirements=updated.client_requirements,
+            budget=updated.budget,
+            start_date=updated.start_date,
+            end_date=updated.end_date,
+            skills_required=updated.skills_required,
+            status=updated.status,
+            created_at=updated.created_at,
+            assignments=employee_list,
+            status_logs=[],
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        session.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+
 # Fetch all active projects
 @router.get("/all-projects")
 def get_all_projects(

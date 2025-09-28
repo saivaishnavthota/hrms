@@ -3,6 +3,7 @@ import { Eye, Edit, Trash2, ChevronUp, ChevronDown, UserCircle } from 'lucide-re
 import EditEmployeeModal from './EditEmployeeModal';
 import axios from 'axios';
 import { toast } from 'react-toastify';
+import { avatarBg } from '../../lib/avatarColors';
 
 const AssignLeaves = () => {
   // Employees fetched from backend
@@ -19,14 +20,7 @@ const AssignLeaves = () => {
   const [actionError, setActionError] = useState(null);
 
   // Sample data with employee leave balance
-  const getAvatarColor = (name) => {
-    const colors = [
-      'bg-blue-500', 'bg-green-500', 'bg-purple-500', 'bg-pink-500', 
-      'bg-indigo-500', 'bg-yellow-500', 'bg-red-500', 'bg-teal-500'
-    ];
-    const index = name.charCodeAt(0) % colors.length;
-    return colors[index];
-  };
+  const getAvatarColor = (name) => avatarBg(name);
 
   // Fetch onboarded employees from backend and map to local structure
   React.useEffect(() => {
@@ -51,7 +45,7 @@ const AssignLeaves = () => {
           paternityLeave: 0,
         }));
         setEmployeeLeaveData(mapped);
-        toast.success(`Loaded ${mapped.length} employees`);
+        // toast.success(`Loaded ${mapped.length} employees`);
 
         // Fetch existing leave balances per employee and populate
         const fetchBalances = async () => {
@@ -86,9 +80,9 @@ const AssignLeaves = () => {
           const succeeded = results.filter(r => r.status === 'fulfilled').length;
           if (failedCount > 0) {
             toast.warn(`Updated ${succeeded} balances; ${failedCount} failed`);
-          } else if (mapped.length > 0) {
-            toast.success('Leave balances updated');
-          }
+          }  //else if (mapped.length > 0) {
+          //   toast.success('Leave balances updated');
+          // }
         };
         fetchBalances();
       } catch (err) {
@@ -427,15 +421,11 @@ const AssignLeaves = () => {
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
-                      {employee.avatar ? (
-                        <img
-                          src={employee.avatar}
-                          alt={employee.employee}
-                          className="w-8 h-8 rounded-full object-cover"
-                        />
-                      ) : (
-                        <UserCircle className="w-8 h-8 text-gray-400" />
-                      )}
+                     <div className={`flex-shrink-0 h-10 w-10 rounded-full ${getAvatarColor(employee.employee)} flex items-center justify-center`}>
+                        <span className="text-sm font-medium text-white">
+                          {employee.employee.split(' ').map(n => n[0]).join('')}
+                        </span>
+                      </div>
                       <div className="flex items-center min-w-0">
                         <span className="text-sm font-medium text-gray-900 truncate">
                           {employee.employee}

@@ -12,17 +12,17 @@ from models.employee_master_model import EmployeeMaster
 from models.employee_assignment_model import EmployeeManager, EmployeeHR
 from fastapi import Query
 from sqlalchemy import func
-
+ 
 router = APIRouter(prefix="/expenses", tags=["Expenses"])
-
+ 
 UPLOAD_DIR = "uploads/expenses"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
-
-
+ 
+ 
 # Public URL prefix (for frontend to fetch files)
-BASE_URL = "http://localhost:8000" 
-
-
+BASE_URL = "http://localhost:8000"
+ 
+ 
 @router.post("/submit-exp", response_model=dict)
 def submit_expense(
     employee_id: int = Form(...),
@@ -48,18 +48,18 @@ def submit_expense(
     session.add(req)
     session.commit()
     session.refresh(req)
-
+ 
     attachment_data = None
     if file:
         folder_path = os.path.join(UPLOAD_DIR, str(req.request_code))
         os.makedirs(folder_path, exist_ok=True)
         file_location = os.path.join(folder_path, file.filename)
-        
+       
         with open(file_location, "wb") as f:
             f.write(file.file.read())
-            
+           
         rel_path = os.path.join("uploads/expenses", str(req.request_code), file.filename).replace(os.sep, "/")
-
+ 
         attach = ExpenseAttachment(
             request_id=req.request_id,
             file_name=file.filename,
@@ -70,10 +70,10 @@ def submit_expense(
         session.add(attach)
         session.commit()
         session.refresh(attach)
-    
+   
         # Build public URL for response (single prefix)
         public_url = f"{BASE_URL}/{rel_path.lstrip('/')}"
-    
+   
         attachment_data = {
             "attachment_id": attach.attachment_id,
             "file_name": attach.file_name,
@@ -81,7 +81,7 @@ def submit_expense(
             "file_type": attach.file_type,
             "file_size": attach.file_size,
         }
-
+ 
     return {
         "request_id": req.request_id,
         "request_code": req.request_code,
@@ -96,7 +96,7 @@ def submit_expense(
         "status": req.status,
         "attachments": [attachment_data] if attachment_data else [],
     }
-
+ 
 #changed
 @router.get("/my-expenses", response_model=List[dict])
 def list_my_expenses(
@@ -108,15 +108,15 @@ def list_my_expenses(
     query = session.query(ExpenseRequest).filter(
         ExpenseRequest.employee_id == employee_id
     )
-
+ 
     if year and month:
         query = query.filter(
             extract("year", ExpenseRequest.created_at) == year,
             extract("month", ExpenseRequest.created_at) == month
         )
-
+ 
     expenses = query.order_by(ExpenseRequest.created_at.desc()).all()
-
+ 
     result = []
     for exp in expenses:
         history_entries = []
@@ -133,7 +133,7 @@ def list_my_expenses(
                     "created_at": h.created_at
                 }
             )
-
+ 
         result.append(
             {
                 "request_id": exp.request_id,
@@ -159,11 +159,11 @@ def list_my_expenses(
                 "history": history_entries,
             }
         )
-
+ 
     return result
-
-
-
+ 
+ 
+ 
 @router.get("/mgr-exp-list", response_model=List[dict])
 def list_all_expenses(
     request: Request,
@@ -176,11 +176,11 @@ def list_all_expenses(
     employee_ids = session.exec(
         select(EmployeeManager.employee_id).where(EmployeeManager.manager_id == manager_id)
     ).all()
-
+ 
     employee_links = [e[0] if isinstance(e, tuple) else e for e in employee_ids]
     if not employee_links:
         return []
-
+ 
     expenses = session.exec(
         select(ExpenseRequest).where(
             ExpenseRequest.employee_id.in_(employee_links),
@@ -194,29 +194,29 @@ def list_all_expenses(
             func.extract("month", ExpenseRequest.created_at) == month
         ).order_by(ExpenseRequest.created_at.desc())
     ).all()
-
+ 
     result = []
-
+ 
     for exp in expenses:
         employee = session.get(User, exp.employee_id)
-
+ 
         attachment_url = None
         if exp.attachments:
             att = exp.attachments[0]
             rel_path = att.file_path.replace("\\", "/").split("uploads/")[-1]
             attachment_url = f"{request.base_url}uploads/{rel_path}"
-
+ 
         history_entries = session.exec(
             select(ExpenseHistory)
             .where(ExpenseHistory.request_id == exp.request_id)
             .order_by(ExpenseHistory.created_at.asc())
         ).all()
-
+ 
         manager_reason = None
         for h in history_entries:
             if h.action_role == "Manager" and h.reason:
-                manager_reason = h.reason 
-
+                manager_reason = h.reason
+ 
         result.append(
             {
                 "id": exp.request_id,
@@ -235,7 +235,7 @@ def list_all_expenses(
             }
         )
     return result
-
+ 
 @router.put("/mgr-upd-status/{request_id}")
 def update_expense_status(
     request_id: int,
@@ -246,11 +246,11 @@ def update_expense_status(
 ):
     if status not in ["Pending", "Approved", "Rejected"]:
         raise HTTPException(status_code=400, detail="Invalid status")
-
+ 
     expense = session.get(ExpenseRequest, request_id)
     if not expense:
         raise HTTPException(status_code=404, detail="Expense not found")
-
+ 
     # Map frontend → DB statuses
     if status == "Pending":
         expense.status = "pending_manager_approval"
@@ -258,12 +258,12 @@ def update_expense_status(
         expense.status = "pending_hr_approval"
     elif status == "Rejected":
         expense.status = "mgr_rejected"
-
+ 
     expense.updated_at = datetime.utcnow()
     session.add(expense)
     session.commit()
     session.refresh(expense)
-
+ 
     history_entry = ExpenseHistory(
         request_id=request_id,
         action_by=manager_id,  # use manager_id from form
@@ -273,14 +273,14 @@ def update_expense_status(
     )
     session.add(history_entry)
     session.commit()
-
+ 
     return {
         "message": "Manager Status updated",
         "request_id": expense.request_id,
         "new_status": expense.status
     }
-
-
+ 
+ 
 @router.get("/hr-exp-list", response_model=List[dict])
 def list_hr_expenses(
     request: Request,
@@ -289,30 +289,17 @@ def list_hr_expenses(
     month: int = Query(..., description="Month of expenses"),
     session: Session = Depends(get_session),
 ):
-    # employees under this HR from EmployeeMaster (hr1_id/hr2_id)
-    employee_links_master = session.exec(
+    # employees under this HR
+    employee_links = session.exec(
         select(EmployeeMaster.emp_id).where(
             (EmployeeMaster.hr1_id == hr_id) |
             (EmployeeMaster.hr2_id == hr_id)
         )
     ).all()
-
-    # employees under this HR from EmployeeHR (assignment table)
-    employee_links_assign = session.exec(
-        select(EmployeeHR.employee_id).where(
-            EmployeeHR.hr_id == hr_id
-        )
-    ).all()
-
-    # normalize potential tuple results and de-dupe
-    def _normalize(ids):
-        return [i[0] if isinstance(i, tuple) else i for i in ids]
-
-    employee_links = list(set(_normalize(employee_links_master) + _normalize(employee_links_assign)))
-
+ 
     if not employee_links:
         return []
-
+ 
     expenses = session.exec(
         select(ExpenseRequest)
         .where(
@@ -324,40 +311,40 @@ def list_hr_expenses(
                 "approved",
                 "carried_forward"
             ]),
-            extract("year", ExpenseRequest.expense_date) == year,
-            extract("month", ExpenseRequest.expense_date) == month
+            extract("year", ExpenseRequest.created_at) == year,
+            extract("month", ExpenseRequest.created_at) == month
         )
         .order_by(ExpenseRequest.created_at.desc())
     ).all()
-
+ 
     result = []
     for exp in expenses:
         employee = session.get(User, exp.employee_id)
-
+ 
         attachments = [
             {
                 "attachment_id": att.attachment_id,
                 "file_name": att.file_name,
                 "file_path": request.base_url + att.file_path.replace("\\", "/"),
-
-
+ 
+ 
                 "file_type": att.file_type,
                 "file_size": att.file_size,
             }
             for att in exp.attachments
         ]
-
+ 
         history_entries = session.exec(
             select(ExpenseHistory)
             .where(ExpenseHistory.request_id == exp.request_id)
             .order_by(ExpenseHistory.created_at.asc())
         ).all()
-
+ 
         hr_reason = None
         for h in history_entries:
             if h.action_role == "HR" and h.reason:
                 hr_reason = h.reason
-
+ 
         result.append(
             {
                 "id": exp.request_id,
@@ -375,9 +362,9 @@ def list_hr_expenses(
                 "reason": hr_reason or "-",
             }
         )
-
+ 
     return result
-
+ 
 @router.put("/hr-upd-status/{request_id}")
 def update_hr_status(
     request_id: int,
@@ -388,11 +375,11 @@ def update_hr_status(
 ):
     if status not in ["Pending", "Approved", "Rejected"]:
         raise HTTPException(status_code=400, detail="Invalid status")
-
+ 
     expense = session.get(ExpenseRequest, request_id)
     if not expense:
         raise HTTPException(status_code=404, detail="Expense not found")
-
+ 
     # Map frontend → DB statuses
     if status == "Pending":
         expense.status = "pending_hr_approval"
@@ -400,12 +387,12 @@ def update_hr_status(
         expense.status = "pending_account_mgr_approval"
     elif status == "Rejected":
         expense.status = "hr_rejected"
-
+ 
     expense.updated_at = datetime.utcnow()
     session.add(expense)
     session.commit()
     session.refresh(expense)
-
+ 
     # Use HR ID from frontend as the action_by
     history_entry = ExpenseHistory(
         request_id=request_id,
@@ -416,14 +403,14 @@ def update_hr_status(
     )
     session.add(history_entry)
     session.commit()
-
+ 
     return {
         "message": "HR status updated",
         "request_id": expense.request_id,
         "new_status": expense.status
     }
-
-
+ 
+ 
 @router.get("/acc-mgr-exp-list", response_model=List[dict])
 def list_acc_mgr_expenses(
     request: Request,
@@ -436,7 +423,7 @@ def list_acc_mgr_expenses(
     acc_mgr = session.get(User, acc_mgr_id)
     if not acc_mgr or not acc_mgr.location_id:
         return []
-
+ 
     #Filter expenses for employees in the same location
     expenses = session.exec(
         select(ExpenseRequest)
@@ -449,29 +436,29 @@ def list_acc_mgr_expenses(
         )
         .order_by(ExpenseRequest.created_at.desc())
     ).all()
-
+ 
     result = []
     for exp in expenses:
         employee = session.get(User, exp.employee_id)
-
+ 
         attachment_url = None
         if exp.attachments:
             att = exp.attachments[0]
             rel_path = att.file_path.replace("\\", "/").split("uploads/")[-1]
             attachment_url = f"{request.base_url}uploads/{rel_path}"
-
+ 
         # Get expense history
         history_entries = session.exec(
             select(ExpenseHistory)
             .where(ExpenseHistory.request_id == exp.request_id)
             .order_by(ExpenseHistory.created_at.asc())
         ).all()
-
+ 
         acc_mgr_reason = None
         for h in history_entries:
             if h.action_role == "Account Manager" and h.reason:
                 acc_mgr_reason = h.reason
-
+ 
         result.append(
             {
                 "id": exp.request_id,
@@ -489,10 +476,10 @@ def list_acc_mgr_expenses(
                 "reason": acc_mgr_reason or "-",
             }
         )
-
+ 
     return result
-
-
+ 
+ 
 #changed
 @router.put("/acc-mgr-upd-status/{request_id}")
 def update_acc_mgr_status(
@@ -502,14 +489,14 @@ def update_acc_mgr_status(
     reason: str = Form(None),
     session: Session = Depends(get_session),
 ):
-
+ 
     if status not in ["Pending", "Approved", "Rejected"]:
         raise HTTPException(status_code=400, detail="Invalid status")
-
+ 
     expense = session.get(ExpenseRequest, request_id)
     if not expense:
         raise HTTPException(status_code=404, detail="Expense not found")
-
+ 
     # Map frontend → DB statuses
     if status == "Pending":
         expense.status = "pending_account_mgr_approval"
@@ -518,12 +505,12 @@ def update_acc_mgr_status(
     elif status == "Rejected":
         expense.status = "acc_mgr_rejected"
         expense.account_mgr_rejection_reason = reason
-
+ 
     expense.updated_at = datetime.utcnow()
     session.add(expense)
     session.commit()
     session.refresh(expense)
-
+ 
     # Use frontend-provided Account Manager ID for history
     history_entry = ExpenseHistory(
         request_id=request_id,
@@ -534,9 +521,11 @@ def update_acc_mgr_status(
     )
     session.add(history_entry)
     session.commit()
-
+ 
     return {
         "message": "Account Manager status updated",
         "request_id": expense.request_id,
         "new_status": expense.status
     }
+ 
+ 

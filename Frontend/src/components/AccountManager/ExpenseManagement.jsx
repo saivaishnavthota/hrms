@@ -38,6 +38,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { useUser } from '@/contexts/UserContext';
+import { avatarBg } from '../../lib/avatarColors';
 
 const BASE_URL = 'http://localhost:8000';
 
@@ -59,17 +60,7 @@ const AccountManagerExpenseManagement = () => {
   const year = now.getFullYear();
   const month = now.getMonth() + 1;
 
-  const getAvatarColor = (name) => {
-    const colors = [
-      'bg-blue-500',
-      'bg-green-500',
-      'bg-purple-500',
-      'bg-orange-500',
-      'bg-pink-500',
-      'bg-indigo-500',
-    ];
-    return colors[(name?.length || 0) % colors.length];
-  };
+  const getAvatarColor = (name) => avatarBg(name);
 
   const getInitials = (name) => {
     if (!name) return 'NA';
@@ -216,7 +207,7 @@ const AccountManagerExpenseManagement = () => {
 
       // Use backend's manager status update endpoint with form-data
       const form = new FormData();
-      form.append('manager_id', String(user.employeeId || ''));
+      form.append('acc_mgr_id', String(user.employeeId || ''));
       form.append('status', 'Approved');
       form.append('reason', reason);
       const res = await fetch(
@@ -260,7 +251,7 @@ const AccountManagerExpenseManagement = () => {
 
       // Use backend's manager status update endpoint with form-data
       const form = new FormData();
-      form.append('manager_id', String(user.employeeId || ''));
+      form.append('acc_mgr_id', String(user.employeeId || ''));
       form.append('status', 'Rejected');
       form.append('reason', reason);
       const res = await fetch(

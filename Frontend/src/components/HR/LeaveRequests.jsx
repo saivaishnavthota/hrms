@@ -1,10 +1,17 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect , useMemo} from 'react';
 import { Eye, Trash2, ChevronUp, ChevronDown } from 'lucide-react';
 import ViewLeaveApplication from './ViewLeaveApplication';
 import PendingRequests from './PendingRequests';
+import { useUser } from '@/contexts/UserContext';
 import axios from 'axios';
+import { avatarBg } from '../../lib/avatarColors';
 
-const LeaveRequests = ({ hrId = 1 }) => {
+const LeaveRequests = () => {
+  const { user } = useUser();
+  const hrId = useMemo(() => {
+    return user?.employeeId || JSON.parse(localStorage.getItem('userData') || '{}')?.employeeId || 1; // fallback for dev
+  }, [user]);
+
   const [activeTab, setActiveTab] = useState('pending');
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -12,6 +19,8 @@ const LeaveRequests = ({ hrId = 1 }) => {
   const [leaveRequests, setLeaveRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+   const getAvatarColor = (name) => avatarBg(name);
 
   // Fetch HR leave requests
   const fetchLeaveRequests = async () => {
@@ -26,37 +35,29 @@ const LeaveRequests = ({ hrId = 1 }) => {
         startDate: item.start_date,
         endDate: item.end_date,
         days: item.no_of_days,
-        status: (item.hr_status || item.final_status || 'Pending').toLowerCase(),
+        status: (item.manager_status || item.final_status || 'Pending').toLowerCase(),
         appliedOn: item.created_at || item.start_date,
-        reason: item.reason,
+        reason:item.reason,
+        manager_status: item.manager_status,
+        hr_status: item.hr_status,
+        final_status: item.status,
       }));
       setLeaveRequests(mapped);
     } catch (err) {
       console.error('Error fetching HR leave requests:', err);
       setError('Failed to fetch leave requests. Please try again.');
       // Fallback sample data for development
-      setLeaveRequests([
-        {
-          id: 101,
-          employee: 'John Doe',
-          leaveType: 'Annual Leave',
-          startDate: '2025-01-12',
-          endDate: '2025-01-16',
-          days: 5,
-          status: 'pending',
-          appliedOn: '2025-01-05',
-          reason: 'Family trip',
-        },
-      ]);
+     
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => {
-    fetchLeaveRequests();
-  }, [hrId]);
-
+    useEffect(() => {
+    if (activeTab === 'pending') fetchLeaveRequests();
+    else fetchLeaveRequests();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, hrId]);
   
   const handleSort = (key) => {
     let direction = 'asc';
@@ -90,9 +91,9 @@ const LeaveRequests = ({ hrId = 1 }) => {
       case 'Annual Leave':
         return 'text-green-600';
       case 'Sick Leave':
-        return 'text-red-600';
-      case 'Emergency Leave':
         return 'text-orange-600';
+      case 'Casual Leave':
+        return 'text-purple-600';
       default:
         return 'text-gray-600';
     }
@@ -103,9 +104,9 @@ const LeaveRequests = ({ hrId = 1 }) => {
       case 'Annual Leave':
         return 'bg-green-500';
       case 'Sick Leave':
-        return 'bg-red-500';
-      case 'Emergency Leave':
         return 'bg-orange-500';
+      case 'Casual Leave':
+        return 'bg-purple-500';
       default:
         return 'bg-gray-500';
     }
@@ -181,9 +182,7 @@ const LeaveRequests = ({ hrId = 1 }) => {
           <table className="w-full">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  #
-                </th>
+               
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Employee
                 </th>
@@ -222,13 +221,20 @@ const LeaveRequests = ({ hrId = 1 }) => {
             <tbody className="bg-white divide-y divide-gray-200">
               {sortedRequests.map((request) => (
                 <tr key={request.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {request.id}
-                  </td>
+                 
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm font-medium text-blue-600 hover:text-blue-800 cursor-pointer">
-                      {request.employee}
-                    </div>
+                    <div className="flex items-center">
+                        <div className={`flex-shrink-0 h-10 w-10 rounded-full ${getAvatarColor(request.employee)} flex items-center justify-center`}>
+                        <span className="text-sm font-medium text-white">
+                          {request.employee.split(' ').map(n => n[0]).join('')}
+                        </span>
+                      </div>
+                    
+                     <div className="ml-4">
+                        <div className="text-sm font-medium text-gray-900">{request.employee}</div>
+                        <div className="text-sm text-gray-500">{request.email}</div>
+                      </div>
+                        </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center">

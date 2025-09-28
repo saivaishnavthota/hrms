@@ -115,6 +115,11 @@ export const MENU_SIDEBAR = [
     path: '/hr/expense-management',
   },
   {
+    title: 'View Projects',
+    icon: Briefcase,
+    path: '/hr/view-projects?tab=view',
+  },
+  {
     title: 'Change Password',
     icon: KeyRound,
     path: '/hr/change-password',

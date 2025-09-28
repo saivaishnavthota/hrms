@@ -31,18 +31,14 @@ const AddAttendance = () => {
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
   const [weekOffDays, setWeekOffDays] = useState([]);
-  
-  // Filter states for daily attendance
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [searchDate, setSearchDate] = useState('');
+  const [typeFilter, setTypeFilter] = useState('all');
   const [filteredDailyAttendance, setFilteredDailyAttendance] = useState([]);
-  
-  // Project modal states
   const [showProjectModal, setShowProjectModal] = useState(false);
   const [selectedRecord, setSelectedRecord] = useState(null);
 
-  // Get week dates starting from Monday
   const getWeekDates = (date) => {
     const week = [];
     const startDate = new Date(date);
@@ -58,11 +54,10 @@ const AddAttendance = () => {
     return week;
   };
 
-  // Initialize attendance data for the week
   useEffect(() => {
     const weekDates = getWeekDates(currentWeek);
     const initialData = {};
-    
+
     weekDates.forEach((date, index) => {
       const dateStr = formatDateLocal(date);
       initialData[index] = {
@@ -74,94 +69,126 @@ const AddAttendance = () => {
         submitted: false
       };
     });
-    
+
     setAttendanceData(initialData);
     fetchWeeklyAttendance();
+    fetchWeekOffs();
   }, [currentWeek]);
 
-  // Fetch projects from backend
   useEffect(() => {
     if (user?.employeeId) {
       fetchProjects();
-      fetchDailyAttendance(); // Fetch daily attendance on component mount
+      fetchDailyAttendance();
+      fetchWeekOffs();
     }
   }, [user]);
 
-  // Filter daily attendance based on month, year, and search date
   useEffect(() => {
     filterDailyAttendance();
-  }, [dailyAttendance, selectedMonth, selectedYear, searchDate]);
+  }, [dailyAttendance, selectedMonth, selectedYear, searchDate, typeFilter]);
 
-  // Fetch attendance data when calendar view month/year changes
   useEffect(() => {
     if (activeTab === 'calendar' && user?.employeeId) {
       fetchDailyAttendance();
     }
   }, [activeTab, selectedMonth, selectedYear, user]);
 
+  const fetchWeekOffs = async () => {
+    try {
+      if (!user?.employeeId) {
+        setMessage('Employee ID not found');
+        return;
+      }
+
+      const response = await api.get(`/weekoffs/${user.employeeId}`);
+      const weekOffs = response.data || [];
+      const weekDates = getWeekDates(currentWeek);
+      const weekStart = formatDateLocal(weekDates[0]);
+      const weekEnd = formatDateLocal(weekDates[6]);
+
+      const currentWeekOff = weekOffs.find(
+        (wo) => wo.week_start === weekStart && wo.week_end === weekEnd
+      );
+
+      if (currentWeekOff) {
+        setWeekOffDays(currentWeekOff.off_days || []);
+      } else {
+        setWeekOffDays([]);
+      }
+    } catch (error) {
+      console.error('Error fetching week-offs:', error);
+      setMessage(error.response?.data?.detail || 'Error fetching week-offs');
+      setTimeout(() => setMessage(''), 5000);
+    }
+  };
+
   const filterDailyAttendance = () => {
     let filtered = [...dailyAttendance];
-    
-    // Filter by month and year
+
     filtered = filtered.filter(record => {
       const recordDate = parseDateLocal(record.date);
       return recordDate.getMonth() === selectedMonth && recordDate.getFullYear() === selectedYear;
     });
-    
-    // Filter by search date if provided
+
     if (searchDate) {
       filtered = filtered.filter(record => record.date === searchDate);
     }
-    
-    // Sort by date (newest first)
+
+    if (typeFilter !== 'all') {
+      filtered = filtered.filter(record => record.type === typeFilter);
+    }
+
     filtered.sort((a, b) => parseDateLocal(b.date) - parseDateLocal(a.date));
-    
     setFilteredDailyAttendance(filtered);
   };
 
-  // Fetch daily attendance from backend
   const fetchDailyAttendance = async () => {
     try {
       if (!user?.employeeId) return;
-      
+
       setLoading(true);
-      
-      // Get current year and month for the API call
-      const currentDate = new Date();
-      const year = selectedYear || currentDate.getFullYear();
-      const month = selectedMonth || (currentDate.getMonth() + 1);
-      
+
+      const year = selectedYear || new Date().getFullYear();
+      const month = (selectedMonth !== undefined ? selectedMonth : new Date().getMonth()) + 1;
+
       const response = await api.get('/attendance/daily', {
-        params: { 
+        params: {
           employee_id: user.employeeId,
           year: year,
           month: month
         }
       });
-      
+
       if (response.data && response.data.length > 0) {
         const formattedData = response.data.map(record => ({
           date: record.date,
-          status: record.action || record.status,
+          status: record.status || record.action || 'Not set',
           hours: record.hours || 0,
-          projects: record.projects || []
+          type: record.type || 'Full-Time',
+          projects: (record.projects || []).map(p => ({
+            projectId: p.value,
+            projectName: p.label,
+            subtasks: (record.subTasks || [])
+              .filter(st => st.project === p.label)
+              .flatMap(st => st.subTasks || [])
+          }))
         }));
         setDailyAttendance(formattedData);
-        setSubmittedAttendance(formattedData); // Also update submitted attendance for backward compatibility
+        setSubmittedAttendance(formattedData);
       } else {
-        // Clear data if no records found
         setDailyAttendance([]);
         setSubmittedAttendance([]);
       }
     } catch (error) {
       console.error('Error fetching daily attendance:', error);
-      setMessage('Error fetching daily attendance data');
+      const errorMessage = error.response?.data?.detail || 'Error fetching daily attendance data';
+      setMessage(errorMessage);
+      setTimeout(() => setMessage(''), 5000);
     } finally {
       setLoading(false);
     }
   };
 
-  // Handle project modal
   const handleShowProjects = (record) => {
     setSelectedRecord(record);
     setShowProjectModal(true);
@@ -178,7 +205,7 @@ const AddAttendance = () => {
         setMessage('Employee ID not found');
         return;
       }
-      
+
       const response = await api.get('/attendance/active-projects', {
         params: { employee_id: user.employeeId }
       });
@@ -189,11 +216,10 @@ const AddAttendance = () => {
     }
   };
 
-  // Fetch weekly attendance from backend
   const fetchWeeklyAttendance = async () => {
     try {
       if (!user?.employeeId) return;
-      
+
       setLoading(true);
       const weekDates = getWeekDates(currentWeek);
       const baseData = {};
@@ -212,22 +238,30 @@ const AddAttendance = () => {
       const response = await api.get('/attendance/weekly', {
         params: { employee_id: user.employeeId }
       });
-      
+
       if (response.data) {
         const updatedData = { ...baseData };
         Object.keys(response.data).forEach(dateStr => {
           const attendance = response.data[dateStr];
-          const rowIndex = Object.keys(updatedData).find(key => 
+          const rowIndex = Object.keys(updatedData).find(key =>
             updatedData[key].date === dateStr
           );
-          
+
           if (rowIndex !== undefined) {
+            const projects = (attendance.projects || []).map(p => ({
+              projectId: p.value,
+              projectName: p.label,
+              subtasks: (attendance.subTasks || [])
+                .filter(st => st.project === p.label)
+                .flatMap(st => st.subTasks || [])
+            }));
+
             updatedData[rowIndex] = {
               ...updatedData[rowIndex],
-              status: attendance.action,
-              hours: attendance.hours,
-              projects: attendance.projects || [],
-              submitted: true
+              status: attendance.action || attendance.status,
+              hours: attendance.hours || 0,
+              projects: projects,
+              submitted: !!attendance.action
             };
           }
         });
@@ -237,7 +271,9 @@ const AddAttendance = () => {
       }
     } catch (error) {
       console.error('Error fetching weekly attendance:', error);
-      setMessage('Error fetching attendance data');
+      const errorMessage = error.response?.data?.detail || 'Error fetching attendance data';
+      setMessage(errorMessage);
+      setTimeout(() => setMessage(''), 5000);
     } finally {
       setLoading(false);
     }
@@ -305,7 +341,7 @@ const AddAttendance = () => {
         return prev.filter(d => d !== day);
       }
       if (prev.length >= 2) {
-        setMessage("You can select up to 2 week-off days");
+        setMessage('You can select up to 2 week-off days');
         setTimeout(() => setMessage(''), 2500);
         return prev;
       }
@@ -317,9 +353,11 @@ const AddAttendance = () => {
     try {
       if (!user?.employeeId) {
         setMessage('Employee ID not found');
+        setTimeout(() => setMessage(''), 5000);
         return;
       }
 
+      const weekDates = getWeekDates(currentWeek);
       const week_start = formatDateLocal(weekDates[0]);
       const week_end = formatDateLocal(weekDates[6]);
 
@@ -331,12 +369,15 @@ const AddAttendance = () => {
       };
 
       setLoading(true);
-      await api.post('/weekoffs/', payload);
+      const response = await api.post('/weekoffs', payload);
       setMessage('Week-off saved successfully');
       setTimeout(() => setMessage(''), 3000);
+      await fetchWeekOffs();
     } catch (error) {
       console.error('Error saving week-offs:', error);
-      setMessage('Error saving week-offs');
+      const errorMessage = error.response?.data?.detail || 'Error saving week-offs';
+      setMessage(errorMessage);
+      setTimeout(() => setMessage(''), 5000);
     } finally {
       setLoading(false);
     }
@@ -348,19 +389,62 @@ const AddAttendance = () => {
         setMessage('Employee ID not found');
         return;
       }
-      
+
+      // Validate week-offs
+      const weekOffViolations = Object.values(attendanceData).filter(row => {
+        const dayOfWeek = row.day;
+        return weekOffDays.includes(dayOfWeek) && (
+          row.status || (row.hours && row.hours > 0) || row.projects.length > 0
+        );
+      });
+
+      if (weekOffViolations.length > 0) {
+        const violationDays = weekOffViolations.map(row => row.day).join(', ');
+        setMessage(`Cannot submit attendance for week-off days: ${violationDays}`);
+        setTimeout(() => setMessage(''), 5000);
+        return;
+      }
+
+      const hasValidData = Object.values(attendanceData).some(row =>
+        !weekOffDays.includes(row.day) && (
+          row.status || (row.hours && row.hours > 0) || row.projects.length > 0
+        )
+      );
+      if (!hasValidData) {
+        setMessage('Please provide attendance data for at least one non-week-off day');
+        setTimeout(() => setMessage(''), 5000);
+        return;
+      }
+
+      const invalidHours = Object.values(attendanceData).some(row =>
+        !weekOffDays.includes(row.day) && (row.hours < 0 || row.hours > 24)
+      );
+      if (invalidHours) {
+        setMessage('Hours must be between 0 and 24 for non-week-off days');
+        setTimeout(() => setMessage(''), 5000);
+        return;
+      }
+
       setLoading(true);
       const dataToSubmit = {};
-      
+
       Object.values(attendanceData).forEach(row => {
-        // Include any row where the user provided status, hours, or projects
-        if (row.status || (row.hours && row.hours > 0) || row.projects.length > 0) {
+        if (!weekOffDays.includes(row.day) && (
+          row.status || (row.hours && row.hours > 0) || row.projects.length > 0
+        )) {
           const project_ids = row.projects
             .map(p => (p.projectId ? parseInt(p.projectId, 10) : null))
             .filter(id => Number.isInteger(id));
-          const sub_tasks = row.projects.map(p => p.subtasks || []).flat();
+          const sub_tasks = row.projects
+            .map(p =>
+              (p.subtasks || []).map(subtask => ({
+                project_id: parseInt(p.projectId, 10),
+                sub_task: subtask
+              }))
+            )
+            .flat()
+            .filter(st => st.project_id && st.sub_task);
 
-          // Conform to backend AttendanceCreate schema
           dataToSubmit[row.date] = {
             date: row.date,
             action: row.status || '',
@@ -371,36 +455,38 @@ const AddAttendance = () => {
         }
       });
 
-      const response = await api.post('/attendance/', dataToSubmit, {
+      if (Object.keys(dataToSubmit).length === 0) {
+        setMessage('No valid attendance data to submit for non-week-off days');
+        setTimeout(() => setMessage(''), 5000);
+        setLoading(false);
+        return;
+      }
+
+      const response = await api.post('/attendance', dataToSubmit, {
         params: { employee_id: user.employeeId }
       });
 
       if (response.data.success) {
         setMessage('Attendance submitted successfully!');
         setTimeout(() => setMessage(''), 3000);
-        
-        // Don't clear the attendance data, just refresh from backend
-        fetchWeeklyAttendance();
-        
-        // Update daily attendance tab
-        await fetchDailyAttendance();
+        await Promise.all([fetchWeeklyAttendance(), fetchDailyAttendance()]);
       }
     } catch (error) {
       console.error('Error submitting attendance:', error);
-      setMessage('Error submitting attendance');
+      const errorMessage = error.response?.data?.detail || 'Error submitting attendance';
+      setMessage(errorMessage);
+      setTimeout(() => setMessage(''), 5000);
     } finally {
       setLoading(false);
     }
   };
 
-  // Fetch daily attendance when component mounts or tab changes
   useEffect(() => {
     if (activeTab === 'daily' && user?.employeeId) {
       fetchDailyAttendance();
     }
   }, [activeTab, user]);
 
-  // Project Popup Component
   const ProjectPopup = ({ onClose, onSave, existingProjects = [] }) => {
     const [selectedProjects, setSelectedProjects] = useState(existingProjects);
 
@@ -507,6 +593,9 @@ const AddAttendance = () => {
                 </div>
               </div>
             ))}
+            {selectedProjects.length === 0 && (
+              <p className="text-gray-500 text-center">No projects selected</p>
+            )}
           </div>
 
           <div className="flex justify-between items-center mt-6 p-6 border-t border-gray-200">
@@ -516,7 +605,7 @@ const AddAttendance = () => {
             >
               <Plus size={18} /> Add Project
             </button>
-            
+
             <div className="flex gap-3">
               <button
                 onClick={onClose}
@@ -525,7 +614,7 @@ const AddAttendance = () => {
                 Cancel
               </button>
               <button
-                onClick={() => onSave(selectedProjects.filter(p => p.projectId))}
+                onClick={() => onSave(selectedProjects.filter(p => p.projectId && p.projectName))}
                 className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
               >
                 Save
@@ -542,20 +631,18 @@ const AddAttendance = () => {
   return (
     <div className="max-w-6xl mx-auto p-6 bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen">
       <div className="bg-white rounded-2xl shadow-xl overflow-hidden">
-        {/* Header */}
         <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-6">
           <h1 className="text-2xl font-bold flex items-center gap-3">
             <Calendar className="text-blue-200" />
             Attendance Management
           </h1>
           {message && (
-            <div className="mt-3 p-3 bg-white bg-opacity-20 rounded-lg text-sm">
+            <div className={`mt-3 p-3 rounded-lg text-sm text-white ${message.includes('success') ? 'bg-green-500' : 'bg-red-500'}`}>
               {message}
             </div>
           )}
         </div>
 
-        {/* Tab Navigation */}
         <div className="border-b border-gray-200 bg-gray-50">
           <nav className="flex space-x-8 px-6">
             {[
@@ -566,11 +653,10 @@ const AddAttendance = () => {
               <button
                 key={id}
                 onClick={() => setActiveTab(id)}
-                className={`py-4 px-2 border-b-2 font-medium text-sm flex items-center gap-2 transition-colors ${
-                  activeTab === id
+                className={`py-4 px-2 border-b-2 font-medium text-sm flex items-center gap-2 transition-colors ${activeTab === id
                     ? 'border-blue-500 text-blue-600'
                     : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
+                  }`}
               >
                 <Icon size={18} />
                 {label}
@@ -579,11 +665,9 @@ const AddAttendance = () => {
           </nav>
         </div>
 
-        {/* Tab Content */}
         <div className="p-6">
           {activeTab === 'add' && (
             <div className="space-y-6">
-              {/* Week Navigation */}
               <div className="flex items-center justify-between bg-gradient-to-r from-gray-50 to-gray-100 p-4 rounded-xl">
                 <button
                   onClick={() => navigateWeek(-1)}
@@ -592,14 +676,12 @@ const AddAttendance = () => {
                   <ChevronLeft size={18} />
                   Previous Week
                 </button>
-                
                 <div className="text-center">
                   <h3 className="text-lg font-semibold text-gray-800">
                     {weekDates[0].toLocaleDateString('en-US', { month: 'long', day: 'numeric' })} - {' '}
                     {weekDates[6].toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
                   </h3>
                 </div>
-                
                 <button
                   onClick={() => navigateWeek(1)}
                   className="flex items-center gap-2 px-4 py-2 bg-white text-gray-700 rounded-lg hover:bg-gray-50 transition-colors shadow-sm"
@@ -609,7 +691,6 @@ const AddAttendance = () => {
                 </button>
               </div>
 
-              {/* Week-off Selection */}
               <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-4">
                 <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                   <div className="md:w-1/4">
@@ -618,12 +699,13 @@ const AddAttendance = () => {
                   </div>
                   <div className="flex-1">
                     <div className="flex flex-wrap gap-3">
-                      {['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'].map((day) => (
+                      {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map((day) => (
                         <label key={day} className="inline-flex items-center gap-2 px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-sm cursor-pointer select-none">
                           <input
                             type="checkbox"
                             checked={weekOffDays.includes(day)}
                             onChange={() => toggleWeekOff(day)}
+                            disabled={loading}
                           />
                           <span className="text-gray-800">{day}</span>
                         </label>
@@ -642,7 +724,6 @@ const AddAttendance = () => {
                 </div>
               </div>
 
-              {/* Attendance Table */}
               <div className="bg-white rounded-xl shadow-lg overflow-hidden border border-gray-200">
                 <div className="overflow-x-auto">
                   <table className="w-full">
@@ -663,36 +744,42 @@ const AddAttendance = () => {
                         <tr key={index} className="hover:bg-gray-50 transition-colors">
                           <td className="px-4 py-4 font-medium text-gray-900">{row.day}</td>
                           <td className="px-4 py-4 text-gray-700">
-                            {new Date(row.date).toLocaleDateString('en-US', { 
-                              month: 'short', 
-                              day: 'numeric' 
+                            {new Date(row.date).toLocaleDateString('en-US', {
+                              month: 'short',
+                              day: 'numeric'
                             })}
                           </td>
                           <td className="px-4 py-4">
-                            <select
-                              value={row.status}
-                              onChange={(e) => handleStatusChange(index, e.target.value)}
-                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
-                            >
-                              <option value="">Select Status</option>
-                              <option value="Present">Present</option>
-                              <option value="Leave">Leave</option>
-                              <option value="WFH">Work From Home</option>
-                            </select>
+                            {weekOffDays.includes(row.day) ? (
+                              <span className="text-gray-400 text-sm">Week-off</span>
+                            ) : (
+                              <select
+                                value={row.status}
+                                onChange={(e) => handleStatusChange(index, e.target.value)}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
+                              >
+                                <option value="">Select Status</option>
+                                <option value="Present">Present</option>
+                                <option value="Leave">Leave</option>
+                                <option value="WFH">Work From Home</option>
+                              </select>
+                            )}
                           </td>
-                          {/* Action column mirrors the selected status */}
                           <td className="px-4 py-4">
-                            {row.status ? (
+                            {weekOffDays.includes(row.day) ? (
+                              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800 border border-gray-200">
+                                Week-off
+                              </span>
+                            ) : row.status ? (
                               <span
-                                className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                                  row.status === 'Present'
+                                className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${row.status === 'Present'
                                     ? 'bg-green-100 text-green-800 border border-green-200'
                                     : row.status === 'WFH' || row.status === 'Work From Home'
-                                    ? 'bg-blue-100 text-blue-800 border border-blue-200'
-                                    : row.status === 'Leave'
-                                    ? 'bg-red-100 text-red-800 border border-red-200'
-                                    : 'bg-gray-100 text-gray-800 border border-gray-200'
-                                }`}
+                                      ? 'bg-blue-100 text-blue-800 border border-blue-200'
+                                      : row.status === 'Leave'
+                                        ? 'bg-red-100 text-red-800 border border-red-200'
+                                        : 'bg-gray-100 text-gray-800 border border-gray-200'
+                                  }`}
                               >
                                 {row.status}
                               </span>
@@ -701,55 +788,36 @@ const AddAttendance = () => {
                             )}
                           </td>
                           <td className="px-4 py-4">
-                            <input
-                              type="number"
-                              min="0"
-                              max="24"
-                              step="0.5"
-                              value={row.hours}
-                              onChange={(e) => handleHoursChange(index, e.target.value)}
-                              disabled={row.status === 'Leave'}
-                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
-                            />
+                            {weekOffDays.includes(row.day) ? (
+                              <span className="text-gray-400 text-sm">N/A</span>
+                            ) : (
+                              <input
+                                type="number"
+                                min="0"
+                                max="24"
+                                step="0.5"
+                                value={row.hours}
+                                onChange={(e) => handleHoursChange(index, e.target.value)}
+                                disabled={row.status === 'Leave'}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
+                              />
+                            )}
                           </td>
                           <td className="px-4 py-4">
-                            <div className="space-y-2">
-                              {row.projects.length > 0 ? (
-                                <div className="space-y-2">
-                                  {row.projects.map((project, projectIndex) => (
-                                    <div key={projectIndex} className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                                      <div className="flex items-center justify-between mb-2">
-                                        <span className="font-medium text-blue-800">{project.projectName}</span>
-                                        <button
-                                          onClick={() => removeProject(index, projectIndex)}
-                                          className="text-red-500 hover:text-red-700"
-                                        >
-                                          <X size={16} />
-                                        </button>
-                                      </div>
-                                      {project.subtasks && project.subtasks.length > 0 && (
-                                        <div className="space-y-1">
-                                          {project.subtasks.map((subtask, subtaskIndex) => (
-                                            <div key={subtaskIndex} className="text-sm text-gray-600 bg-white px-2 py-1 rounded">
-                                              • {subtask}
-                                            </div>
-                                          ))}
-                                        </div>
-                                      )}
-                                    </div>
-                                  ))}
-                                </div>
-                              ) : (
-                                <span className="text-gray-400 text-sm">No projects selected</span>
-                              )}
-                              <button
-                                onClick={() => openProjectPopup(index)}
-                                className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-lg hover:from-blue-600 hover:to-indigo-600 transition-all duration-200 shadow-sm"
-                              >
-                                <Edit3 size={16} />
-                                {row.projects.length > 0 ? 'Edit Projects' : 'Add Projects'}
-                              </button>
-                            </div>
+                            {weekOffDays.includes(row.day) ? (
+                              <span className="text-gray-400 text-sm">N/A</span>
+                            ) : (
+                              <div className="space-y-2">
+                                       
+                                <button
+                                  onClick={() => openProjectPopup(index)}
+                                  className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-lg hover:from-blue-600 hover:to-indigo-600 transition-all duration-200 shadow-sm"
+                                >
+                                  <Edit3 size={16} />
+                                  {row.projects.length > 0 ? 'Edit Projects' : 'Add Projects'}
+                                </button>
+                              </div>
+                            )}
                           </td>
                           <td className="px-4 py-4">
                             <div className="flex items-center gap-3">
@@ -758,12 +826,12 @@ const AddAttendance = () => {
                               </span>
                             </div>
                           </td>
-                          {/* Details column with eye icon */}
                           <td className="px-4 py-4">
                             <button
                               title="View details"
                               onClick={() => handleShowProjects({ date: row.date, projects: row.projects, hours: row.hours, status: row.status })}
                               className="inline-flex items-center justify-center p-2 bg-blue-100 text-blue-800 rounded-full hover:bg-blue-200"
+                              disabled={weekOffDays.includes(row.day)}
                             >
                               <Eye className="h-4 w-4" />
                             </button>
@@ -775,7 +843,6 @@ const AddAttendance = () => {
                 </div>
               </div>
 
-              {/* Submit Button */}
               <div className="flex justify-center">
                 <button
                   onClick={submitAttendance}
@@ -791,7 +858,6 @@ const AddAttendance = () => {
 
           {activeTab === 'calendar' && (
             <div className="space-y-6">
-              {/* Calendar Header */}
               <div className="flex items-center justify-between">
                 <h3 className="text-xl font-semibold text-gray-800">Calendar View</h3>
                 <div className="flex items-center gap-4">
@@ -844,9 +910,7 @@ const AddAttendance = () => {
                 </div>
               </div>
 
-              {/* Calendar Grid */}
               <div className="bg-white rounded-xl shadow-lg overflow-hidden border border-gray-200">
-                {/* Calendar Header - Days of Week */}
                 <div className="grid grid-cols-7 bg-gradient-to-r from-gray-600 to-blue-600">
                   {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
                     <div key={day} className="p-4 text-center font-semibold text-white">
@@ -854,64 +918,59 @@ const AddAttendance = () => {
                     </div>
                   ))}
                 </div>
-
-                {/* Calendar Body */}
                 <div className="grid grid-cols-7">
                   {(() => {
                     const firstDay = new Date(selectedYear, selectedMonth, 1);
                     const lastDay = new Date(selectedYear, selectedMonth + 1, 0);
                     const startDate = new Date(firstDay);
                     startDate.setDate(startDate.getDate() - firstDay.getDay());
-                    
+
                     const days = [];
                     const currentDate = new Date(startDate);
-                    
-                    // Generate 42 days (6 weeks) for the calendar
+
                     for (let i = 0; i < 42; i++) {
                       const dateStr = formatDateLocal(currentDate);
                       const isCurrentMonth = currentDate.getMonth() === selectedMonth;
                       const isToday = dateStr === formatDateLocal(new Date());
-                      
-                      // Find attendance record for this date
-                      const attendanceRecord = dailyAttendance.find(record => record.date === dateStr);
-                      
+                      const dayOfWeek = currentDate.toLocaleDateString('en-US', { weekday: 'long' });
+
+                      const attendanceRecord = filteredDailyAttendance.find(record => record.date === dateStr);
+                      const isWeekOff = weekOffDays.includes(dayOfWeek);
+
                       days.push(
                         <div
                           key={dateStr}
-                          className={`min-h-[120px] p-2 border-b border-r border-gray-200 ${
-                            isCurrentMonth ? 'bg-white' : 'bg-gray-50'
-                          } ${isToday ? 'bg-blue-50 border-blue-200' : ''}`}
+                          className={`min-h-[120px] p-2 border-b border-r border-gray-200 ${isCurrentMonth ? 'bg-white' : 'bg-gray-50'
+                            } ${isToday ? 'bg-blue-50 border-blue-200' : ''}`}
                         >
-                          <div className={`text-sm font-medium mb-2 ${
-                            isCurrentMonth ? 'text-gray-900' : 'text-gray-400'
-                          } ${isToday ? 'text-blue-600 font-bold' : ''}`}>
+                          <div className={`text-sm font-medium mb-2 ${isCurrentMonth ? 'text-gray-900' : 'text-gray-400'
+                            } ${isToday ? 'text-blue-600 font-bold' : ''}`}>
                             {currentDate.getDate()}
                           </div>
-                          
-                          {attendanceRecord && isCurrentMonth && (
+                          {isWeekOff && isCurrentMonth ? (
                             <div className="space-y-1">
-                              {/* Status Badge */}
-                              <div className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                                attendanceRecord.status === 'Present' 
+                              <div className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800 border border-gray-200">
+                                Week-off
+                              </div>
+                            </div>
+                          ) : attendanceRecord && isCurrentMonth ? (
+                            <div className="space-y-1">
+                              <div className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${attendanceRecord.status === 'Present'
                                   ? 'bg-green-100 text-green-800 border border-green-200'
-                                  : attendanceRecord.status === 'Work From Home'
-                                  ? 'bg-blue-100 text-blue-800 border border-blue-200'
-                                  : attendanceRecord.status === 'Leave'
-                                  ? 'bg-red-100 text-red-800 border border-red-200'
-                                  : 'bg-gray-100 text-gray-800 border border-gray-200'
-                              }`}>
+                                  : attendanceRecord.status === 'WFH'
+                                    ? 'bg-blue-100 text-blue-800 border border-blue-200'
+                                    : attendanceRecord.status === 'Leave'
+                                      ? 'bg-red-100 text-red-800 border border-red-200'
+                                      : 'bg-gray-100 text-gray-800 border border-gray-200'
+                                }`}>
                                 {attendanceRecord.status}
                               </div>
-                              
-                              {/* Hours */}
                               {attendanceRecord.hours > 0 && (
                                 <div className="text-xs text-gray-600 flex items-center gap-1">
                                   <Clock className="h-3 w-3" />
                                   {attendanceRecord.hours}h
                                 </div>
                               )}
-                              
-                              {/* Projects Count */}
                               {attendanceRecord.projects && attendanceRecord.projects.length > 0 && (
                                 <div className="text-xs text-gray-600 flex items-center gap-1">
                                   <Briefcase className="h-3 w-3" />
@@ -919,22 +978,19 @@ const AddAttendance = () => {
                                 </div>
                               )}
                             </div>
-                          )}
+                          ) : null}
                         </div>
                       );
-                      
                       currentDate.setDate(currentDate.getDate() + 1);
                     }
-                    
                     return days;
                   })()}
                 </div>
               </div>
 
-              {/* Legend */}
               <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-200">
                 <h4 className="text-lg font-semibold text-gray-800 mb-4">Legend</h4>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
                   <div className="flex items-center gap-2">
                     <div className="w-4 h-4 bg-green-100 border border-green-200 rounded"></div>
                     <span className="text-sm text-gray-700">Present</span>
@@ -946,6 +1002,10 @@ const AddAttendance = () => {
                   <div className="flex items-center gap-2">
                     <div className="w-4 h-4 bg-red-100 border border-red-200 rounded"></div>
                     <span className="text-sm text-gray-700">Leave</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 bg-gray-100 border border-gray-200 rounded"></div>
+                    <span className="text-sm text-gray-700">Week-off</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <div className="w-4 h-4 bg-blue-50 border border-blue-200 rounded"></div>
@@ -960,10 +1020,7 @@ const AddAttendance = () => {
             <div className="space-y-6">
               <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
                 <h3 className="text-xl font-semibold text-gray-800">Daily Attendance Records</h3>
-                
-                {/* Filters */}
                 <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
-                  {/* Month and Year Filter */}
                   <div className="flex gap-2 items-center">
                     <Filter className="h-4 w-4 text-gray-500" />
                     <select
@@ -991,9 +1048,17 @@ const AddAttendance = () => {
                         );
                       })}
                     </select>
+                    <select
+                      value={typeFilter}
+                      onChange={(e) => setTypeFilter(e.target.value)}
+                      className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                    >
+                      <option value="all">All Types</option>
+                      <option value="Full-Time">Full-Time</option>
+                      <option value="Intern">Intern</option>
+                      <option value="Contract">Contract</option>
+                    </select>
                   </div>
-                  
-                  {/* Date Search */}
                   <div className="flex gap-2 items-center">
                     <Search className="h-4 w-4 text-gray-500" />
                     <input
@@ -1014,7 +1079,7 @@ const AddAttendance = () => {
                   </div>
                 </div>
               </div>
-              
+
               {filteredDailyAttendance.length === 0 ? (
                 <div className="text-center py-8">
                   <div className="w-16 h-16 bg-gradient-to-r from-gray-200 to-gray-300 rounded-full mx-auto mb-4 flex items-center justify-center">
@@ -1022,8 +1087,8 @@ const AddAttendance = () => {
                   </div>
                   <p className="text-gray-600 font-medium">No attendance records found</p>
                   <p className="text-sm text-gray-500 mt-1">
-                    {searchDate 
-                      ? 'No records found for the selected date' 
+                    {searchDate
+                      ? 'No records found for the selected date'
                       : `No records found for ${new Date(selectedYear, selectedMonth, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}`
                     }
                   </p>
@@ -1060,23 +1125,24 @@ const AddAttendance = () => {
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="text-sm text-gray-900">
-                              {new Date(record.date).toLocaleDateString('en-US', { 
-                                year: 'numeric', 
-                                month: 'short', 
-                                day: 'numeric' 
+                              {new Date(record.date).toLocaleDateString('en-US', {
+                                year: 'numeric',
+                                month: 'short',
+                                day: 'numeric'
                               })}
                             </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
-                            <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                              record.status === 'Present' 
-                                ? 'bg-green-100 text-green-800' 
+                            <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${record.status === 'Present'
+                                ? 'bg-green-100 text-green-800'
                                 : record.status === 'Leave'
-                                ? 'bg-red-100 text-red-800'
-                                : record.status === 'WFH'
-                                ? 'bg-blue-100 text-blue-800'
-                                : 'bg-gray-100 text-gray-800'
-                            }`}>
+                                  ? 'bg-red-100 text-red-800'
+                                  : record.status === 'WFH'
+                                    ? 'bg-blue-100 text-blue-800'
+                                    : record.status === 'Week-off'
+                                      ? 'bg-gray-100 text-gray-800'
+                                      : 'bg-gray-100 text-gray-800'
+                              }`}>
                               {record.status}
                             </span>
                           </td>
@@ -1095,7 +1161,7 @@ const AddAttendance = () => {
                                 View Details
                               </button>
                             </div>
-                         </td>
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -1107,7 +1173,6 @@ const AddAttendance = () => {
         </div>
       </div>
 
-      {/* Project Popup */}
       {showProjectPopup && (
         <ProjectPopup
           onClose={() => setShowProjectPopup(false)}
@@ -1116,17 +1181,16 @@ const AddAttendance = () => {
         />
       )}
 
-      {/* Project Details Modal */}
       {showProjectModal && selectedRecord && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[80vh] overflow-y-auto">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-semibold text-gray-800">
-                Projects for {new Date(selectedRecord.date).toLocaleDateString('en-US', { 
-                  weekday: 'long', 
-                  year: 'numeric', 
-                  month: 'long', 
-                  day: 'numeric' 
+                Projects for {new Date(selectedRecord.date).toLocaleDateString('en-US', {
+                  weekday: 'long',
+                  year: 'numeric',
+                  month: 'long',
+                  day: 'numeric'
                 })}
               </h3>
               <button
@@ -1136,7 +1200,6 @@ const AddAttendance = () => {
                 <X className="h-6 w-6" />
               </button>
             </div>
-            
             <div className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-sm">
                 <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
@@ -1147,40 +1210,37 @@ const AddAttendance = () => {
                 </div>
                 <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
                   <div className="text-gray-500">Hours</div>
-                  <div className="font-medium text-gray-800">{(selectedRecord.hours ?? selectedRecord.total_hours ?? 0)}</div>
+                  <div className="font-medium text-gray-800">{selectedRecord.hours || 0}</div>
                 </div>
                 <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
                   <div className="text-gray-500">Status</div>
-                  <div className="font-medium text-gray-800">{selectedRecord.status ?? 'Not set'}</div>
+                  <div className="font-medium text-gray-800">{selectedRecord.status || 'Not set'}</div>
                 </div>
                 <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
                   <div className="text-gray-500">Projects</div>
-                  <div className="font-medium text-gray-800">{selectedRecord.projects?.length ?? 0}</div>
+                  <div className="font-medium text-gray-800">{selectedRecord.projects?.length || 0}</div>
                 </div>
               </div>
               {selectedRecord.projects && selectedRecord.projects.length > 0 ? (
                 selectedRecord.projects.map((project, index) => (
                   <div key={index} className="border border-gray-200 rounded-lg p-4">
                     <div className="flex items-center justify-between mb-2">
-                      <h4 className="font-medium text-gray-800">{project.projectName || project.name}</h4>
+                      <h4 className="font-medium text-gray-800">{project.projectName}</h4>
                       <span className="text-sm text-gray-500">Project {index + 1}</span>
                     </div>
-                    
-                    {project.subtasks && project.subtasks.length > 0 && (
+                    {project.subtasks && project.subtasks.length > 0 ? (
                       <div>
                         <h5 className="text-sm font-medium text-gray-700 mb-2">Subtasks:</h5>
                         <div className="space-y-1">
                           {project.subtasks.map((subtask, subIndex) => (
                             <div key={subIndex} className="flex items-center text-sm text-gray-600">
                               <div className="w-2 h-2 bg-blue-400 rounded-full mr-2"></div>
-                              {typeof subtask === 'string' ? subtask : subtask.name || subtask.task}
+                              {subtask}
                             </div>
                           ))}
                         </div>
                       </div>
-                    )}
-                    
-                    {(!project.subtasks || project.subtasks.length === 0) && (
+                    ) : (
                       <p className="text-sm text-gray-500 italic">No subtasks assigned</p>
                     )}
                   </div>
@@ -1195,6 +1255,12 @@ const AddAttendance = () => {
               )}
             </div>
           </div>
+        </div>
+      )}
+
+      {loading && (
+        <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
+          <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
         </div>
       )}
     </div>

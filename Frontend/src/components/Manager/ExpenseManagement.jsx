@@ -41,6 +41,7 @@ import {
 } from '@/components/ui/dialog';
 import { useUser } from '@/contexts/UserContext';
 import NewExpenseForm from '@/components/Manager/NewExpenseForm';
+import { avatarBg } from '../../lib/avatarColors';
 
 const BASE_URL = 'http://localhost:8000';
 
@@ -66,17 +67,7 @@ const ManagerExpenseManagement = () => {
   const year = now.getFullYear();
   const month = now.getMonth() + 1;
 
-  const getAvatarColor = (name) => {
-    const colors = [
-      'bg-blue-500',
-      'bg-green-500',
-      'bg-purple-500',
-      'bg-orange-500',
-      'bg-pink-500',
-      'bg-indigo-500',
-    ];
-    return colors[(name?.length || 0) % colors.length];
-  };
+  const getAvatarColor = (name) => avatarBg(name);
 
   const getInitials = (name) => {
     if (!name) return 'NA';

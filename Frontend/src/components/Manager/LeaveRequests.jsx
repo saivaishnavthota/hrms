@@ -1,8 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
-import { Eye, ChevronUp, ChevronDown } from 'lucide-react';
+import { Eye, ChevronUp, ChevronDown, Check, X } from 'lucide-react';
 import { useUser } from '@/contexts/UserContext';
 import ViewLeaveApplication from '../HR/ViewLeaveApplication';
+import { avatarBg } from '../../lib/avatarColors';
 
 const ManagerLeaveRequests = () => {
   const { user } = useUser();
@@ -60,6 +61,7 @@ const ManagerLeaveRequests = () => {
       const mapped = (response.data || []).map((item) => ({
         id: item.leave_id ?? item.id,
         employee: item.employee_name,
+        employeeEmail:item.employee_email,
         leaveType: item.leave_type,
         startDate: item.start_date,
         endDate: item.end_date,
@@ -138,27 +140,46 @@ const ManagerLeaveRequests = () => {
     }
   };
 
+   const getAvatarColor = (name) => avatarBg(name);
+
+
   return (
-    <div className="space-y-6">
+    <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold text-gray-900">Leave Requests</h1>
-        <div className="flex gap-2">
-          <button
-            className={`px-3 py-1 rounded ${activeTab === 'pending' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700'}`}
-            onClick={() => setActiveTab('pending')}
-          >
-            Pending
-          </button>
-          <button
-            className={`px-3 py-1 rounded ${activeTab === 'all' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700'}`}
-            onClick={() => setActiveTab('all')}
-          >
-            All Requests
-          </button>
+        <div>
+          <h1 className="text-2xl font-semibold text-gray-900">Leave Requests</h1>
+          <p className="text-gray-600 mt-1">Review and take action on team leave requests</p>
         </div>
       </div>
 
-      <div className="bg-white rounded-lg shadow">
+      <div className="mb-2">
+        <div className="border-b border-gray-200">
+          <nav className="-mb-px flex space-x-8">
+            <button
+              onClick={() => setActiveTab('pending')}
+              className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                activeTab === 'pending'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              Pending Requests
+            </button>
+            <button
+              onClick={() => setActiveTab('all')}
+              className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                activeTab === 'all'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              All Leave Requests
+            </button>
+          </nav>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200">
         {loading ? (
           <div className="px-6 py-10 text-center text-gray-600">Loading...</div>
         ) : error ? (
@@ -166,73 +187,85 @@ const ManagerLeaveRequests = () => {
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">#</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <thead>
+                <tr className="bg-gray-50 border-b border-gray-200">
+                  <th className="w-12 text-center font-semibold text-gray-700 px-6 py-4">S.NO</th>
+                  <th className="text-left font-semibold text-gray-700 px-6 py-4">
                     <button onClick={() => handleSort('employee')} className="flex items-center">
                       Employee {getSortIcon('employee')}
                     </button>
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="text-left font-semibold text-gray-700 px-6 py-4">
                     <button onClick={() => handleSort('leaveType')} className="flex items-center">
                       Leave Type {getSortIcon('leaveType')}
                     </button>
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Start</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">End Date</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Days</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Action</th>
+                  <th className="text-left font-semibold text-gray-700 px-6 py-4">Start</th>
+                  <th className="text-left font-semibold text-gray-700 px-6 py-4">End Date</th>
+                  <th className="text-left font-semibold text-gray-700 px-6 py-4">Days</th>
+                  <th className="text-left font-semibold text-gray-700 px-6 py-4">Status</th>
+                  <th className="text-left font-semibold text-gray-700 px-6 py-4">Actions</th>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
+              <tbody>
                 {sortedData(activeTab === 'pending' ? pendingRequests : leaveRequests).map((req, idx) => (
-                  <tr key={req.id}>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{idx + 1}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{req.employee}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{req.leaveType}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{req.startDate}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{req.endDate}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{req.days}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm">
-                      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                        req.status === 'approved'
-                          ? 'bg-green-100 text-green-800'
-                          : req.status === 'rejected'
-                          ? 'bg-red-100 text-red-800'
-                          : 'bg-yellow-100 text-yellow-800'
-                      }`}>
+                  <tr key={req.id} className="border-b border-gray-200 hover:bg-gray-50">
+                    <td className="text-center text-gray-600 px-6 py-4">{idx + 1}</td>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-3">
+                        <div className={`w-10 h-10 rounded-full ${getAvatarColor(req.employee)} flex items-center justify-center text-white font-medium text-sm`}>
+                          {req.employee.split(' ').map(n => n[0]).join('')}
+                        </div>
+                        <div>
+                          <div className="font-medium text-gray-900">{req.employee}</div>
+                          <div className="text-sm text-gray-500">
+                            <span>{req.employeeEmail}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 text-gray-700">{req.leaveType}</td>
+                    <td className="px-6 py-4 text-gray-700">{req.startDate}</td>
+                    <td className="px-6 py-4 text-gray-700">{req.endDate}</td>
+                    <td className="px-6 py-4 font-medium text-gray-900">{req.days}</td>
+                    <td className="px-6 py-4">
+                      <span
+                        className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${
+                          req.status === 'pending'
+                            ? 'bg-yellow-100 text-yellow-800'
+                            : req.status === 'approved'
+                            ? 'bg-green-100 text-green-800'
+                            : 'bg-red-100 text-red-800'
+                        }`}
+                      >
                         {req.status}
                       </span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      <div className="flex items-center gap-3">
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-2">
                         <button
-                          className="text-blue-600 hover:text-blue-800"
+                          className="h-8 w-8 p-0 text-blue-600 hover:bg-blue-50 rounded-md"
                           title="View"
                           onClick={() => handleViewLeave(req)}
                         >
-                          <Eye className="w-5 h-5" />
+                          <Eye className="h-4 w-4" />
                         </button>
-                        {activeTab === 'pending' && (
-                          <>
-                            <button
-                              className={`px-2 py-1 rounded text-white ${actionLoading[req.id] === 'Approved' ? 'bg-green-400' : 'bg-green-600 hover:bg-green-700'}`}
-                              onClick={() => handleApproveReject(req.id, 'Approved')}
-                              disabled={!!actionLoading[req.id]}
-                            >
-                              Approve
-                            </button>
-                            <button
-                              className={`px-2 py-1 rounded text-white ${actionLoading[req.id] === 'Rejected' ? 'bg-red-400' : 'bg-red-600 hover:bg-red-700'}`}
-                              onClick={() => handleApproveReject(req.id, 'Rejected')}
-                              disabled={!!actionLoading[req.id]}
-                            >
-                              Reject
-                            </button>
-                          </>
-                        )}
+                        <button
+                          className="h-8 w-8 p-0 text-green-600 hover:bg-green-50 rounded-md"
+                          onClick={() => handleApproveReject(req.id, 'Approved')}
+                          disabled={!!actionLoading[req.id] || req.status !== 'pending'}
+                          title="Approve"
+                        >
+                          <Check className="h-4 w-4" />
+                        </button>
+                        <button
+                          className="h-8 w-8 p-0 text-red-600 hover:bg-red-50 rounded-md"
+                          onClick={() => handleApproveReject(req.id, 'Rejected')}
+                          disabled={!!actionLoading[req.id] || req.status !== 'pending'}
+                          title="Reject"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
                       </div>
                     </td>
                   </tr>

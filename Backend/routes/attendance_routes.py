@@ -10,6 +10,7 @@ from models.employee_assignment_model import EmployeeManager, EmployeeHR
 from datetime import datetime
 from schemas.attendance_schema import AttendanceCreate, AttendanceBase
 from datetime import timedelta, date
+import json
 
 router = APIRouter(prefix="/attendance", tags=["Attendance"])
 
@@ -57,32 +58,35 @@ async def save_attendance(
     hr_id: int = Query(None),
     session: Session = Depends(get_session)
 ):
-    # Determine the ID to use
     user_id = employee_id or manager_id or hr_id
     if not user_id:
         raise HTTPException(status_code=400, detail="employee_id, manager_id, or hr_id is required")
 
     try:
         for date_str, entry in data.items():
+            # Skip empty entries entirely (don't delete or process)
             if (not entry.action or entry.action.strip() == "") and \
                (not entry.hours or entry.hours == 0) and \
                (not entry.project_ids or len(entry.project_ids) == 0):
-                session.execute(
-                    text("DELETE FROM attendance WHERE employee_id = :emp_id AND date = :date"),
-                    {"emp_id": user_id, "date": entry.date}
-                )
-                continue  # skip save_attendance
-            
+                continue  # Skip this entry without deleting
+
             if entry.action not in VALID_ACTIONS:
                 continue
 
             project_ids = entry.project_ids or []
             sub_tasks = entry.sub_tasks or []
-            # if len(project_ids) != len(sub_tasks):
-            #     raise HTTPException(
-            #         status_code=400,
-            #         detail=f"project_ids and sub_tasks length mismatch for date {entry.date}"
-            #     )
+
+            for st in sub_tasks:
+                if st.project_id not in project_ids:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"sub_task project_id {st.project_id} does not match any project_ids for date {entry.date}"
+                    )
+
+            sub_tasks_json = [
+                {"project_id": st.project_id, "sub_task": st.sub_task}
+                for st in sub_tasks
+            ]
 
             session.execute(
                 text("""SELECT save_attendance(
@@ -99,7 +103,7 @@ async def save_attendance(
                     "action": entry.action,
                     "hours": entry.hours,
                     "project_ids": project_ids,
-                    "sub_tasks": sub_tasks
+                    "sub_tasks": json.dumps(sub_tasks_json)
                 }
             )
 
@@ -141,16 +145,37 @@ def get_weekly_attendance(
     """)
 
     result = session.execute(query, {"emp_id": user_id, "monday": monday, "sunday": sunday}).fetchall()
-    # same processing as before...
+
     attendance = {}
     for row in result:
         key = str(row.date)
         if key not in attendance:
-            attendance[key] = {"action": row.action, "hours": row.hours, "status": row.action, "projects": [], "subTasks": []}
-        if row.project_name:
+            attendance[key] = {
+                "action": row.action,
+                "hours": row.hours,
+                "status": row.action,
+                "projects": [],
+                "subTasks": []
+            }
+        
+        # Add project if not already present
+        if row.project_name and {"value": row.project_name, "label": row.project_name} not in attendance[key]["projects"]:
             attendance[key]["projects"].append({"value": row.project_name, "label": row.project_name})
-        if row.sub_task:
-            attendance[key]["subTasks"].append({"project": row.project_name, "subTask": row.sub_task})
+        
+        # Group subtasks by project
+        if row.sub_task and row.project_name:
+            # Find existing subTasks entry for this project
+            sub_task_entry = next((st for st in attendance[key]["subTasks"] if st["project"] == row.project_name), None)
+            if sub_task_entry:
+                # Add subtask to existing project entry
+                if row.sub_task not in sub_task_entry["subTasks"]:
+                    sub_task_entry["subTasks"].append(row.sub_task)
+            else:
+                # Create new subTasks entry for this project
+                attendance[key]["subTasks"].append({
+                    "project": row.project_name,
+                    "subTasks": [row.sub_task]
+                })
 
     return attendance
 
@@ -158,7 +183,7 @@ def get_weekly_attendance(
 
 from collections import defaultdict
 
-
+#changed
 @router.get("/daily")
 def get_daily_attendance(
     year: int,
@@ -171,40 +196,29 @@ def get_daily_attendance(
     employee_ids = []
 
     if employee_id:
-        # Fetch only this employee
         employee_ids = [employee_id]
-
     elif manager_id:
-        # Fetch employees reporting to this manager
         mgr_employees = session.exec(
             select(EmployeeManager.employee_id).where(EmployeeManager.manager_id == manager_id)
         ).all()
         employee_ids = [e[0] if isinstance(e, tuple) else e for e in mgr_employees]
-
     elif hr_id:
-        # Fetch managers assigned to this HR
         hr_managers = session.exec(
             select(EmployeeHR.manager_id).where(EmployeeHR.hr_id == hr_id)
         ).all()
         manager_ids = [m[0] if isinstance(m, tuple) else m for m in hr_managers]
-
-        # Fetch employees reporting to those managers
         if manager_ids:
             mgr_employees = session.exec(
                 select(EmployeeManager.employee_id).where(EmployeeManager.manager_id.in_(manager_ids))
             ).all()
             employee_ids = [e[0] if isinstance(e, tuple) else e for e in mgr_employees]
-
-        # Include managers themselves
         employee_ids.extend(manager_ids)
-
     else:
         raise HTTPException(status_code=400, detail="employee_id, manager_id, or hr_id must be provided")
 
     if not employee_ids:
         return []
 
-    # Fetch attendance for selected employees
     query = text("""
         SELECT 
             u.id as employee_id,
@@ -233,31 +247,43 @@ def get_daily_attendance(
     ).fetchall()
 
     attendance_list = []
+    attendance_by_employee_date = {}
 
     for row in result:
         if not row.date:
-        # Skip rows with no attendance
             continue
 
-        att = {
-        "employee_id": row.employee_id,
-        "name": row.name,
-        "email": row.company_email,
-        "date": str(row.date),
-        "day": row.date.strftime("%A"),
-        "status": row.action,
-        "hours": row.hours,
-        "projects": [],
-        "subTasks": []
-    }
+        key = (row.employee_id, str(row.date))
+        if key not in attendance_by_employee_date:
+            att = {
+                "employee_id": row.employee_id,
+                "name": row.name,
+                "email": row.company_email,
+                "date": str(row.date),
+                "day": row.date.strftime("%A"),
+                "status": row.action,
+                "hours": row.hours,
+                "projects": [],
+                "subTasks": []
+            }
+            attendance_by_employee_date[key] = att
+            attendance_list.append(att)
 
-        if row.project_name:
+        att = attendance_by_employee_date[key]
+        if row.project_name and {"label": row.project_name, "value": row.project_name} not in att["projects"]:
             att["projects"].append({"label": row.project_name, "value": row.project_name})
-
-        if row.sub_task:
-            att["subTasks"].append({"project": row.project_name, "subTask": row.sub_task})
-
-        attendance_list.append(att)
+        
+        # Group subtasks by project
+        if row.sub_task and row.project_name:
+            sub_task_entry = next((st for st in att["subTasks"] if st["project"] == row.project_name), None)
+            if sub_task_entry:
+                if row.sub_task not in sub_task_entry["subTasks"]:
+                    sub_task_entry["subTasks"].append(row.sub_task)
+            else:
+                att["subTasks"].append({
+                    "project": row.project_name,
+                    "subTasks": [row.sub_task]
+                })
 
     return attendance_list
 
@@ -460,6 +486,7 @@ def get_daily_attendance(
             u.name,
             u.company_email,
             u.role,
+            u.employment_type,
             a.id AS attendance_id,
             a.date,
             a.action,
@@ -494,7 +521,8 @@ def get_daily_attendance(
                 "employee_id": row.employee_id,
                 "name": row.name,
                 "email": row.company_email,
-                "type": row.role or "Employee",
+                "role": row.role or "Employee",
+                "type":row.employment_type,
                 "date": str(row.date),
                 "day": row.date.strftime("%A"),
                 "status": row.action,

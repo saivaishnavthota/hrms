@@ -44,6 +44,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
+import { avatarBg } from '../../lib/avatarColors';
 
 
   const EmployeeManagement = () => {
@@ -438,16 +439,7 @@ import { Label } from '@/components/ui/label';
     }
   };
 
-  const getAvatarColor = (name) => {
-    const colors = [
-      'bg-green-500',
-      'bg-blue-500', 
-      'bg-purple-500',
-      'bg-orange-500',
-      'bg-pink-500'
-    ];
-    return colors[name.length % colors.length];
-  };
+  const getAvatarColor = (name) => avatarBg(name);
 
   const filteredEmployees = employees.filter(employee => {
     const matchesSearch = employee.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||

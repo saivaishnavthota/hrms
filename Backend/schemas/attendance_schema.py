@@ -17,13 +17,17 @@ class AttendanceBase(SQLModel):
     status: Optional[str]
     hours: Optional[int]
 
+class SubTask(SQLModel):
+    project_id: int
+    sub_task: str
+
 # Attendance Create Schema 
 class AttendanceCreate(SQLModel):
     date: date                 # string "YYYY-MM-DD"
     action: str                # e.g., "Present"
     hours: Optional[int]       # integer
     project_ids: Optional[List[int]] = []
-    sub_tasks: Optional[List[str]] = []
+    sub_tasks: List[SubTask]
 
 
 # Attendance Read Schema

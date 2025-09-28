@@ -1,9 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useMemo,useEffect } from 'react';
 import { Eye, Trash2, ChevronUp, ChevronDown, Check, X, Loader2 } from 'lucide-react';
 import axios from 'axios';
 import ViewLeaveApplication from './ViewLeaveApplication';
-
-const PendingRequests = ({ hrId = 1 }) => { // Default hrId for testing
+import { useUser } from '@/contexts/UserContext';
+import { avatarBg } from '../../lib/avatarColors';
+const PendingRequests = () => {
+  
+   const { user } = useUser();
+  const hrId = useMemo(() => {
+    return user?.employeeId || JSON.parse(localStorage.getItem('userData') || '{}')?.employeeId || 1; // fallback for dev
+  }, [user]);
+  // Default hrId for testing
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedLeave, setSelectedLeave] = useState(null);
@@ -12,6 +19,9 @@ const PendingRequests = ({ hrId = 1 }) => { // Default hrId for testing
   const [error, setError] = useState(null);
   const [actionLoading, setActionLoading] = useState({});
 
+
+   const getAvatarColor = (name) => avatarBg(name);
+  
   // Fetch pending requests from backend
   const fetchPendingRequests = async () => {
     try {
@@ -20,20 +30,19 @@ const PendingRequests = ({ hrId = 1 }) => { // Default hrId for testing
       const response = await axios.get(`http://localhost:8000/leave/hr/pending-leaves/${hrId}`);
       
       // Map backend response to frontend format
-      const mappedData = response.data.map(item => ({
+      const mapped= response.data.map(item => ({
         id: item.id,
         employee: item.employee_name,
-        employee_name: item.employee_name,
         leaveType: item.leave_type,
-        leave_type: item.leave_type,
+        
         startDate: item.start_date,
-        start_date: item.start_date,
+        
         endDate: item.end_date,
-        end_date: item.end_date,
+       
         days: item.no_of_days,
-        total_days: item.no_of_days,
-        status: item.hr_status?.toLowerCase() || 'pending',
-        appliedOn: item.created_at,
+        
+        status: (item.hr_status || 'Pending').toLowerCase(),
+        appliedOn: item.created_at ||  item.start_date,
         applied_date: item.created_at,
         reason: item.reason,
         description: item.reason,
@@ -42,75 +51,21 @@ const PendingRequests = ({ hrId = 1 }) => { // Default hrId for testing
         final_status: item.status
       }));
       
-      setPendingRequests(mappedData);
+      setPendingRequests(mapped);
     } catch (err) {
       console.error('Error fetching pending requests:', err);
       setError('Failed to fetch pending requests. Please try again.');
-      // Fallback to sample data for development
-      setPendingRequests([
-        {
-          id: 1,
-          employee: 'Dr. Sarah Johnson',
-          employee_name: 'Dr. Sarah Johnson',
-          leaveType: 'Annual Leave',
-          leave_type: 'Annual Leave',
-          startDate: '2025-01-15',
-          start_date: '2025-01-15',
-          endDate: '2025-01-20',
-          end_date: '2025-01-20',
-          days: 6,
-          total_days: 6,
-          status: 'pending',
-          appliedOn: '2025-01-05',
-          applied_date: '2025-01-05',
-          reason: 'Family vacation',
-          description: 'Family vacation',
-        },
-        {
-          id: 2,
-          employee: 'Mr. John Smith',
-          employee_name: 'Mr. John Smith',
-          leaveType: 'Sick Leave',
-          leave_type: 'Sick Leave',
-          startDate: '2025-01-10',
-          start_date: '2025-01-10',
-          endDate: '2025-01-12',
-          end_date: '2025-01-12',
-          days: 3,
-          total_days: 3,
-          status: 'pending',
-          appliedOn: '2025-01-08',
-          applied_date: '2025-01-08',
-          reason: 'Medical appointment',
-          description: 'Medical appointment',
-        },
-        {
-          id: 3,
-          employee: 'Ms. Emily Davis',
-          employee_name: 'Ms. Emily Davis',
-          leaveType: 'Personal Leave',
-          leave_type: 'Personal Leave',
-          startDate: '2025-01-25',
-          start_date: '2025-01-25',
-          endDate: '2025-01-25',
-          end_date: '2025-01-25',
-          days: 1,
-          total_days: 1,
-          status: 'pending',
-          appliedOn: '2025-01-20',
-          applied_date: '2025-01-20',
-          reason: 'Personal matters',
-          description: 'Personal matters',
-        }
-      ]);
     } finally {
       setLoading(false);
     }
   };
 
+  // Trigger fetch on mount and when HR ID changes
   useEffect(() => {
     fetchPendingRequests();
   }, [hrId]);
+
+  
 
   const handleSort = (key) => {
     let direction = 'asc';
@@ -130,45 +85,48 @@ const PendingRequests = ({ hrId = 1 }) => { // Default hrId for testing
     setSelectedLeave(null);
   };
 
-  const handleApprove = async (requestId) => {
+  const handleApproveReject = async (requestId, action) => {
     try {
-      setActionLoading(prev => ({ ...prev, [requestId]: 'approving' }));
+      setActionLoading((prev) => ({
+        ...prev,
+        [requestId]: action === 'Approved' ? 'approving' : 'rejecting',
+      }));
       await axios.post(`http://localhost:8000/leave/hr/leave-action/${requestId}`, {
-        action: 'Approved'  // Backend expects 'Approved' with capital A
+        action, // Backend expects 'Approved' or 'Rejected'
       });
-      
+
       // Refresh the pending requests list
       await fetchPendingRequests();
-      
-      // Show success message (you can add a toast notification here)
-      console.log('Leave request approved successfully');
+
+      // Success message for debugging/notifications
+      console.log(`Leave request ${action.toLowerCase()} successfully`);
     } catch (err) {
-      console.error('Error approving leave request:', err);
-      setError('Failed to approve leave request. Please try again.');
+      console.error(`Error ${action.toLowerCase()} leave request:`, err);
+      setError(`Failed to ${action.toLowerCase()} leave request. Please try again.`);
     } finally {
-      setActionLoading(prev => ({ ...prev, [requestId]: null }));
+      setActionLoading((prev) => ({ ...prev, [requestId]: null }));
     }
   };
 
-  const handleReject = async (requestId) => {
-    try {
-      setActionLoading(prev => ({ ...prev, [requestId]: 'rejecting' }));
-      await axios.post(`http://localhost:8000/leave/hr/leave-action/${requestId}`, {
-        action: 'Rejected'  // Backend expects 'Rejected' with capital R
-      });
+  // const handleReject = async (requestId) => {
+  //   try {
+  //     setActionLoading(prev => ({ ...prev, [requestId]: 'rejecting' }));
+  //     await axios.post(`http://localhost:8000/leave/hr/leave-action/${requestId}`, {
+  //       action: 'Rejected'  // Backend expects 'Rejected' with capital R
+  //     });
       
-      // Refresh the pending requests list
-      await fetchPendingRequests();
+  //     // Refresh the pending requests list
+  //     await fetchPendingRequests();
       
-      // Show success message (you can add a toast notification here)
-      console.log('Leave request rejected successfully');
-    } catch (err) {
-      console.error('Error rejecting leave request:', err);
-      setError('Failed to reject leave request. Please try again.');
-    } finally {
-      setActionLoading(prev => ({ ...prev, [requestId]: null }));
-    }
-  };
+  //     // Show success message (you can add a toast notification here)
+  //     console.log('Leave request rejected successfully');
+  //   } catch (err) {
+  //     console.error('Error rejecting leave request:', err);
+  //     setError('Failed to reject leave request. Please try again.');
+  //   } finally {
+  //     setActionLoading(prev => ({ ...prev, [requestId]: null }));
+  //   }
+  // };
 
   const sortedRequests = React.useMemo(() => {
     let sortableRequests = [...pendingRequests];
@@ -193,6 +151,42 @@ const PendingRequests = ({ hrId = 1 }) => { // Default hrId for testing
         <ChevronDown className="w-4 h-4" />;
     }
     return <ChevronUp className="w-4 h-4 opacity-30" />;
+  };
+
+  // Match LeaveRequests visual styling for leave type chips
+  const getLeaveTypeColor = (leaveType) => {
+    switch (leaveType) {
+      case 'Annual Leave':
+        return 'text-green-600';
+      case 'Sick Leave':
+        return 'text-orange-600';
+      case 'Casual Leave':
+        return 'text-purple-600';
+       case 'Maternity Leave':
+        return 'text-red-600';
+      case 'Paternity Leave':
+        return 'text-brown-600';
+      default:
+        return 'text-gray-600';
+
+    }
+  };
+
+  const getLeaveTypeDot = (leaveType) => {
+    switch (leaveType) {
+      case 'Annual Leave':
+        return 'bg-green-500';
+      case 'Sick Leave':
+        return 'bg-orange-500';
+      case 'Casual Leave':
+        return 'bg-purple-500';
+       case 'Maternity Leave':
+        return 'bg-red-500';
+      case 'Paternity Leave':
+        return 'bg-brown-500';
+      default:
+        return 'bg-gray-500';
+    }
   };
 
   const getStatusBadge = (status) => {
@@ -275,7 +269,7 @@ const PendingRequests = ({ hrId = 1 }) => { // Default hrId for testing
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
+            <table className="w-full">
               <thead className="bg-gray-50">
                 <tr>
                   <th 
@@ -349,11 +343,26 @@ const PendingRequests = ({ hrId = 1 }) => { // Default hrId for testing
               <tbody className="bg-white divide-y divide-gray-200">
                 {sortedRequests.map((request) => (
                   <tr key={request.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                      {getDisplayValue(request, 'employee', 'employee_name')}
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center">
+                        <div className={`flex-shrink-0 h-10 w-10 rounded-full ${getAvatarColor(getDisplayValue(request, 'employee', 'employee_name'))} flex items-center justify-center`}>
+                          <span className="text-sm font-medium text-white">
+                            {getDisplayValue(request, 'employee', 'employee_name').split(' ').map(n => n[0]).join('')}
+                          </span>
+                        </div>
+                        <div className="ml-4">
+                          <div className="text-sm font-medium text-gray-900">{getDisplayValue(request, 'employee', 'employee_name')}</div>
+                          <div className="text-sm text-gray-500">{request.email}</div>
+                        </div>
+                      </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {getDisplayValue(request, 'leaveType', 'leave_type')}
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center">
+                        <div className={`w-2 h-2 rounded-full mr-2 ${getLeaveTypeDot(getDisplayValue(request, 'leaveType', 'leave_type'))}`}></div>
+                        <span className={`text-sm font-medium ${getLeaveTypeColor(getDisplayValue(request, 'leaveType', 'leave_type'))}`}>
+                          {getDisplayValue(request, 'leaveType', 'leave_type')}
+                        </span>
+                      </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       {new Date(getDisplayValue(request, 'startDate', 'start_date')).toLocaleDateString()}
@@ -380,7 +389,7 @@ const PendingRequests = ({ hrId = 1 }) => { // Default hrId for testing
                           <Eye className="w-4 h-4" />
                         </button>
                         <button
-                          onClick={() => handleApprove(request.id)}
+                          onClick={() => handleApproveReject(request.id, 'Approved')}
                           disabled={actionLoading[request.id]}
                           className="text-green-600 hover:text-green-900 p-1 rounded-full hover:bg-green-50 disabled:opacity-50"
                           title="Approve"
@@ -392,7 +401,7 @@ const PendingRequests = ({ hrId = 1 }) => { // Default hrId for testing
                           )}
                         </button>
                         <button
-                          onClick={() => handleReject(request.id)}
+                          onClick={() => handleApproveReject(request.id, 'Rejected')}
                           disabled={actionLoading[request.id]}
                           className="text-red-600 hover:text-red-900 p-1 rounded-full hover:bg-red-50 disabled:opacity-50"
                           title="Reject"

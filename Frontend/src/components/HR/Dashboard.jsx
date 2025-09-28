@@ -1,35 +1,251 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, Legend } from 'recharts';
 import { Users, Building, TrendingUp, Calendar, RefreshCw, Clock, Briefcase, UserCheck, BarChart3 } from 'lucide-react';
-import { userAPI } from '../../lib/api';
-
+import api, { userAPI } from '../../lib/api';
+import { useUser } from '../../contexts/UserContext';
+import useLivePoll from '../../hooks/useLivePoll';
+import axios from 'axios';
 const Dashboard = () => {
-  const [totalEmployees, setTotalEmployees] = useState(null);
+  const [totalEmployees, setTotalEmployees] = useState(0);
   const [isLoadingEmployees, setIsLoadingEmployees] = useState(false);
   const [employeeError, setEmployeeError] = useState(null);
+  const { user } = useUser();
+  const hrId = useMemo(() => {
+    return (
+      user?.employeeId ||
+      (() => {
+        try {
+          const stored = localStorage.getItem('userData');
+          return stored ? JSON.parse(stored)?.employeeId : null;
+        } catch (e) {
+          return null;
+        }
+      })()
+    );
+  }, [user]);
+  const [month, setMonth] = useState(() => new Date().getMonth()+1);
+  const [year, setYear] = useState(() => new Date().getFullYear());
+  const [attMonthCounts, setAttMonthCounts] = useState({ present: 0, wfh: 0, leave: 0, total: 0 });
+  const [attTodayCounts, setAttTodayCounts] = useState({ present: 0, wfh: 0, leave: 0, date: null });
+  const [employeeTypeCounts, setEmployeeTypeCounts] = useState({ fullTime: 0, contract: 0, intern: 0, total: 0 });
+  const [leaveCounts, setLeaveCounts] = useState({ approved: 0, pending: 0, rejected: 0, total: 0 });
+  const [isLoadingMetrics, setIsLoadingMetrics] = useState(false);
+  const [metricsError, setMetricsError] = useState(null);
+  const [expenseCounts, setExpenseCounts] = useState({ pendingHr: 0, approved: 0, rejected: 0, carried: 0, total: 0 });
+  const [attTrendData, setAttTrendData] = useState([]);
 
-  const fetchTotalEmployees = async () => {
-    setIsLoadingEmployees(true);
-    setEmployeeError(null);
+useEffect(() => {
+    const fetchTotalEmployees = async () => {
+      try {
+        const res = await api.get('/users/employees');
+        const listRaw = Array.isArray(res.data?.employees) ? res.data.employees : (Array.isArray(res.data) ? res.data : []);
+
+        // Scope to employees assigned to this HR using multiple possible fields
+        const matchesHr = (hrItem) => {
+          const val = typeof hrItem === 'object' ? (hrItem?.id || hrItem?.employee_id || hrItem?.emp_id) : hrItem;
+          return hrId ? String(val) === String(hrId) : true;
+        };
+        const isAssignedToHR = (emp) => {
+          const hrList = emp?.hr_list || emp?.hrs || emp?.hr || [];
+          if (Array.isArray(hrList) && hrId && hrList.some(matchesHr)) return true;
+          if (Array.isArray(emp?.hr_ids) && hrId && emp.hr_ids.some((id) => String(id) === String(hrId))) return true;
+          if (hrId && emp?.hr1_id && String(emp.hr1_id) === String(hrId)) return true;
+          if (hrId && emp?.hr2_id && String(emp.hr2_id) === String(hrId)) return true;
+          return !hrId; // if no hrId available, treat as all employees
+        };
+
+        const list = Array.isArray(listRaw) ? listRaw.filter(isAssignedToHR) : [];
+        setTotalEmployees(list.length);
+      } catch (error) {
+        console.error('Error fetching employees:', error);
+      }
+    };
+
+    fetchTotalEmployees();
+  }, [hrId]);
+
+
+  const fetchHRMetrics = useCallback(async () => {
+    if (!hrId) return;
+    setIsLoadingMetrics(true);
+    setMetricsError(null);
     try {
-      const count = await userAPI.getOnboardedEmployeesCount();
-      if (count !== null && count !== undefined) {
-        setTotalEmployees(count);
-      } else {
-        // Fallback: use /users/employees and take length if count missing
-        const employees = await userAPI.getEmployees();
-        setTotalEmployees(Array.isArray(employees) ? employees.length : null);
+      // Attendance monthly summary or fallback to daily
+      let present = 0, wfh = 0, leave = 0, total = 0;
+      let todayPresent = 0, todayWfh = 0, todayLeave = 0, latestDate = null;
+      try {
+        const res = await api.get('/attendance/hr-assigned', {
+          params: { hr_id: hrId, year, month },
+        });
+        if (res.status >= 200 && res.status < 300) {
+          const data = res.data;
+          if (Array.isArray(data)) {
+            data.forEach((item) => {
+              present += Number(item.present || 0);
+              wfh += Number(item.wfh || 0);
+              leave += Number(item.leave || 0);
+            });
+            total = present + wfh + leave;
+          } else if (data && data.summary) {
+            present = Number(data.summary.present || 0);
+            wfh = Number(data.summary.wfh || 0);
+            leave = Number(data.summary.leave || 0);
+            total = present + wfh + leave;
+          } else {
+            throw new Error('Unexpected summary shape');
+          }
+        } else {
+          throw new Error('Attendance summary fetch failed');
+        }
+      } catch {
+        // Fallback: hr-daily and compute both monthly and today
+        try {
+          const resDaily = await api.get('/attendance/hr-daily', {
+            params: { hr_id: hrId, year, month },
+          });
+          if (resDaily.status >= 200 && resDaily.status < 300) {
+            const records = Array.isArray(resDaily.data) ? resDaily.data : (Array.isArray(resDaily.data?.records) ? resDaily.data.records : []);
+            const byDate = {};
+            if (Array.isArray(records)) {
+              records.forEach((r) => {
+                const s = String(r.action || r.status || '').toLowerCase();
+                const d = r.date || r.day || null;
+                if (s === 'present') present += 1; else if (s === 'wfh') wfh += 1; else if (s === 'leave') leave += 1;
+                if (d) {
+                  if (!latestDate || String(d) > String(latestDate)) latestDate = d;
+                  byDate[d] = byDate[d] || { present: 0, wfh: 0, leave: 0 };
+                  if (s === 'present') byDate[d].present += 1; else if (s === 'wfh') byDate[d].wfh += 1; else if (s === 'leave') byDate[d].leave += 1;
+                }
+              });
+              total = present + wfh + leave;
+              const td = byDate[latestDate] || { present: 0, wfh: 0, leave: 0 };
+              todayPresent = td.present; todayWfh = td.wfh; todayLeave = td.leave;
+              // Build last 7 days trend data
+              const sortedDates = Object.keys(byDate).sort((a, b) => (String(a) < String(b) ? -1 : 1));
+              const last7 = sortedDates.slice(Math.max(0, sortedDates.length - 7));
+              const trend = last7.map((d) => ({
+                label: d,
+                present: byDate[d].present || 0,
+                wfh: byDate[d].wfh || 0,
+                leave: byDate[d].leave || 0,
+              }));
+              setAttTrendData(trend);
+            }
+          }
+        } catch (e) {
+          // keep defaults
+        }
+      }
+      // If monthly summary succeeded, still fetch hr-daily to populate trend
+      if (!attTrendData || attTrendData.length === 0) {
+        try {
+          const resDaily2 = await api.get('/attendance/hr-daily', {
+            params: { hr_id: hrId, year, month },
+          });
+          const records2 = Array.isArray(resDaily2.data) ? resDaily2.data : (Array.isArray(resDaily2.data?.records) ? resDaily2.data.records : []);
+          const byDate2 = {};
+          for (const r of records2) {
+            const s = String(r.action || r.status || '').toLowerCase();
+            const d = r.date || r.day || null;
+            if (!d) continue;
+            byDate2[d] = byDate2[d] || { present: 0, wfh: 0, leave: 0 };
+            if (s === 'present') byDate2[d].present += 1; else if (s === 'wfh') byDate2[d].wfh += 1; else if (s === 'leave') byDate2[d].leave += 1;
+          }
+          const sorted2 = Object.keys(byDate2).sort((a, b) => (String(a) < String(b) ? -1 : 1));
+          const last7_2 = sorted2.slice(Math.max(0, sorted2.length - 7));
+          setAttTrendData(last7_2.map((d) => ({ label: d, present: byDate2[d].present || 0, wfh: byDate2[d].wfh || 0, leave: byDate2[d].leave || 0 })));
+        } catch {}
+      }
+      setAttMonthCounts({ present, wfh, leave, total });
+      setAttTodayCounts({ present: todayPresent, wfh: todayWfh, leave: todayLeave, date: latestDate });
+
+      // Leave requests counts for this month
+      try {
+        const resLeaves = await api.get(`/leave/hr/leave-requests/${hrId}`);
+        if (resLeaves.status >= 200 && resLeaves.status < 300) {
+          const items = Array.isArray(resLeaves.data) ? resLeaves.data : (Array.isArray(resLeaves.data?.items) ? resLeaves.data.items : []);
+          let approved = 0, pending = 0, rejected = 0;
+          const start = new Date(year, month - 1, 1);
+          const end = new Date(year, month, 0, 23, 59, 59);
+          if (Array.isArray(items)) {
+            items.forEach((lv) => {
+              const created = new Date(lv.created_at || lv.request_date || lv.start_date || Date.now());
+              if (created >= start && created <= end) {
+                const s = String(lv.status || lv.hr_status || '').toLowerCase();
+                if (s.includes('approve')) approved += 1; else if (s.includes('reject')) rejected += 1; else pending += 1;
+              }
+            });
+          }
+          const totalLeaves = approved + pending + rejected;
+          setLeaveCounts({ approved, pending, rejected, total: totalLeaves });
+        }
+      } catch (e) {
+        // ignore errors
+      }
+
+      // Employee type distribution (full-time, contract, intern) - scoped to employees assigned to this HR
+      try {
+        const resEmp = await api.get('/users/employees');
+        const listRaw = Array.isArray(resEmp.data?.employees) ? resEmp.data.employees : (Array.isArray(resEmp.data) ? resEmp.data : []);
+
+        const matchesHr = (hrItem) => {
+          const val = typeof hrItem === 'object' ? (hrItem?.id || hrItem?.employee_id || hrItem?.emp_id) : hrItem;
+          return String(val) === String(hrId);
+        };
+        const isAssignedToHR = (emp) => {
+          const hrList = emp?.hr_list || emp?.hrs || emp?.hr || [];
+          if (Array.isArray(hrList) && hrList.some(matchesHr)) return true;
+          if (Array.isArray(emp?.hr_ids) && emp.hr_ids.some((id) => String(id) === String(hrId))) return true;
+          if (emp?.hr1_id && String(emp.hr1_id) === String(hrId)) return true;
+          if (emp?.hr2_id && String(emp.hr2_id) === String(hrId)) return true;
+          return false;
+        };
+
+        const list = Array.isArray(listRaw) ? listRaw.filter(isAssignedToHR) : [];
+        let full = 0, contract = 0, intern = 0;
+        list.forEach((emp) => {
+          const t = String(emp.type || emp.employment_type || '').toLowerCase();
+          if (t.includes('full')) full += 1; else if (t.includes('contract')) contract += 1; else if (t.includes('intern')) intern += 1;
+        });
+        const tot = full + contract + intern;
+        setEmployeeTypeCounts({ fullTime: full, contract, intern, total: tot });
+
+        // Also keep total employees in sync using the scoped list
+        setTotalEmployees(list.length);
+      } catch (e) {
+        // ignore errors
+      }
+
+      // Expenses summary for HR (current month)
+      try {
+        const resExp = await api.get('/expenses/hr-exp-list', {
+          params: { hr_id: hrId, year, month },
+        });
+        const items = Array.isArray(resExp.data) ? resExp.data : (Array.isArray(resExp.data?.items) ? resExp.data.items : []);
+        let pendingHr = 0, approved = 0, rejected = 0, carried = 0;
+        for (const it of items) {
+          const s = String(it.status || '').toLowerCase();
+          if (s === 'pending_hr_approval') pendingHr += 1;
+          else if (s === 'approved') approved += 1;
+          else if (s === 'hr_rejected') rejected += 1;
+          else if (s === 'carried_forward') carried += 1;
+        }
+        setExpenseCounts({ pendingHr, approved, rejected, carried, total: items.length });
+      } catch (e) {
+        // ignore errors
       }
     } catch (err) {
-      setEmployeeError('Failed to load employees');
+      setMetricsError('Failed to load metrics');
     } finally {
-      setIsLoadingEmployees(false);
+      setIsLoadingMetrics(false);
     }
-  };
+  }, [hrId, month, year]);
 
   useEffect(() => {
-    fetchTotalEmployees();
-  }, []);
+    fetchHRMetrics();
+  }, [fetchHRMetrics]);
+
+  useLivePoll(fetchHRMetrics, 5000);
   // Employee Performance Chart
   const EmployeePerformanceChart = () => (
     <div className="bg-white rounded-lg p-6 border border-gray-200 shadow-sm">
@@ -38,22 +254,22 @@ const Dashboard = () => {
           <BarChart3 className="h-5 w-5 text-blue-500" />
           Employee Attendance 
         </h3>
-        <span className="text-sm text-gray-500">Last 1 month</span>
+        <span className="text-sm text-gray-500">Current month</span>
       </div>
       <div className="h-80">
         <div className="flex items-end justify-between h-full px-4 pb-8">
           {/* Bar Chart */}
           <div className="flex items-end gap-4 h-full w-full">
             <div className="flex flex-col items-center gap-2 flex-1">
-              <div className="w-8 h-32 bg-gradient-to-t from-blue-500 to-blue-300 rounded-t"></div>
+              <div className="w-8 bg-gradient-to-t from-blue-500 to-blue-300 rounded-t" style={{ height: `${attMonthCounts.total ? Math.max(5, Math.round((attMonthCounts.present / attMonthCounts.total) * 100)) : 0}%` }}></div>
               <span className="text-xs text-gray-600">Present</span>
             </div>
             <div className="flex flex-col items-center gap-2 flex-1">
-              <div className="w-8 h-40 bg-gradient-to-t from-green-500 to-green-300 rounded-t"></div>
+              <div className="w-8 bg-gradient-to-t from-green-500 to-green-300 rounded-t" style={{ height: `${attMonthCounts.total ? Math.max(5, Math.round((attMonthCounts.wfh / attMonthCounts.total) * 100)) : 0}%` }}></div>
               <span className="text-xs text-gray-600">WFH</span>
             </div>
             <div className="flex flex-col items-center gap-2 flex-1">
-              <div className="w-8 h-36 bg-gradient-to-t from-yellow-500 to-yellow-300 rounded-t"></div>
+              <div className="w-8 bg-gradient-to-t from-yellow-500 to-yellow-300 rounded-t" style={{ height: `${attMonthCounts.total ? Math.max(5, Math.round((attMonthCounts.leave / attMonthCounts.total) * 100)) : 0}%` }}></div>
               <span className="text-xs text-gray-600">Leave</span>
             </div>
 
@@ -72,7 +288,7 @@ const Dashboard = () => {
           <PieChart className="h-5 w-5 text-green-500" />
           Type of the Employee
         </h3>
-        <span className="text-sm text-gray-500"> 150 employees</span>
+        <span className="text-sm text-gray-500"> {employeeTypeCounts.total || 0} employees</span>
       </div>
       <div className="flex items-center justify-center h-80">
         <div className="relative w-64 h-64">
@@ -85,7 +301,7 @@ const Dashboard = () => {
               fill="none"
               stroke="#3b82f6"
               strokeWidth="12"
-              strokeDasharray="132 88"
+              strokeDasharray={`${Math.round(2 * Math.PI * 35 * ((employeeTypeCounts.total ? employeeTypeCounts.fullTime / employeeTypeCounts.total : 0)))} ${Math.max(0, Math.round(2 * Math.PI * 35 - (2 * Math.PI * 35 * ((employeeTypeCounts.total ? employeeTypeCounts.fullTime / employeeTypeCounts.total : 0)))))}`}
               strokeDashoffset="0"
             />
             {/* Contract - 30% */}
@@ -96,8 +312,8 @@ const Dashboard = () => {
               fill="none"
               stroke="#f59e0b"
               strokeWidth="12"
-              strokeDasharray="66 154"
-              strokeDashoffset="-132"
+              strokeDasharray={`${Math.round(2 * Math.PI * 35 * ((employeeTypeCounts.total ? employeeTypeCounts.contract / employeeTypeCounts.total : 0)))} ${Math.max(0, Math.round(2 * Math.PI * 35 - (2 * Math.PI * 35 * ((employeeTypeCounts.total ? employeeTypeCounts.contract / employeeTypeCounts.total : 0)))))}`}
+              strokeDashoffset={`-${Math.round(2 * Math.PI * 35 * ((employeeTypeCounts.total ? employeeTypeCounts.fullTime / employeeTypeCounts.total : 0)))}`}
             />
             {/* Intern - 10% */}
             <circle
@@ -107,23 +323,23 @@ const Dashboard = () => {
               fill="none"
               stroke="#8b5cf6"
               strokeWidth="12"
-              strokeDasharray="22 198"
-              strokeDashoffset="-198"
+              strokeDasharray={`${Math.round(2 * Math.PI * 35 * ((employeeTypeCounts.total ? employeeTypeCounts.intern / employeeTypeCounts.total : 0)))} ${Math.max(0, Math.round(2 * Math.PI * 35 - (2 * Math.PI * 35 * ((employeeTypeCounts.total ? employeeTypeCounts.intern / employeeTypeCounts.total : 0)))))}`}
+              strokeDashoffset={`-${Math.round(2 * Math.PI * 35 * ((employeeTypeCounts.total ? (employeeTypeCounts.fullTime + employeeTypeCounts.contract) / employeeTypeCounts.total : 0)))}`}
             />
           </svg>
           {/* Legend */}
           <div className="absolute -right-25 top-0 space-y-2 text-sm ">
             <div className="flex items-center gap-2">
               <div className="w-3 h-3 bg-blue-500 rounded"></div>
-              <span>Full-time (60%)</span>
+              <span>Full-time ({employeeTypeCounts.total ? Math.round((employeeTypeCounts.fullTime / employeeTypeCounts.total) * 100) : 0}%)</span>
             </div>
             <div className="flex items-center gap-2">
               <div className="w-3 h-3 bg-orange-500 rounded"></div>
-              <span>Contract (30%)</span>
+              <span>Contract ({employeeTypeCounts.total ? Math.round((employeeTypeCounts.contract / employeeTypeCounts.total) * 100) : 0}%)</span>
             </div>
             <div className="flex items-center gap-2">
               <div className="w-3 h-3 bg-purple-500 rounded"></div>
-              <span>Intern (10%)</span>
+              <span>Intern ({employeeTypeCounts.total ? Math.round((employeeTypeCounts.intern / employeeTypeCounts.total) * 100) : 0}%)</span>
             </div>
           </div>
         </div>
@@ -139,49 +355,21 @@ const Dashboard = () => {
           <TrendingUp className="h-5 w-5 text-purple-500" />
           Attendance Trend
         </h3>
-        <span className="text-sm text-gray-500">Weekly average</span>
+        <span className="text-sm text-gray-500">Last 7 days</span>
       </div>
-      <div className="h-80 relative">
-        <svg className="w-full h-full" viewBox="0 0 400 200">
-          {/* Grid lines */}
-          <defs>
-            <pattern id="grid" width="40" height="20" patternUnits="userSpaceOnUse">
-              <path d="M 40 0 L 0 0 0 20" fill="none" stroke="#f3f4f6" strokeWidth="1"/>
-            </pattern>
-          </defs>
-          <rect width="100%" height="100%" fill="url(#grid)" />
-          
-          {/* Line chart */}
-          <polyline
-            fill="none"
-            stroke="#8b5cf6"
-            strokeWidth="3"
-            points="20,160 60,140 100,120 140,100 180,90 220,85 260,80 300,75 340,70 380,65"
-          />
-          
-          {/* Data points */}
-          <circle cx="20" cy="160" r="4" fill="#8b5cf6" />
-          <circle cx="60" cy="140" r="4" fill="#8b5cf6" />
-          <circle cx="100" cy="120" r="4" fill="#8b5cf6" />
-          <circle cx="140" cy="100" r="4" fill="#8b5cf6" />
-          <circle cx="180" cy="90" r="4" fill="#8b5cf6" />
-          <circle cx="220" cy="85" r="4" fill="#8b5cf6" />
-          <circle cx="260" cy="80" r="4" fill="#8b5cf6" />
-          <circle cx="300" cy="75" r="4" fill="#8b5cf6" />
-          <circle cx="340" cy="70" r="4" fill="#8b5cf6" />
-          <circle cx="380" cy="65" r="4" fill="#8b5cf6" />
-        </svg>
-        
-        {/* X-axis labels */}
-        <div className="absolute bottom-0 left-0 right-0 flex justify-between text-xs text-gray-500 px-4">
-          <span>Mon</span>
-          <span>Tue</span>
-          <span>Wed</span>
-          <span>Thu</span>
-          <span>Fri</span>
-          <span>Sat</span>
-          <span>Sun</span>
-        </div>
+      <div className="h-80">
+        <ResponsiveContainer width="100%" height="100%">
+          <LineChart data={attTrendData} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis dataKey="label" />
+            <YAxis allowDecimals={false} />
+            <Tooltip />
+            <Legend />
+            <Line type="monotone" dataKey="present" stroke="#10b981" name="Present" />
+            <Line type="monotone" dataKey="wfh" stroke="#3b82f6" name="WFH" />
+            <Line type="monotone" dataKey="leave" stroke="#ef4444" name="Leave" />
+          </LineChart>
+        </ResponsiveContainer>
       </div>
     </div>
   );
@@ -201,35 +389,35 @@ const Dashboard = () => {
           {/* Approved Leaves */}
           <div className="flex items-center justify-between">
             <span className="text-sm font-medium text-gray-700">Approved</span>
-            <span className="text-sm text-gray-500">24</span>
+            <span className="text-sm text-gray-500">{leaveCounts.approved || 0}</span>
           </div>
           <div className="w-full bg-gray-200 rounded-full h-3">
-            <div className="bg-green-500 h-3 rounded-full" style={{width: '60%'}}></div>
+            <div className="bg-green-500 h-3 rounded-full" style={{width: `${leaveCounts.total ? (leaveCounts.approved / leaveCounts.total) * 100 : 0}%`}}></div>
           </div>
           
           {/* Pending Leaves */}
           <div className="flex items-center justify-between">
             <span className="text-sm font-medium text-gray-700">Pending</span>
-            <span className="text-sm text-gray-500">8</span>
+            <span className="text-sm text-gray-500">{leaveCounts.pending || 0}</span>
           </div>
           <div className="w-full bg-gray-200 rounded-full h-3">
-            <div className="bg-yellow-500 h-3 rounded-full" style={{width: '20%'}}></div>
+            <div className="bg-yellow-500 h-3 rounded-full" style={{width: `${leaveCounts.total ? (leaveCounts.pending / leaveCounts.total) * 100 : 0}%`}}></div>
           </div>
           
           {/* Rejected Leaves */}
           <div className="flex items-center justify-between">
             <span className="text-sm font-medium text-gray-700">Rejected</span>
-            <span className="text-sm text-gray-500">3</span>
+            <span className="text-sm text-gray-500">{leaveCounts.rejected || 0}</span>
           </div>
           <div className="w-full bg-gray-200 rounded-full h-3">
-            <div className="bg-red-500 h-3 rounded-full" style={{width: '7.5%'}}></div>
+            <div className="bg-red-500 h-3 rounded-full" style={{width: `${leaveCounts.total ? (leaveCounts.rejected / leaveCounts.total) * 100 : 0}%`}}></div>
           </div>
         </div>
         
         {/* Summary */}
         <div className="mt-8 p-4 bg-gray-50 rounded-lg">
           <div className="text-center">
-            <div className="text-2xl font-bold text-gray-900">40</div>
+            <div className="text-2xl font-bold text-gray-900">{leaveCounts.total || 0}</div>
             <div className="text-sm text-gray-500">Total Requests</div>
           </div>
         </div>
@@ -241,10 +429,23 @@ const Dashboard = () => {
     <div className="p-6 bg-gray-50 min-h-screen">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold text-gray-800">HR Dashboard</h1>
-        <button className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">
-          <RefreshCw className="w-4 h-4" />
-          Refresh
-        </button>
+        <div className="flex items-center gap-2">
+          <select value={month} onChange={(e) => setMonth(Number(e.target.value))} className="px-3 py-2 border rounded-md bg-white text-sm">
+            {['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'].map((m, idx) => (
+              <option key={m} value={idx+1}>{m}</option>
+            ))}
+          </select>
+          <select value={year} onChange={(e) => setYear(Number(e.target.value))} className="px-3 py-2 border rounded-md bg-white text-sm">
+            {Array.from({ length: 5 }).map((_, i) => {
+              const y = new Date().getFullYear() - 2 + i;
+              return <option key={y} value={y}>{y}</option>;
+            })}
+          </select>
+          <button onClick={fetchHRMetrics} className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">
+            <RefreshCw className="w-4 h-4" />
+            Refresh
+          </button>
+        </div>
       </div>
 
       {/* Statistical Data Cards */}
@@ -270,8 +471,8 @@ const Dashboard = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-gray-600 mb-1">Attendance rate</p>
-              <p className="text-3xl font-bold text-gray-900">0%</p>
-              <p className="text-sm text-green-500 mt-1"> 2 work from home today</p>
+              <p className="text-3xl font-bold text-gray-900">{attMonthCounts.total ? Math.round((attMonthCounts.present / attMonthCounts.total) * 100) : 0}%</p>
+              <p className="text-sm text-green-500 mt-1">{attTodayCounts.wfh || 0} work from home today</p>
             </div>
             <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
               <Building className="w-6 h-6 text-green-600" />
@@ -284,8 +485,8 @@ const Dashboard = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-gray-600 mb-1">Attendance Rate</p>
-              <p className="text-3xl font-bold text-gray-900">0%</p>
-              <p className="text-sm text-green-500 mt-1">0 present today</p>
+              <p className="text-3xl font-bold text-gray-900">{attMonthCounts.total ? Math.round((attMonthCounts.present / attMonthCounts.total) * 100) : 0}%</p>
+              <p className="text-sm text-green-500 mt-1">{attTodayCounts.present || 0} present today</p>
             </div>
             <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
               <Clock className="w-6 h-6 text-purple-600" />
@@ -298,8 +499,8 @@ const Dashboard = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-gray-600 mb-1">Pending Leaves</p>
-              <p className="text-3xl font-bold text-gray-900">0</p>
-              <p className="text-sm text-red-500 mt-1">60 on leave today</p>
+              <p className="text-3xl font-bold text-gray-900">{leaveCounts.pending || 0}</p>
+              <p className="text-sm text-red-500 mt-1">{attTodayCounts.leave || 0} on leave today</p>
             </div>
             <div className="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center">
               <Calendar className="w-6 h-6 text-yellow-600" />
@@ -312,8 +513,8 @@ const Dashboard = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-gray-600 mb-1">Attendance rate</p>
-              <p className="text-3xl font-bold text-gray-900">6</p>
-              <p className="text-sm text-red-600 mt-1">+8 Leave on today</p>
+              <p className="text-3xl font-bold text-gray-900">{attTodayCounts.leave || 0}</p>
+              <p className="text-sm text-red-600 mt-1">Leave today</p>
             </div>
             <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center">
               <Briefcase className="w-6 h-6 text-orange-600" />
@@ -326,8 +527,8 @@ const Dashboard = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-gray-600 mb-1">Pending Expenses</p>
-              <p className="text-3xl font-bold text-gray-900">20</p>
-              <p className="text-sm text-red-600 mt-1">+20 this month</p>
+              <p className="text-3xl font-bold text-gray-900">{expenseCounts.pendingHr || 0}</p>
+              <p className="text-sm text-red-600 mt-1">+{expenseCounts.total || 0} this month</p>
             </div>
             <div className="w-12 h-12 bg-indigo-100 rounded-lg flex items-center justify-center">
               <UserCheck className="w-6 h-6 text-indigo-600" />

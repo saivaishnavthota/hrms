@@ -10,7 +10,7 @@ import Dashboard from '@/components/HR/Dashboard';
 import ChangePassword from '@/components/HR/ChangePassword';
 import LeaveRequests from '@/components/HR/LeaveRequests';
 import AssignLeaves from '@/components/HR/AssignLeaves';
-import AddAttendance from '@/components/HR/AddAttendance';
+
 import EmployeeAttendance from '@/components/HR/EmployeeAttendance';
 import Holidays from '@/components/HR/Holidays';
 import OnboardingEmployees from '@/components/HR/OnboardingEmployees';
@@ -27,6 +27,8 @@ import ChangePasswordOnboarding from '@/components/auth/ChangePasswordOnboarding
 import MyProfile from '@/components/Profile/MyProfile';
 // Employee components
 import EmployeeAddAttendance from '@/components/Employee/AddAttendance';
+import HRAddAttendance from '@/components/Employee/AddAttendance';
+import ManagerAddAttendance from '@/components/Employee/AddAttendance';
 import ApplyLeave from '@/components/Employee/ApplyLeave';
 import SubmitExpense from '@/components/Employee/SubmitExpense';
 import UploadDocuments from '@/components/Employee/UploadDocuments';
@@ -39,7 +41,7 @@ import AccountManagerExpenseManagement from '@/components/AccountManager/Expense
 import Projects from '@/components/AccountManager/Projects';
 import ManagerDashboard from '@/components/Manager/Dashboard';
 import ManagerExpenseManagement from '@/components/Manager/ExpenseManagement';
-
+import ManagerEmployeeAttendance from '@/components/Manager/EmployeesAttendance';
 
 export const AppRoutingSetup = () => {
   return (
@@ -58,13 +60,14 @@ export const AppRoutingSetup = () => {
         <Route path="employees-form" element={<EmployeeManagement />} />
         <Route path="onboarding-employees" element={<OnboardingEmployees />} />
         <Route path="expense-management" element={<ExpenseManagement />} />
+        <Route path="view-projects" element={<Projects viewOnly />} />
         <Route path="document-collection" element={<DocumentCollection />} />
         <Route path="pending-requests" element={<PendingRequests />} />
         <Route path="view-leave-application" element={<ViewLeaveApplication />} />
          <Route path="reset-password" element={< ChangePassword/>} />
         <Route path="leave-requests" element={<LeaveRequests />} />
         <Route path="assign-leaves" element={<AssignLeaves />} />
-        <Route path="add-attendance" element={<AddAttendance />} />
+        <Route path="add-attendance" element={<HRAddAttendance />} />
         <Route path="employees-attendance" element={<EmployeeAttendance />} />
         <Route path="holidays" element={<Holidays />} />
       </Route>
@@ -86,8 +89,8 @@ export const AppRoutingSetup = () => {
       <Route path="/manager" element={<ProtectedRoute allowedRoles={["Manager"]}><Layout1 menu={MENU_SIDEBAR_MANAGER} /></ProtectedRoute>}>
         <Route index element={<ManagerDashboard />} />
         <Route path="dashboard" element={<ManagerDashboard />} />
-        <Route path="add-attendance" element={<EmployeeAddAttendance />} />
-        <Route path="employees-attendance" element={<EmployeeAttendance />} />
+        <Route path="add-attendance" element={<ManagerAddAttendance />} />
+        <Route path="employees-attendance" element={<ManagerEmployeeAttendance />} />
         <Route path="employees" element={<ManagerEmployees />} />
         <Route path="apply-leave" element={<ApplyLeave />} />
         <Route path="leave-requests" element={<ManagerLeaveRequests />} />

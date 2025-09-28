@@ -50,8 +50,8 @@ import {
 } from '@/components/ui/dialog';
 import { useUser } from '@/contexts/UserContext';
 import NewExpenseForm from '@/components/Manager/NewExpenseForm';
-
-const BASE_URL = 'http://127.0.0.1:8000';
+import { avatarBg } from '../../lib/avatarColors';
+import api from '@/lib/api';
 
 
 const ExpenseManagement = () => {
@@ -68,7 +68,7 @@ const ExpenseManagement = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  const token = useMemo(() => localStorage.getItem('authToken'), []);
+  // Authorization is handled by axios interceptor in '@/lib/api'
 
   // Compute current year/month to satisfy backend validation when required
   const now = new Date();
@@ -95,17 +95,7 @@ const ExpenseManagement = () => {
     { value: '12', label: 'December' },
   ];
 
-  const getAvatarColor = (name) => {
-    const colors = [
-      'bg-blue-500',
-      'bg-green-500',
-      'bg-purple-500',
-      'bg-orange-500',
-      'bg-pink-500',
-      'bg-indigo-500',
-    ];
-    return colors[(name?.length || 0) % colors.length];
-  };
+  const getAvatarColor = (name) => avatarBg(name);
 
   const getInitials = (name) => {
     if (!name) return 'NA';
@@ -177,16 +167,17 @@ const ExpenseManagement = () => {
     setLoading(true);
     setError(null);
   try {
-      const url = `${BASE_URL}/expenses/hr-exp-list?hr_id=${encodeURIComponent(
-        user.employeeId
-      )}&year=${selectedYear}&month=${selectedMonth}`;
-      const res = await fetch(url, {
+      const { data } = await api.get('/expenses/hr-exp-list', {
+        params: {
+          hr_id: user.employeeId,
+          year: Number(selectedYear),
+          month: Number(selectedMonth),
+        },
         headers: {
-          Authorization: token ? `Bearer ${token}` : '',
+          // Backend can use Authorization header to read HR ID if needed
+          Authorization: String(user.employeeId || ''),
         },
       });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
       const mapped = (data || []).map(mapExpense);
       setExpenses(mapped.filter((e) => (e.status || '').toLowerCase() === 'pending'));
     } catch (err) {
@@ -206,16 +197,16 @@ const ExpenseManagement = () => {
     setLoading(true);
     setError(null);
   try {
-      const url = `${BASE_URL}/expenses/hr-exp-list?hr_id=${encodeURIComponent(
-        user.employeeId
-      )}&year=${selectedYear}&month=${selectedMonth}`;
-      const res = await fetch(url, {
+      const { data } = await api.get('/expenses/hr-exp-list', {
+        params: {
+          hr_id: user.employeeId,
+          year: Number(selectedYear),
+          month: Number(selectedMonth),
+        },
         headers: {
-          Authorization: token ? `Bearer ${token}` : '',
+          Authorization: String(user.employeeId || ''),
         },
       });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
       setExpenses((data || []).map(mapExpense));
     } catch (err) {
       console.error('Error fetching hr-exp-list:', err);
@@ -235,16 +226,16 @@ const ExpenseManagement = () => {
     setLoading(true);
     setError(null);
     try {
-      const url = `${BASE_URL}/expenses/my-expenses?employee_id=${encodeURIComponent(
-        user.employeeId
-      )}&year=${selectedYear}&month=${selectedMonth}`;
-      const res = await fetch(url, {
+      const { data } = await api.get('/expenses/my-expenses', {
+        params: {
+          employee_id: user.employeeId,
+          year: Number(selectedYear),
+          month: Number(selectedMonth),
+        },
         headers: {
-          Authorization: token ? `Bearer ${token}` : '',
+          Authorization: String(user.employeeId || ''),
         },
       });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
       const mapped = (data || []).map((item) => {
         const approvals = Array.isArray(item.history)
           ? item.history
@@ -319,17 +310,11 @@ const ExpenseManagement = () => {
       form.append('hr_id', String(user.employeeId || ''));
       form.append('status', 'Approved');
       form.append('reason', reason);
-      const res = await fetch(
-        `${BASE_URL}/expenses/hr-upd-status/${expense.requestId}`,
-        {
-          method: 'PUT',
-          headers: {
-            Authorization: token ? `Bearer ${token}` : '',
-          },
-          body: form,
-        }
-      );
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      await api.put(`/expenses/hr-upd-status/${expense.requestId}`, form, {
+        headers: {
+          Authorization: String(user.employeeId || ''),
+        },
+      });
       setExpenses((prev) =>
         activeTab === 'pending'
           ? prev.filter((e) => e.requestId !== expense.requestId)
@@ -362,17 +347,11 @@ const ExpenseManagement = () => {
       form.append('hr_id', String(user.employeeId || ''));
       form.append('status', 'Rejected');
       form.append('reason', reason);
-      const res = await fetch(
-        `${BASE_URL}/expenses/hr-upd-status/${expense.requestId}`,
-        {
-          method: 'PUT',
-          headers: {
-            Authorization: token ? `Bearer ${token}` : '',
-          },
-          body: form,
-        }
-      );
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      await api.put(`/expenses/hr-upd-status/${expense.requestId}`, form, {
+        headers: {
+          Authorization: String(user.employeeId || ''),
+        },
+      });
       setExpenses((prev) =>
         activeTab === 'pending'
           ? prev.filter((e) => e.requestId !== expense.requestId)

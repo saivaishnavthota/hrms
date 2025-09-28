@@ -3,7 +3,7 @@ import { User, Trash2, Eye, X, Search, CheckCircle, Home, CalendarDays } from 'l
 import axios from 'axios';
 import { avatarBg } from '../../lib/avatarColors';
 
-const EmployeeAttendance = () => {
+const ManagerEmployeeAttendance = () => {
   const [attendanceRecords, setAttendanceRecords] = useState([]);
   const [selectedRecord, setSelectedRecord] = useState(null);
   const [showModal, setShowModal] = useState(false);
@@ -16,6 +16,8 @@ const EmployeeAttendance = () => {
   const [month, setMonth] = useState(9);
   const [userId, setUserId] = useState(null);
   const [error, setError] = useState(null);
+
+   const getAvatarColor = (name) => avatarBg(name);
 
   // Set axios base URL
   axios.defaults.baseURL = 'http://127.0.0.1:8000';
@@ -37,8 +39,8 @@ const EmployeeAttendance = () => {
 
       try {
         setError(null);
-        const response = await axios.get('/attendance/hr-daily', {
-          params: { hr_id: userId, year, month }
+        const response = await axios.get('/attendance/daily', {
+          params: { manager_id: userId, year, month }
         });
         setAttendanceRecords(transformData(response.data));
       } catch (error) {
@@ -295,9 +297,12 @@ const EmployeeAttendance = () => {
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
                         <div className="flex-shrink-0 h-10 w-10">
-                          <div className={`h-10 w-10 rounded-full ${avatarBg(record.employee.name)} flex items-center justify-center`}>
-                            <User className="h-5 w-5 text-black" />
-                          </div>
+                         
+ <div className={`flex-shrink-0 h-10 w-10 rounded-full ${getAvatarColor(record.employee.name)} flex items-center justify-center`}>
+                        <span className="text-sm font-medium text-white">
+                          {record.employee.name.split(' ').map(n => n[0]).join('')}
+                        </span>
+                      </div>
                         </div>
                         <div className="ml-4">
                           <div className="text-sm font-medium text-gray-900">{record.employee.name}</div>
@@ -553,4 +558,4 @@ const EmployeeAttendance = () => {
   );
 };
 
-export default EmployeeAttendance;
+export default ManagerEmployeeAttendance;

@@ -59,7 +59,13 @@ export function SidebarMenu({ menu }) {
       return (
         <AccordionMenuSub key={index} value={item.path || `root-${index}`}>
           <AccordionMenuSubTrigger className="text-sm font-medium flex items-center gap-2">
-            {item.icon && <item.icon data-slot="accordion-menu-icon" className="shrink-0" />}
+            {item.icon && (
+              <item.icon
+                data-slot="accordion-menu-icon"
+                className="shrink-0"
+                style={{ color: 'rgb(53, 4, 151)' }}
+              />
+            )}
             <span data-slot="accordion-menu-title" className="flex-1">{item.title}</span>
           </AccordionMenuSubTrigger>
           <AccordionMenuSubContent
@@ -85,7 +91,13 @@ export function SidebarMenu({ menu }) {
             to={item.path || '#'}
             className="flex items-center grow gap-2"
           >
-            {item.icon && <item.icon data-slot="accordion-menu-icon" className="shrink-0" />}
+            {item.icon && (
+              <item.icon
+                data-slot="accordion-menu-icon"
+                className="shrink-0"
+              style={{ color: 'rgb(53, 4, 151)' }}
+              />
+            )}
             <span data-slot="accordion-menu-title" className="flex-1">{item.title}</span>
           </Link>
         </AccordionMenuItem>
@@ -101,7 +113,13 @@ export function SidebarMenu({ menu }) {
         className="text-sm font-medium"
       >
         <div className="flex items-center gap-2 w-full">
-          {item.icon && <item.icon data-slot="accordion-menu-icon" className="shrink-0" />}
+          {item.icon && (
+            <item.icon
+              data-slot="accordion-menu-icon"
+              className="shrink-0"
+              style={{ color: 'rgb(110, 38, 253)' }}
+            />
+          )}
           <span data-slot="accordion-menu-title" className="flex-1">{item.title}</span>
         </div>
         {item.disabled && (

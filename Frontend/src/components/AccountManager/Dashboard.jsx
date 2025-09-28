@@ -1,8 +1,9 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent } from '@/components/ui/chart';
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer } from 'recharts';
 import { useUser } from '@/contexts/UserContext';
+import useLivePoll from '@/hooks/useLivePoll';
 
 const BASE_URL = 'http://localhost:8000';
 
@@ -25,43 +26,42 @@ const Dashboard = () => {
     return 'Other';
   };
 
-  useEffect(() => {
-    const fetchData = async () => {
-      if (!user?.employeeId) return;
-      setLoading(true);
-      setError(null);
-      try {
-        const url = `${BASE_URL}/expenses/mgr-exp-list?manager_id=${encodeURIComponent(
-          user.employeeId
-        )}&year=${year}&month=${month}`;
-        const res = await fetch(url, {
-          headers: {
-            Authorization: token ? `Bearer ${token}` : '',
-          },
-        });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const json = await res.json();
-        const counts = { Pending: 0, Approved: 0, Rejected: 0 };
-        (json || []).forEach((item) => {
-          const s = mapStatus(item);
-          if (counts[s] !== undefined) counts[s] += 1;
-        });
-        const chartData = [
-          { label: 'Pending', value: counts.Pending },
-          { label: 'Approved', value: counts.Approved },
-          { label: 'Rejected', value: counts.Rejected },
-        ];
-        setData(chartData);
-      } catch (err) {
-        console.error('Error fetching manager expenses for dashboard:', err);
-        setError('Failed to load expense summary.');
-        setData([]);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchData();
-  }, [user?.employeeId]);
+  const fetchData = useCallback(async () => {
+    if (!user?.employeeId) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const url = `${BASE_URL}/expenses/mgr-exp-list?manager_id=${encodeURIComponent(
+        user.employeeId
+      )}&year=${year}&month=${month}`;
+      const res = await fetch(url, {
+        headers: {
+          Authorization: token ? `Bearer ${token}` : '',
+        },
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const json = await res.json();
+      const counts = { Pending: 0, Approved: 0, Rejected: 0 };
+      (json || []).forEach((item) => {
+        const s = mapStatus(item);
+        if (counts[s] !== undefined) counts[s] += 1;
+      });
+      const chartData = [
+        { label: 'Pending', value: counts.Pending },
+        { label: 'Approved', value: counts.Approved },
+        { label: 'Rejected', value: counts.Rejected },
+      ];
+      setData(chartData);
+    } catch (err) {
+      console.error('Error fetching manager expenses for dashboard:', err);
+      setError('Failed to load expense summary.');
+      setData([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [user?.employeeId, token, year, month]);
+
+  useLivePoll(fetchData, { intervalMs: 5000, deps: [user?.employeeId, token, year, month] });
 
   const chartConfig = {
     Pending: { label: 'Pending', color: 'hsl(var(--chart-2))' },
@@ -71,7 +71,9 @@ const Dashboard = () => {
 
   return (
     <div className="p-6 space-y-6">
-      <h1 className="text-2xl font-semibold">Dashboard</h1>
+      <h1 className="text-2xl font-semibold">
+        {`Welcome to Account Manager Portal - ${user?.name || ''}`}
+      </h1>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <Card>

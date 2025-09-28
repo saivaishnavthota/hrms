@@ -11,8 +11,10 @@ import {
   Building,
   UserCheck,
   Loader2,
-  AlertCircle
+  AlertCircle,
+  ArrowLeft
 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -21,7 +23,8 @@ import { toast } from 'react-toastify';
 import { useUser } from '../../contexts/UserContext';
 
 const MyProfile = () => {
-  const { user } = useUser();
+  const navigate = useNavigate();
+  const { user, getDashboardPath } = useUser();
   const [profileData, setProfileData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -104,13 +107,26 @@ const MyProfile = () => {
 
   return (
     <div className="container mx-auto p-6 max-w-4xl">
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-          My Profile
-        </h1>
-        <p className="text-muted-foreground mt-2">
-          {user?.name ? `Welcome back, ${user.name}!` : 'View and manage your personal information'}
-        </p>
+      <div className="mb-6 flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+            My Profile
+          </h1>
+          <p className="text-muted-foreground mt-2">
+            {user?.name ? `Welcome back, ${user.name}!` : 'View and manage your personal information'}
+          </p>
+        </div>
+        <Button
+          variant="outline"
+          className="gap-2"
+          onClick={() => {
+            const path = getDashboardPath(user?.role);
+            navigate(path || '/');
+          }}
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Back to Dashboard
+        </Button>
       </div>
 
       <div className="grid gap-6 md:grid-cols-2">

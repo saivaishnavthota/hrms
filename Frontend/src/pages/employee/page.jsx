@@ -22,9 +22,11 @@ import ApplyLeave from '@/components/Employee/ApplyLeave';
 import UploadDocuments from '@/components/Employee/UploadDocuments';
 import SubmitExpense from '@/components/Employee/SubmitExpense';
 import SetPassword from '@/components/Employee/SetPassword';
+import { useUser } from '@/contexts/UserContext';
 
 const EmployeePage = () => {
   const location = useLocation();
+  const { user } = useUser();
   const [dateRange, setDateRange] = useState({
     from: startOfMonth(new Date()),
     to: endOfMonth(new Date())
@@ -110,7 +112,9 @@ const EmployeePage = () => {
         <div className="employee-dashboard-content">
           {/* Welcome Section */}
           <div className="employee-welcome-banner">
-            <h2 className="text-xl font-semibold mb-2">Employee Dashboard</h2>
+            <h2 className="text-xl font-semibold mb-2">
+              {`Welcome to Employee Portal - ${user?.name || ''}`}
+            </h2>
             <p className="text-blue-100">Overview of your weekly attendance, leaves, and documents.</p>
           </div>
 

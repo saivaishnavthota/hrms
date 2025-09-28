@@ -260,40 +260,54 @@ async def display_hrs(session: Session = Depends(get_session)):
 # Get all employees with their assigned HRs and Managers
 # ----------------------------
 @router.get("/employees")
-async def display_employees(session: Session = Depends(get_session)):
-    query = text("""
-        SELECT
-            e.id AS employeeId,
-           INITCAP(e.name) as name,
-            e.company_email,
-            e.email,
-            e.role,
-            -- Collect HR names linked to the employee
-            COALESCE(array_agg(DISTINCT hr.name) FILTER (WHERE hr.id IS NOT NULL), '{}') AS hr,
-            -- Collect Manager names linked to the employee
-            COALESCE(array_agg(DISTINCT mgr.name) FILTER (WHERE mgr.id IS NOT NULL), '{}') AS managers
-        FROM employees e
-        LEFT JOIN employee_hrs eh ON e.id = eh.employee_id
-        LEFT JOIN employees hr ON eh.hr_id = hr.id
-        LEFT JOIN employee_managers em ON e.id = em.employee_id
-        LEFT JOIN employees mgr ON em.manager_id = mgr.id
-        GROUP BY e.id, e.name, e.email, e.role
-        ORDER BY e.name;
-    """)
+async def display_employees(hr_id: int = None, session: Session = Depends(get_session)):
+    """
+    Get all employees with their assigned HRs and Managers.
+    If `hr_id` is provided, filter employees assigned to that HR.
+    """
+    try:
+        base_query = """
+            SELECT
+                e.id AS employeeId,
+                INITCAP(e.name) AS name,
+                e.company_email,
+                e.email,
+                e.role,
+                COALESCE(array_agg(DISTINCT hr.name) FILTER (WHERE hr.id IS NOT NULL), '{}') AS hr,
+                COALESCE(array_agg(DISTINCT mgr.name) FILTER (WHERE mgr.id IS NOT NULL), '{}') AS managers
+            FROM employees e
+            LEFT JOIN employee_hrs eh ON e.id = eh.employee_id
+            LEFT JOIN employees hr ON eh.hr_id = hr.id
+            LEFT JOIN employee_managers em ON e.id = em.employee_id
+            LEFT JOIN employees mgr ON em.manager_id = mgr.id
+        """
 
-    result = session.execute(query).all()
-    employees = []
-    for row in result:
-        employees.append({
-            "employeeId": row.employeeid,
-            "name": row.name,
-            "to_email"  : row.email,    
-            "email": row.company_email,
-            "role": row.role,
-            "hr": row.hr,
-            "managers": row.managers
-        })
-    return employees
+        # Filter by hr_id if provided
+        if hr_id:
+            base_query += " WHERE eh.hr_id = :hr_id"
+
+        base_query += " GROUP BY e.id, e.name, e.email, e.role ORDER BY e.name"
+
+        result = session.execute(text(base_query), {"hr_id": hr_id} if hr_id else {}).all()
+        
+        employees = []
+        for row in result:
+            employees.append({
+                "employeeId": row.employeeid,
+                "name": row.name,
+                "to_email": row.email,
+                "email": row.company_email,
+                "role": row.role,
+                "hr": row.hr,
+                "managers": row.managers
+            })
+
+        return {"count": len(employees), "employees": employees}
+
+    except Exception as e:
+        logger.error(f"Error fetching employees: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
 
 # Get all onboarded employees with document status
 # -----------------------------------------------

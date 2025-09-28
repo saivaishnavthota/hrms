@@ -21,9 +21,11 @@ import Dashboard from '@/components/HR/Dashboard';
 import ExpenseManagement from '@/components/HR/ExpenseManagement';
 import OnboardingEmployees from '@/components/HR/OnboardingEmployees';
 import DocumentCollection from '@/components/HR/DocumentCollection';
+import { useUser } from '@/contexts/UserContext';
 
 export function Layout1Page() {
   const location = useLocation();
+  const { user } = useUser();
   const [isOpen, setIsOpen] = useState(false);
   const [date, setDate] = useState({
     from: new Date(2025, 0, 20),
@@ -97,14 +99,17 @@ export function Layout1Page() {
   };
 
   const pageInfo = getPageInfo();
+  const role = user?.role || 'HR';
+  const name = user?.name || '';
+  const welcomeTitle = `Welcome to ${role} Portal - ${name}`;
 
   return (
     <div className="container">
       <Toolbar>
         <ToolbarHeading>
-          <ToolbarPageTitle>{pageInfo.title}</ToolbarPageTitle>
+          <ToolbarPageTitle>{welcomeTitle}</ToolbarPageTitle>
           <ToolbarDescription>
-            {pageInfo.description}
+            {pageInfo.title}: {pageInfo.description}
           </ToolbarDescription>
         </ToolbarHeading>
         <ToolbarActions>

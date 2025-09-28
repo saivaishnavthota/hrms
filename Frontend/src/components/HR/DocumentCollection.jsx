@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Eye, FileText, Download, ExternalLink, X, CheckCircle, Clock, AlertCircle, Send, Check, XCircle } from 'lucide-react';
+import { avatarBg } from '../../lib/avatarColors';
 
 const DocumentCollection = () => {
   const [showDocumentsModal, setShowDocumentsModal] = useState(false);
@@ -227,14 +228,7 @@ const DocumentCollection = () => {
   }, []);
 
   // Helper function to get avatar color
-  const getAvatarColor = (name) => {
-    const colors = [
-      'bg-blue-500', 'bg-green-500', 'bg-purple-500', 'bg-pink-500', 
-      'bg-indigo-500', 'bg-yellow-500', 'bg-red-500', 'bg-teal-500'
-    ];
-    const index = name.charCodeAt(0) % colors.length;
-    return colors[index];
-  };
+  const getAvatarColor = (name) => avatarBg(name);
 
   // Helper function to get status badge
   const getStatusBadge = (status) => {

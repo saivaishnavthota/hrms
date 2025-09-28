@@ -11,8 +11,9 @@ const ProtectedRoute = ({ children, allowedRoles = [] }) => {
   }
   
   const userRole = getUserRole();
-  const normalizedAllowed = allowedRoles.map(r => r.toLowerCase());
-  const normalizedUserRole = (userRole || '').toLowerCase();
+  const normalize = (s) => (s || '').toLowerCase().replace(/[^a-z]/g, '');
+  const normalizedAllowed = allowedRoles.map(r => normalize(r));
+  const normalizedUserRole = normalize(userRole);
 
   // If specific roles are required, check if user has the right role (case-insensitive)
   if (normalizedAllowed.length > 0 && !normalizedAllowed.includes(normalizedUserRole)) {

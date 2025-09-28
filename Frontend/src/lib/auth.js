@@ -84,13 +84,13 @@ export const logout = () => {
  * @returns {string} - Redirect path
  */
 export const getRedirectPath = (userType) => {
-  const role = (userType || '').toLowerCase();
-  switch (role) {
+  const norm = (userType || '').toLowerCase().replace(/[^a-z]/g, '');
+  switch (norm) {
     case 'employee':
       return '/employee';
     case 'hr':
       return '/hr/dashboard';
-    case 'account manager':
+    case 'accountmanager':
       return '/account-manager';
     case 'manager':
       return '/manager';

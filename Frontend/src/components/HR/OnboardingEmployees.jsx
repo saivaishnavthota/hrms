@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Eye, Trash2, X, FileText, Download, Check, XCircle, User } from 'lucide-react';
 import Swal from 'sweetalert2';
+import { avatarBg } from '../../lib/avatarColors';
 
 const OnboardingEmployees = () => {
   const [showDocumentsModal, setShowDocumentsModal] = useState(false);
@@ -103,14 +104,7 @@ const OnboardingEmployees = () => {
     }
   };
 
-  const getAvatarColor = (name) => {
-    const colors = [
-      'bg-blue-500', 'bg-green-500', 'bg-purple-500', 'bg-pink-500', 
-      'bg-indigo-500', 'bg-yellow-500', 'bg-red-500', 'bg-teal-500'
-    ];
-    const index = name.charCodeAt(0) % colors.length;
-    return colors[index];
-  };
+  const getAvatarColor = (name) => avatarBg(name);
 
   const getStatusBadge = (status) => {
     const statusStyles = {

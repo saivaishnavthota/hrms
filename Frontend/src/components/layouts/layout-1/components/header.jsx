@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useScrollPosition } from '@/hooks/use-scroll-position';
 import { Button } from '@/components/ui/button';
+import { useUser } from '@/contexts/UserContext';
 import {
   Sheet,
   SheetBody,
@@ -23,6 +24,7 @@ export function Header({ menu }) {
 
   const { pathname } = useLocation();
   const mobileMode = useIsMobile();
+  const { user } = useUser();
 
   const scrollPosition = useScrollPosition();
   const headerSticky = scrollPosition > 0;
@@ -31,6 +33,15 @@ export function Header({ menu }) {
   useEffect(() => {
     setIsSidebarSheetOpen(false);
   }, [pathname]);
+
+  const getPortalLabel = (path) => {
+    if (!path) return 'Portal';
+    if (path.startsWith('/manager')) return 'Manager Portal';
+    if (path.startsWith('/account-manager')) return 'Account Manager Portal';
+    if (path.startsWith('/employee')) return 'Employee Portal';
+    if (path.startsWith('/hr')) return 'HR Portal';
+    return 'Portal';
+  };
 
   return (
     <header
@@ -77,8 +88,22 @@ export function Header({ menu }) {
           </div>
         </div>
 
-        {/* Mega Menu - Removed as requested, keeping only profile */}
+        {/* Centered Welcome Message */}
+        <div className="hidden lg:flex items-center justify-center flex-1">
+          <h1 className="text-1xl font-semibold text-gray-900 text-center">
+            {`Welcome to ${getPortalLabel(pathname)} - ${user?.name || ''}`}
+          </h1>
+        </div>
 
+        {/* Centered Welcome Message (Mobile) */}
+        <div className="flex lg:hidden items-center justify-center flex-1">
+          <h1 className="text-sm font-semibold text-gray-900 text-center">
+            {`Welcome to ${getPortalLabel(pathname)} - ${user?.name || ''}`}
+          </h1>
+        </div>
+
+        {/* Mega Menu - Removed as requested, keeping only profile */}
+      
         {/* HeaderTopbar - Only Profile - Moved to extreme right */}
         <div className="flex items-center justify-end flex-1">
           <UserDropdownMenu

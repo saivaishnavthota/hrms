@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Eye, Edit, Plus, X, Trash2 } from 'lucide-react';
+import { avatarBg } from '../../lib/avatarColors';
 
 // Helper to get current user (manager) from localStorage
 const getCurrentUser = () => {
@@ -41,15 +42,7 @@ const getInitials = (name) => {
   return (first + last).toUpperCase() || (first.toUpperCase()) || 'NA';
 };
 
-const getAvatarColor = (name) => {
-  const colors = [
-    'bg-blue-600', 'bg-indigo-600', 'bg-emerald-600', 'bg-amber-600',
-    'bg-purple-600', 'bg-cyan-600', 'bg-pink-600', 'bg-teal-600',
-  ];
-  let hash = 0;
-  for (let i = 0; i < (name || '').length; i++) hash = (hash * 31 + name.charCodeAt(i)) % 997;
-  return colors[hash % colors.length];
-};
+const getAvatarColor = (name) => avatarBg(name);
 
 const ManagerEmployees = () => {
   const { userId: managerId } = getCurrentUser();

@@ -13,7 +13,7 @@ redis
 python-multipart
 aiofiles
 filetype
-bcrypt
+bcrypt==3.2.2
 fastapi_mail
 python-jose[cryptography]==3.3.0
 azure-storage-blob

@@ -15,14 +15,17 @@ import io
 from typing import Optional
 from models.user_model import User
 from schemas.document_schema import  DraftResponse,DocumentStatus,EmployeeDocuments
+import os
+import os
+from dotenv import load_dotenv
 
 router = APIRouter(prefix="/documents", tags=["Documents"])
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-AZURE_CONNECTION_STRING = "DefaultEndpointsProtocol=https;AccountName=hrmsnxzen;AccountKey=Jug56pLmeZIJplobcV+f20v7IXnh6PWuih0hxRYpvRXpGh6tnJrzALqtqL/hRR3lpZK0ZTKIs2Pv+AStDvBH4w==;EndpointSuffix=core.windows.net"
-AZURE_CONTAINER_NAME = "con-hrms"
+AZURE_CONNECTION_STRING = os.getenv("AZURE_CONNECTION_STRING", "DefaultEndpointsProtocol=https;AccountName=hrmsnxzen;AccountKey=Jug56pLmeZIJplobcV+f20v7IXnh6PWuih0hxRYpvRXpGh6tnJrzALqtqL/hRR3lpZK0ZTKIs2Pv+AStDvBH4w==;EndpointSuffix=core.windows.net")
+AZURE_CONTAINER_NAME =os.getenv("AZURE_CONTAINER_NAME", "con-hrms")
 blob_service_client = BlobServiceClient.from_connection_string(AZURE_CONNECTION_STRING)
 container_client = blob_service_client.get_container_client(AZURE_CONTAINER_NAME)
 

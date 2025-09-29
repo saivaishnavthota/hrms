@@ -30,7 +30,7 @@ export default function NewUserUploadDocs() {
         { id: 'latest_compensation_letter', name: 'Latest Compensation Letter', required: false },
         { id: 'experience_relieving_letter', name: 'Experience & Relieving Letter', required: false },
         { id: 'latest_3_months_payslips', name: 'Latest 3 months Pay Slips', required: false },
-        { id: 'form_16_or_12b_or_taxable_income', name: 'Form 16/ Form 12B / Taxable Income Statement', required: false }
+        { id: 'form16_or_12b_or_taxable_income', name: 'Form 16/ Form 12B / Taxable Income Statement', required: false }
       ]
     },
     educational: {
@@ -65,44 +65,28 @@ export default function NewUserUploadDocs() {
           return;
         }
         
-        // GET request to fetch existing uploaded documents
-        const response = await axios.get(`http://localhost:8000/onboarding/doc/${employee_id}`);
-        if (response.data) {
-          // Convert the boolean response to uploadedFiles format
+        // GET request to fetch existing uploaded documents from Azure Blob Storage
+        const response = await axios.get(`http://localhost:8000/onboarding/emp/${employee_id}`);
+        if (response.data && response.data.length > 0) {
           const uploadedFilesData = {};
           
-          // Document type to display name mapping
-          const documentDisplayNames = {
-            "aadhar": "Aadhar Card",
-            "pan": "PAN Card", 
-            "latest_graduation_certificate": "Graduation Certificate",
-            "updated_resume": "Updated Resume",
-            "offer_letter": "Offer Letter",
-            "latest_compensation_letter": "Compensation Letter",
-            "experience_relieving_letter": "Relieving Letter",
-            "latest_3_months_payslips": "Latest 3 Months Payslips",
-            "form16_or_12b_or_taxable_income": "Form 16/12B/Taxable Income",
-            "ssc_certificate": "SSC Certificate",
-            "hsc_certificate": "HSC Certificate", 
-            "hsc_marksheet": "HSC Marksheet",
-            "graduation_marksheet": "Graduation Marksheet",
-            "postgraduation_marksheet": "Post Graduation Marksheet",
-            "postgraduation_certificate": "Post Graduation Certificate",
-            "passport": "Passport"
-          };
-          
-          Object.keys(response.data).forEach(key => {
-            if (key !== 'employeeId' && key !== 'uploaded_at' && response.data[key] === true) {
-              uploadedFilesData[key] = { 
-                name: key, 
-                displayName: documentDisplayNames[key] || key,
-                actualFileName: `${documentDisplayNames[key] || key}.pdf`, // Default extension, will be updated from backend
-                uploaded: true 
-              };
-            }
+          // Process documents from Azure Blob Storage
+          response.data.forEach(doc => {
+            const docType = doc.doc_type;
+            const fileName = extractFileNameFromUrl(doc.file_url);
+            const displayName = getDocumentDisplayName(docType);
+            
+            uploadedFilesData[docType] = {
+              name: docType,
+              displayName: displayName,
+              actualFileName: fileName,
+              uploaded: true,
+              file_url: doc.file_url,
+              uploaded_at: doc.uploaded_at
+            };
           });
-          setUploadedFiles(uploadedFilesData);
           
+          setUploadedFiles(uploadedFilesData);
         }
       } catch (error) {
         console.error('Error fetching uploaded documents:', error);
@@ -118,6 +102,42 @@ export default function NewUserUploadDocs() {
     }
   }, [user]);
 
+  // Helper function to extract filename from Azure Blob URL
+  const extractFileNameFromUrl = (url) => {
+    try {
+      const urlPath = new URL(url).pathname;
+      const segments = urlPath.split('/');
+      return segments[segments.length - 1]; // Get the last segment (filename)
+    } catch (error) {
+      console.error('Error extracting filename from URL:', error);
+      return 'Unknown File';
+    }
+  };
+
+  // Helper function to get display name for document types
+  const getDocumentDisplayName = (docType) => {
+    const documentDisplayNames = {
+      "aadhar": "Aadhar Card",
+      "pan": "PAN Card", 
+      "latest_graduation_certificate": "Graduation Certificate",
+      "updated_resume": "Updated Resume",
+      "offer_letter": "Offer Letter",
+      "latest_compensation_letter": "Compensation Letter",
+      "experience_relieving_letter": "Relieving Letter",
+      "latest_3_months_payslips": "Latest 3 Months Payslips",
+      "form16_or_12b_or_taxable_income": "Form 16/12B/Taxable Income",
+      "ssc_certificate": "SSC Certificate",
+      "hsc_certificate": "HSC Certificate", 
+      "hsc_marksheet": "HSC Marksheet",
+      "graduation_marksheet": "Graduation Marksheet",
+      "postgraduation_marksheet": "Post Graduation Marksheet",
+      "postgraduation_certificate": "Post Graduation Certificate",
+      "passport": "Passport"
+    };
+    
+    return documentDisplayNames[docType] || docType;
+  };
+
   const toggleSection = (sectionKey) => {
     setExpandedSections(prev => ({
       ...prev,
@@ -127,7 +147,7 @@ export default function NewUserUploadDocs() {
 
   const getSectionProgress = (sectionKey) => {
     const section = documentSections[sectionKey];
-    const allDocs = section.documents; // Count all documents, not just required ones
+    const allDocs = section.documents;
     const uploadedDocs = allDocs.filter(doc => uploadedFiles[doc.id]);
     return {
       uploaded: uploadedDocs.length,
@@ -155,24 +175,26 @@ export default function NewUserUploadDocs() {
     }
 
     setUploadedFiles(prev => {
-  const d = new Date();
-  const day = String(d.getDate()).padStart(2, "0");
-  const month = String(d.getMonth() + 1).padStart(2, "0");
-  const year = d.getFullYear();
-  const formattedDate = `${day}-${month}-${year}`;
-  return {
-      ...prev,
-      [documentId]: {
-        file,
-        name: file.name,
-        size: file.size,
-        uploaded_at: formattedDate,
-        status: 'uploaded',
-        url: URL.createObjectURL(file),
-        type: file.type
-      }
-    }
-    })
+      const d = new Date();
+      const day = String(d.getDate()).padStart(2, "0");
+      const month = String(d.getMonth() + 1).padStart(2, "0");
+      const year = d.getFullYear();
+      const formattedDate = `${day}-${month}-${year}`;
+      
+      return {
+        ...prev,
+        [documentId]: {
+          file,
+          name: file.name,
+          size: file.size,
+          uploaded_at: formattedDate,
+          status: 'uploaded',
+          url: URL.createObjectURL(file),
+          type: file.type,
+          isNewUpload: true // Flag to distinguish new uploads from existing ones
+        }
+      };
+    });
   };
 
   const handleDrop = (e, documentId) => {
@@ -194,8 +216,8 @@ export default function NewUserUploadDocs() {
 
   const removeFile = (documentId) => {
     const fileData = uploadedFiles[documentId];
-    if (fileData && fileData.url) {
-      URL.revokeObjectURL(fileData.url); // Clean up memory
+    if (fileData && fileData.url && fileData.isNewUpload) {
+      URL.revokeObjectURL(fileData.url); // Clean up memory for new uploads
     }
     setUploadedFiles(prev => {
       const updated = { ...prev };
@@ -207,62 +229,43 @@ export default function NewUserUploadDocs() {
   const handlePreview = async (fileData) => {
     try {
       // If this is a newly uploaded file with local data
-      if (fileData.file && fileData.url) {
+      if (fileData.isNewUpload && fileData.file && fileData.url) {
         setPreviewFile(fileData);
         return;
       }
       
-      // If this is a previously uploaded file from backend, fetch it
-      if (fileData.uploaded && fileData.name) {
-        const employee_id = user?.employeeId || 0;
-        const response = await axios.get(
-          `http://localhost:8000/onboarding/doc/${employee_id}/${fileData.name}`,
-          { responseType: 'blob' }
-        );
-        
-        // Create a blob URL for preview
-        const blob = response.data;
-        const url = URL.createObjectURL(blob);
-        
-        // Get content type from response headers
-        const contentType = response.headers['content-type'] || 'application/octet-stream';
-        
-        // Extract filename from Content-Disposition header if available
-        const contentDisposition = response.headers['content-disposition'];
-        let actualFileName = fileData.actualFileName || fileData.displayName || fileData.name;
-        
-        if (contentDisposition) {
-          const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
-          if (filenameMatch && filenameMatch[1]) {
-            actualFileName = filenameMatch[1].replace(/['"]/g, '');
-            
-            // Update the uploadedFiles with the actual filename for future reference
-            setUploadedFiles(prev => ({
-              ...prev,
-              [fileData.name]: {
-                ...prev[fileData.name],
-                actualFileName: actualFileName
-              }
-            }));
-          }
+      // If this is a previously uploaded file from Azure Blob Storage
+      if (fileData.uploaded && fileData.file_url) {
+        // For Azure Blob Storage, we can directly use the file URL
+        // But we need to handle CORS and authentication if required
+        try {
+          const response = await fetch(fileData.file_url);
+          const blob = await response.blob();
+          const url = URL.createObjectURL(blob);
+          
+          setPreviewFile({
+            name: fileData.actualFileName || fileData.displayName,
+            url: url,
+            type: blob.type,
+            size: blob.size,
+            uploaded: true,
+            fromBlob: true
+          });
+        } catch (fetchError) {
+          // If direct fetch fails, try through backend proxy
+          console.warn('Direct fetch failed, trying backend proxy:', fetchError);
+          toast.info('Loading file for preview...');
+          
+          // Use the file_url directly for preview if possible
+          setPreviewFile({
+            name: fileData.actualFileName || fileData.displayName,
+            url: fileData.file_url,
+            type: 'application/pdf', // Default type
+            size: 0,
+            uploaded: true,
+            fromBlob: true
+          });
         }
-        
-        // Update the uploadedFiles with the actual filename for future reference
-        setUploadedFiles(prev => ({
-          ...prev,
-          [fileData.name]: {
-            ...prev[fileData.name],
-            actualFileName: actualFileName
-          }
-        }));
-        
-        setPreviewFile({
-          name: actualFileName,
-          url: url,
-          type: contentType,
-          size: blob.size,
-          uploaded: true
-        });
       }
     } catch (error) {
       console.error('Error loading file for preview:', error);
@@ -272,7 +275,7 @@ export default function NewUserUploadDocs() {
 
   const closePreview = () => {
     // Clean up blob URL to prevent memory leaks
-    if (previewFile?.url && previewFile.uploaded) {
+    if (previewFile?.url && (previewFile.uploaded || previewFile.fromBlob)) {
       URL.revokeObjectURL(previewFile.url);
     }
     setPreviewFile(null);
@@ -281,7 +284,7 @@ export default function NewUserUploadDocs() {
   const downloadFile = async (fileData) => {
     try {
       // If this is a newly uploaded file with local data
-      if (fileData.file && fileData.url) {
+      if (fileData.isNewUpload && fileData.file && fileData.url) {
         const link = document.createElement('a');
         link.href = fileData.url;
         link.download = fileData.name;
@@ -291,48 +294,28 @@ export default function NewUserUploadDocs() {
         return;
       }
       
-      // If this is a previously uploaded file from backend, fetch it
-      if (fileData.uploaded && fileData.name) {
-        const employee_id = user?.employeeId || 0;
-        const response = await axios.get(
-          `http://localhost:8000/onboarding/doc/${employee_id}/${fileData.name}`,
-          { responseType: 'blob' }
-        );
-        
-        // Create a blob URL for download
-        const blob = response.data;
-        const url = URL.createObjectURL(blob);
-        
-        // Extract filename from Content-Disposition header if available
-        const contentDisposition = response.headers['content-disposition'];
-        let actualFileName = fileData.actualFileName || fileData.displayName || fileData.name;
-        
-        if (contentDisposition) {
-          const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
-          if (filenameMatch && filenameMatch[1]) {
-            actualFileName = filenameMatch[1].replace(/['"]/g, '');
-            
-            // Update the uploadedFiles with the actual filename for future reference
-            setUploadedFiles(prev => ({
-              ...prev,
-              [fileData.name]: {
-                ...prev[fileData.name],
-                actualFileName: actualFileName
-              }
-            }));
-          }
+      // If this is a previously uploaded file from Azure Blob Storage
+      if (fileData.uploaded && fileData.file_url) {
+        try {
+          // Try direct download from Azure Blob Storage URL
+          const response = await fetch(fileData.file_url);
+          const blob = await response.blob();
+          const url = URL.createObjectURL(blob);
+          
+          const link = document.createElement('a');
+          link.href = url;
+          link.download = fileData.actualFileName || fileData.displayName;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          
+          // Clean up
+          URL.revokeObjectURL(url);
+        } catch (fetchError) {
+          // Fallback: redirect to the blob URL for download
+          console.warn('Direct download failed, using redirect:', fetchError);
+          window.open(fileData.file_url, '_blank');
         }
-        
-        // Create download link
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = actualFileName;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        
-        // Clean up
-        URL.revokeObjectURL(url);
       }
     } catch (error) {
       console.error('Error downloading file:', error);
@@ -367,23 +350,30 @@ export default function NewUserUploadDocs() {
       return;
     }
 
+    // Check if there are any new files to upload
+    const newFiles = Object.entries(uploadedFiles).filter(([_, fileData]) => fileData.isNewUpload);
+    if (newFiles.length === 0) {
+      toast.info('No new files to save as draft.');
+      return;
+    }
+
     setIsSubmitting(true);
     
     try {
       const formData = new FormData();
       
-      // Add all uploaded files to form data
-      Object.entries(uploadedFiles).forEach(([documentId, fileData]) => {
+      // Add only new uploaded files to form data
+      newFiles.forEach(([documentId, fileData]) => {
         formData.append(documentId, fileData.file);
       });
       
       // Add employeeId as form field (required by backend)
       formData.append('employeeId', employee_id.toString());
       
-      // Add draft flag
+      // Add draft flag (if backend supports it)
       formData.append('is_draft', 'true');
 
-      // POST request to save documents as draft
+      // POST request to upload documents to Azure Blob Storage
       const response = await axios.post(`http://localhost:8000/onboarding/upload`, formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
@@ -392,6 +382,19 @@ export default function NewUserUploadDocs() {
       
       if (response.data) {
         toast.success('Draft saved successfully!');
+        
+        // Update the uploadedFiles state to mark these as uploaded
+        setUploadedFiles(prev => {
+          const updated = { ...prev };
+          newFiles.forEach(([documentId, fileData]) => {
+            updated[documentId] = {
+              ...fileData,
+              uploaded: true,
+              isNewUpload: false
+            };
+          });
+          return updated;
+        });
       }
       
     } catch (error) {
@@ -416,35 +419,43 @@ export default function NewUserUploadDocs() {
       return;
     }
 
+    // Check if there are any new files to upload
+    const newFiles = Object.entries(uploadedFiles).filter(([_, fileData]) => fileData.isNewUpload);
+    
     setIsSubmitting(true);
     
     try {
-      const formData = new FormData();
-      
-      Object.entries(uploadedFiles).forEach(([documentId, fileData]) => {
-        formData.append(documentId, fileData.file);
-      });
-
-      // Add employeeId as form field (required by backend)
-      formData.append('employeeId', employee_id.toString());
-
-      // POST request to upload documents
-      const response = await axios.post(`http://localhost:8000/onboarding/upload`, formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-        onUploadProgress: (progressEvent) => {
-          const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
-          console.log(`Upload Progress: ${percentCompleted}%`);
-        }
-      });
-      
-      if (response.data) {
-        toast.success('Documents uploaded successfully!');
+      // Only upload new files if any exist
+      if (newFiles.length > 0) {
+        const formData = new FormData();
         
-        // Set completion state to show success message and disable form
-        setIsCompleted(true);
+        newFiles.forEach(([documentId, fileData]) => {
+          formData.append(documentId, fileData.file);
+        });
+
+        // Add employeeId as form field (required by backend)
+        formData.append('employeeId', employee_id.toString());
+
+        // POST request to upload documents to Azure Blob Storage
+        const response = await axios.post(`http://localhost:8000/onboarding/upload`, formData, {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+          onUploadProgress: (progressEvent) => {
+            const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+            console.log(`Upload Progress: ${percentCompleted}%`);
+          }
+        });
+        
+        if (response.data) {
+          toast.success('Documents uploaded successfully!');
+        }
+      } else {
+        toast.success('All documents are already uploaded!');
       }
+      
+      // Set completion state to show success message and disable form
+      setIsCompleted(true);
       
     } catch (error) {
       console.error('Error uploading documents:', error);
@@ -581,11 +592,19 @@ export default function NewUserUploadDocs() {
                                       <div className="flex items-center space-x-3">
                                         <div className="flex items-center space-x-2">
                                           <CheckCircle className="w-4 h-4 text-green-500" />
-                                          <span className="text-sm font-medium text-green-600">Uploaded</span>
+                                          <span className="text-sm font-medium text-green-600">
+                                            {isUploaded.isNewUpload ? 'Ready to Upload' : 'Uploaded'}
+                                          </span>
                                         </div>
                                         <div className="flex flex-col">
-                                          <span className="text-sm text-gray-700 font-medium">{isUploaded.actualFileName || isUploaded.name}</span>
-                                         
+                                          <span className="text-sm text-gray-700 font-medium">
+                                            {isUploaded.actualFileName || isUploaded.name}
+                                          </span>
+                                          {isUploaded.uploaded_at && (
+                                            <span className="text-xs text-gray-500">
+                                              {isUploaded.uploaded_at}
+                                            </span>
+                                          )}
                                         </div>
                                       </div>
                                       <div className="flex items-center space-x-2">
@@ -713,12 +732,12 @@ export default function NewUserUploadDocs() {
             <button
               type="button"
               onClick={handleSaveDraft}
-              disabled={isCompleted}
+              disabled={isCompleted || isSubmitting}
               className={`px-8 py-3 bg-gradient-to-r from-gray-500 to-gray-600 text-white rounded-lg hover:from-gray-600 hover:to-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500 transition-all duration-200 font-medium ${
-                isCompleted ? 'opacity-50 cursor-not-allowed' : ''
+                isCompleted || isSubmitting ? 'opacity-50 cursor-not-allowed' : ''
               }`}
             >
-              Save Draft
+              {isSubmitting ? 'Saving...' : 'Save Draft'}
             </button>
             <button
               onClick={handleSubmit}

@@ -1,5 +1,5 @@
 import { Layout1Page } from '@/pages/layout-1/page';
-import { Navigate, Route, Routes } from 'react-router';
+import { Navigate, Route, Routes } from 'react-router-dom';
 import { Layout1 } from '@/components/layouts/layout-1';
 // Employee layout now uses Layout1 with employee-specific menu
 import { MENU_SIDEBAR_EMPLOYEE } from '@/config/employee-layout.config';

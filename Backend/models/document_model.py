@@ -2,25 +2,15 @@
 from sqlmodel import SQLModel, Field
 from typing import Optional
 from datetime import datetime
+import uuid
 
 class Document(SQLModel, table=True):
-    __tablename__ = "documents"
+    __tablename__ = "employee_documents"
 
-    employee_id: int = Field(primary_key=True)
-    aadhar: Optional[bytes] = None
-    pan: Optional[bytes] = None
-    latest_graduation_certificate: Optional[bytes] = None
-    updated_resume: Optional[bytes] = None
-    offer_letter: Optional[bytes] = None
-    latest_compensation_letter: Optional[bytes] = None
-    experience_relieving_letter: Optional[bytes] = None
-    latest_3_months_payslips: Optional[bytes] = None
-    form16_or_12b_or_taxable_income: Optional[bytes] = None
-    ssc_certificate: Optional[bytes] = None
-    hsc_certificate: Optional[bytes] = None
-    hsc_marksheet: Optional[bytes] = None
-    graduation_marksheet: Optional[bytes] = None
-    postgraduation_marksheet: Optional[bytes] = None
-    postgraduation_certificate: Optional[bytes] = None
-    passport: Optional[bytes] = None
+    id: Optional[int] = Field(default=None, primary_key=True)
+    employee_id: int
+    doc_type: str  # e.g., "passport", "aadhar", "offer_letter", etc.
+    file_id: str = Field(default_factory=lambda: str(uuid.uuid4()))  # unique identifier
+    file_name: str  # original file name
+    file_url: str  # Azure Blob URL
     uploaded_at: datetime = Field(default_factory=datetime.utcnow)

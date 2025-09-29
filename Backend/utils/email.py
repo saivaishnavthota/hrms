@@ -131,3 +131,35 @@ async def forgot_password_mail(email:str,otp:str):
     except Exception as e:
         print(f"❌ Failed to send login credentials email: {e}")
         return False
+    
+async def send_document_request_email(email: str, name: str, document_type: str):
+    try:
+        subject = "Document Submission Request 📄"
+
+        body = f"""
+        Hi {name},
+
+        The HR team has requested you to submit the following document:
+
+        👉 Required Document: {document_type}
+
+        Please upload the document at the earliest through your employee portal.
+
+        Regards,  
+        HR Team
+        """
+
+        message = MessageSchema(
+            subject=subject,
+            recipients=[email],
+            body=body,
+            subtype="plain"
+        )
+
+        fm = FastMail(mail_conf)
+        await fm.send_message(message)
+        print(f"✅ Document request email sent to {email}")
+        return True
+    except Exception as e:
+        print(f"❌ Failed to send document request email: {e}")
+        return False

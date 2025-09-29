@@ -1,20 +1,20 @@
 # app/schemas/document_schema.py
 from sqlmodel import SQLModel
-from typing import Optional
+from typing import Optional,List
 from datetime import datetime
 
-class DocumentCreate(SQLModel):
-    employee_id: int
-    file_name: str
-    file_type: str
-    file_data: bytes
+class DocumentStatus(SQLModel):
+    doc_type: str
+    file_url: Optional[str]
+    uploaded_at: Optional[str]
 
-class DocumentResponse(SQLModel):
+class EmployeeDocuments(SQLModel):
     id: int
-    employee_id: int
-    file_name: str
-    file_type: str
+    name: str
+    email: str
+    role: str
+    documents: List[DocumentStatus]
 
 class DraftResponse(SQLModel):
     message: str
-    saved_at: datetime
+    saved_at: str

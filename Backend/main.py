@@ -30,8 +30,6 @@ app.add_middleware(
     allow_headers=["Authorization", "Content-Type"],
 )
 
-#changed
-app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
 # CORS middleware already added above; avoid adding twice
 

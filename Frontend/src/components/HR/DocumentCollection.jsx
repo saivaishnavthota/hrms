@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { Eye, FileText, Download, ExternalLink, X, CheckCircle, Clock, AlertCircle, Send, Check, XCircle } from 'lucide-react';
-import { avatarBg } from '../../lib/avatarColors';
 
 const DocumentCollection = () => {
   const [showDocumentsModal, setShowDocumentsModal] = useState(false);
@@ -8,14 +7,17 @@ const DocumentCollection = () => {
   const [employeesData, setEmployeesData] = useState([]);
   const [employeeDocuments, setEmployeeDocuments] = useState([]);
   const [loadingDocuments, setLoadingDocuments] = useState(false);
+  const [loadingEmployees, setLoadingEmployees] = useState(true);
   const [isRejectMode, setIsRejectMode] = useState(false);
   const [selectedDocuments, setSelectedDocuments] = useState([]);
   const [requestLogs, setRequestLogs] = useState([]);
   const [showRequestLogs, setShowRequestLogs] = useState(false);
-
+  const [showDocumentRequestModal, setShowDocumentRequestModal] = useState(false);
+  const [selectedEmployeeForRequest, setSelectedEmployeeForRequest] = useState(null);
 
   // API Functions
   const fetchEmployeesData = async () => {
+    setLoadingEmployees(true);
     try {
       const response = await fetch('http://127.0.0.1:8000/documents/all-documents');
       if (!response.ok) {
@@ -24,142 +26,74 @@ const DocumentCollection = () => {
       const data = await response.json();
       
       // Transform API data to match component structure
-      const transformedData = data.map(employee => ({
-        id: employee.id,
-        name: employee.name,
-        email: employee.email,
-        type: employee.type || 'Full-time',
-        role: employee.role || 'Employee',
-        totalDocuments: 16, // Standard document count
-        submittedDocuments: Object.values(employee.documents || {}).filter(Boolean).length,
-        documents: [] // Will be populated when viewing individual employee documents
-      }));
+      const transformedData = data.map(employee => {
+        // Count uploaded documents
+        const uploadedDocs = employee.documents ? employee.documents.length : 0;
+        
+        return {
+          id: employee.id,
+          name: employee.name,
+          email: employee.email,
+          type: 'Employee', // Default since not provided in API
+          role: employee.role || 'Employee',
+          totalDocuments: 16, // Standard document count
+          submittedDocuments: uploadedDocs,
+          documents: employee.documents || []
+        };
+      });
       
       setEmployeesData(transformedData);
     } catch (error) {
       console.error('Error fetching employees data:', error);
-      // Fallback to sample data if API fails
-      setEmployeesData(sampleEmployeesData);
+      setEmployeesData([]); // Set empty array on error
+    } finally {
+      setLoadingEmployees(false);
     }
   };
 
   const fetchEmployeeDocuments = async (employeeId) => {
     setLoadingDocuments(true);
     try {
-      // Fetch all documents for all employees, then pick current employee
-      const response = await fetch('http://127.0.0.1:8000/documents/all-documents');
+      const response = await fetch(`http://127.0.0.1:8000/documents/emp/${employeeId}`);
+      
       if (!response.ok) {
+        // If no documents found, show empty state with all possible document types
+        if (response.status === 404) {
+          setEmployeeDocuments(getEmptyDocumentsList());
+          return;
+        }
         throw new Error(`HTTP error! status: ${response.status}`);
       }
-      const allDocsData = await response.json();
+      
+      const documents = await response.json();
+      
+      // Transform API response to match component structure
+      const transformedDocs = documents.map(doc => ({
+        id: doc.doc_type,
+        name: getDocumentDisplayName(doc.doc_type),
+        type: 'PDF',
+        upload_date: doc.uploaded_at || 'N/A',
+        url: doc.file_url,
+        status: 'uploaded'
+      }));
 
-      const employeeEntry = Array.isArray(allDocsData)
-        ? allDocsData.find((e) => String(e.id) === String(employeeId))
-        : null;
-
-      // Backend canonical document fields
-      const docFields = [
-        'aadhar',
-        'pan',
-        'latest_graduation_certificate',
-        'updated_resume',
-        'offer_letter',
-        'latest_compensation_letter',
-        'experience_relieving_letter',
-        'latest_3_months_payslips',
-        'form16_or_12b_or_taxable_income',
-        'ssc_certificate',
-        'hsc_certificate',
-        'hsc_marksheet',
-        'graduation_marksheet',
-        'postgraduation_marksheet',
-        'postgraduation_certificate',
-        'passport',
-      ];
-
-      const displayNameMap = {
-        aadhar: 'Aadhar Card',
-        pan: 'PAN Card',
-        latest_graduation_certificate: 'Graduation Certificate',
-        updated_resume: 'Resume',
-        offer_letter: 'Offer Letter',
-        latest_compensation_letter: 'Compensation Letter',
-        experience_relieving_letter: 'Experience Letter',
-        latest_3_months_payslips: 'Payslips',
-        form16_or_12b_or_taxable_income: 'Tax Documents',
-        ssc_certificate: 'SSC Certificate',
-        hsc_certificate: 'HSC Certificate',
-        hsc_marksheet: 'HSC Marksheet',
-        graduation_marksheet: 'Graduation Marksheet',
-        postgraduation_marksheet: 'Post Graduation Marksheet',
-        postgraduation_certificate: 'Post Graduation Certificate',
-        passport: 'Passport',
-      };
-
-      const statusDict = employeeEntry?.documents || {};
-
-      const transformedDocs = docFields.map((key) => {
-        const isUploaded = Boolean(statusDict[key]);
-        return {
-          id: key,
-          name: displayNameMap[key] || key.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase()),
-          type: 'PDF',
-          upload_date: isUploaded ? (employeeEntry?.uploaded_at || 'N/A') : 'N/A',
-          url: isUploaded ? `http://127.0.0.1:8000/documents/${employeeId}/${key}` : null,
-          status: isUploaded ? 'uploaded' : 'not_uploaded',
+      // Merge with all possible document types to show missing ones
+      const allDocTypes = getAllDocumentTypes();
+      const completeDocList = allDocTypes.map(docType => {
+        const uploadedDoc = transformedDocs.find(doc => doc.id === docType.id);
+        return uploadedDoc || {
+          ...docType,
+          upload_date: 'N/A',
+          url: null,
+          status: 'not_uploaded'
         };
       });
 
-      setEmployeeDocuments(transformedDocs);
+      setEmployeeDocuments(completeDocList);
     } catch (error) {
       console.error('Error fetching employee documents:', error);
-      // Fallback to empty list of all known document types with not uploaded
-      const docFields = [
-        'aadhar',
-        'pan',
-        'latest_graduation_certificate',
-        'updated_resume',
-        'offer_letter',
-        'latest_compensation_letter',
-        'experience_relieving_letter',
-        'latest_3_months_payslips',
-        'form16_or_12b_or_taxable_income',
-        'ssc_certificate',
-        'hsc_certificate',
-        'hsc_marksheet',
-        'graduation_marksheet',
-        'postgraduation_marksheet',
-        'postgraduation_certificate',
-        'passport',
-      ];
-      const displayNameMap = {
-        aadhar: 'Aadhar Card',
-        pan: 'PAN Card',
-        latest_graduation_certificate: 'Graduation Certificate',
-        updated_resume: 'Resume',
-        offer_letter: 'Offer Letter',
-        latest_compensation_letter: 'Compensation Letter',
-        experience_relieving_letter: 'Experience Letter',
-        latest_3_months_payslips: 'Payslips',
-        form16_or_12b_or_taxable_income: 'Tax Documents',
-        ssc_certificate: 'SSC Certificate',
-        hsc_certificate: 'HSC Certificate',
-        hsc_marksheet: 'HSC Marksheet',
-        graduation_marksheet: 'Graduation Marksheet',
-        postgraduation_marksheet: 'Post Graduation Marksheet',
-        postgraduation_certificate: 'Post Graduation Certificate',
-        passport: 'Passport',
-      };
-      setEmployeeDocuments(
-        docFields.map((key) => ({
-          id: key,
-          name: displayNameMap[key] || key,
-          type: 'PDF',
-          upload_date: 'N/A',
-          url: null,
-          status: 'not_uploaded',
-        }))
-      );
+      // Fallback to empty document list
+      setEmployeeDocuments(getEmptyDocumentsList());
     } finally {
       setLoadingDocuments(false);
     }
@@ -167,8 +101,6 @@ const DocumentCollection = () => {
 
   const requestDocument = async (employeeId, documentType = 'General Document') => {
     try {
-      // Since there's no specific document request endpoint, we'll use the save-draft endpoint
-      // to log the request or create a notification system
       const response = await fetch('http://127.0.0.1:8000/documents/request-doc', {
         method: 'POST',
         headers: { 
@@ -176,59 +108,206 @@ const DocumentCollection = () => {
         },
         body: JSON.stringify({ 
           employee_id: employeeId,
-          // Create a draft entry to indicate document was requested
-          requested_document: true,
-          request_type: documentType,
-          request_timestamp: new Date().toISOString()
+          document_type: documentType
         })
       });
       
       if (!response.ok) {
+        // Handle authentication errors gracefully
+        if (response.status === 401) {
+          console.warn('Authentication required for document requests');
+          // Fallback to local logging
+          const employee = employeesData.find(emp => emp.id === employeeId);
+          const newLog = {
+            id: Date.now(),
+            employeeId,
+            employeeName: employee?.name || 'Unknown',
+            documentType,
+            requestDate: new Date().toISOString(),
+            status: 'pending'
+          };
+          
+          setRequestLogs(prev => [newLog, ...prev]);
+          alert(`Document request logged locally for ${employee?.name || 'employee'} (Authentication required for backend)`);
+          return;
+        }
         throw new Error(`HTTP error! status: ${response.status}`);
       }
+      
+      const result = await response.json();
       
       // Add to request logs
       const employee = employeesData.find(emp => emp.id === employeeId);
       const newLog = {
-        id: Date.now(),
+        id: result.id || Date.now(),
         employeeId,
         employeeName: employee?.name || 'Unknown',
         documentType,
-        requestDate: new Date().toISOString(),
-        status: 'pending'
+        requestDate: result.requested_at || new Date().toISOString(),
+        status: result.status || 'pending'
       };
       
       setRequestLogs(prev => [newLog, ...prev]);
       
       // Show success message
-      alert(`Document request sent to ${employee?.name || 'employee'}`);
+      alert(result.message || `Document request sent to ${employee?.name || 'employee'}`);
       
     } catch (error) {
       console.error('Error requesting document:', error);
-      
-      // Still add to local logs even if API fails
-      const employee = employeesData.find(emp => emp.id === employeeId);
-      const newLog = {
-        id: Date.now(),
-        employeeId,
-        employeeName: employee?.name || 'Unknown',
-        documentType,
-        requestDate: new Date().toISOString(),
-        status: 'pending'
-      };
-      
-      setRequestLogs(prev => [newLog, ...prev]);
-      alert('Document request logged locally (API unavailable)');
+      alert('Failed to send document request. Please try again.');
     }
+  };
+
+  const fetchRequestLogs = async () => {
+    try {
+      const response = await fetch('http://127.0.0.1:8000/documents/request-logs');
+      if (!response.ok) {
+        console.warn('Request logs endpoint not available or has errors');
+        return;
+      }
+      const logs = await response.json();
+      console.log('Raw request logs:', logs); // Debug log
+      
+      // Fetch employee data to get names
+      try {
+        const employeesResponse = await fetch('http://127.0.0.1:8000/users/employees');
+        console.log('Employees response status:', employeesResponse.status); // Debug log
+        
+        let employeesMap = {};
+        
+        if (employeesResponse.ok) {
+          const employees = await employeesResponse.json();
+          console.log('Fetched employees:', employees); // Debug log
+          
+          // Create a map of employee_id -> employee data
+          employeesMap = employees.reduce((map, emp) => {
+            map[emp.employeeId] = emp;
+            return map;
+          }, {});
+          console.log('Employees map:', employeesMap); // Debug log
+        } else {
+          console.error('Failed to fetch employees:', employeesResponse.status);
+          // Fallback: use the employeesData we already have
+          employeesMap = employeesData.reduce((map, emp) => {
+            map[emp.employeeId] = emp;
+            return map;
+          }, {});
+        }
+        
+        // Transform logs to match component structure with actual employee names
+        const transformedLogs = logs.map(log => {
+          const employee = employeesMap[log.employee_id];
+          console.log(`Looking up employee ${log.employee_id}:`, employee); // Debug log
+          
+          return {
+            id: log.id,
+            employeeId: log.employee_id,
+            employeeName: employee?.name ,
+            documentType: log.document_type,
+            requestDate: log.requested_at,
+            status: log.status
+          };
+        });
+        
+        console.log('Transformed logs:', transformedLogs); // Debug log
+        setRequestLogs(transformedLogs);
+        
+      } catch (employeeError) {
+        console.error('Error fetching employees:', employeeError);
+        // Use existing employeesData as fallback
+        const employeesMap = employeesData.reduce((map, emp) => {
+          map[emp.id] = emp;
+          return map;
+        }, {});
+        
+        const transformedLogs = logs.map(log => {
+          const employee = employeesMap[log.employee_id];
+          return {
+            id: log.id,
+            employeeId: log.employee_id,
+            employeeName: employee?.name ,
+            documentType: log.document_type,
+            requestDate: log.requested_at,
+            status: log.status
+          };
+        });
+        
+        setRequestLogs(transformedLogs);
+      }
+      
+    } catch (error) {
+      console.error('Error fetching request logs:', error);
+    }
+  };
+
+  // Helper function to get all possible document types
+  const getAllDocumentTypes = () => {
+    return [
+      { id: 'aadhar', name: 'Aadhar Card', type: 'PDF' },
+      { id: 'pan', name: 'PAN Card', type: 'PDF' },
+      { id: 'latest_graduation_certificate', name: 'Graduation Certificate', type: 'PDF' },
+      { id: 'updated_resume', name: 'Resume', type: 'PDF' },
+      { id: 'offer_letter', name: 'Offer Letter', type: 'PDF' },
+      { id: 'latest_compensation_letter', name: 'Compensation Letter', type: 'PDF' },
+      { id: 'experience_relieving_letter', name: 'Experience Letter', type: 'PDF' },
+      { id: 'latest_3_months_payslips', name: 'Payslips', type: 'PDF' },
+      { id: 'form16_or_12b_or_taxable_income', name: 'Tax Documents', type: 'PDF' },
+      { id: 'ssc_certificate', name: 'SSC Certificate', type: 'PDF' },
+      { id: 'hsc_certificate', name: 'HSC Certificate', type: 'PDF' },
+      { id: 'hsc_marksheet', name: 'HSC Marksheet', type: 'PDF' },
+      { id: 'graduation_marksheet', name: 'Graduation Marksheet', type: 'PDF' },
+      { id: 'postgraduation_marksheet', name: 'Post Graduation Marksheet', type: 'PDF' },
+      { id: 'postgraduation_certificate', name: 'Post Graduation Certificate', type: 'PDF' },
+      { id: 'passport', name: 'Passport', type: 'PDF' }
+    ];
+  };
+
+  const getEmptyDocumentsList = () => {
+    return getAllDocumentTypes().map(docType => ({
+      ...docType,
+      upload_date: 'N/A',
+      url: null,
+      status: 'not_uploaded'
+    }));
+  };
+
+  const getDocumentDisplayName = (docType) => {
+    const displayNameMap = {
+      aadhar: 'Aadhar Card',
+      pan: 'PAN Card',
+      latest_graduation_certificate: 'Graduation Certificate',
+      updated_resume: 'Resume',
+      offer_letter: 'Offer Letter',
+      latest_compensation_letter: 'Compensation Letter',
+      experience_relieving_letter: 'Experience Letter',
+      latest_3_months_payslips: 'Payslips',
+      form16_or_12b_or_taxable_income: 'Tax Documents',
+      ssc_certificate: 'SSC Certificate',
+      hsc_certificate: 'HSC Certificate',
+      hsc_marksheet: 'HSC Marksheet',
+      graduation_marksheet: 'Graduation Marksheet',
+      postgraduation_marksheet: 'Post Graduation Marksheet',
+      postgraduation_certificate: 'Post Graduation Certificate',
+      passport: 'Passport',
+    };
+    return displayNameMap[docType] || docType.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase());
   };
 
   // Initialize data on component mount
   useEffect(() => {
     fetchEmployeesData();
+    fetchRequestLogs();
   }, []);
 
   // Helper function to get avatar color
-  const getAvatarColor = (name) => avatarBg(name);
+  const getAvatarColor = (name) => {
+    const colors = [
+      'bg-blue-500', 'bg-green-500', 'bg-purple-500', 'bg-pink-500', 
+      'bg-indigo-500', 'bg-yellow-500', 'bg-red-500', 'bg-teal-500'
+    ];
+    const index = name.charCodeAt(0) % colors.length;
+    return colors[index];
+  };
 
   // Helper function to get status badge
   const getStatusBadge = (status) => {
@@ -249,11 +328,6 @@ const DocumentCollection = () => {
     );
   };
 
-  // Helper function to get document type icon
-  const getDocumentIcon = (type) => {
-    return <FileText className="w-4 h-4 text-blue-600" />;
-  };
-
   const handleViewDocuments = async (employee) => {
     setSelectedEmployee(employee);
     setShowDocumentsModal(true);
@@ -269,7 +343,17 @@ const DocumentCollection = () => {
   };
 
   const handleRequestDocument = (employeeId) => {
-    requestDocument(employeeId);
+    const employee = employeesData.find(emp => emp.id === employeeId);
+    setSelectedEmployeeForRequest(employee);
+    setShowDocumentRequestModal(true);
+  };
+
+  const handleSpecificDocumentRequest = async (documentType) => {
+    if (!selectedEmployeeForRequest) return;
+    
+    await requestDocument(selectedEmployeeForRequest.id, documentType);
+    setShowDocumentRequestModal(false);
+    setSelectedEmployeeForRequest(null);
   };
 
   const handleDocumentSelection = (documentId) => {
@@ -280,96 +364,25 @@ const DocumentCollection = () => {
     );
   };
 
-  const handleApproveAll = async () => {
+  const handleDownloadDocument = async (documentUrl, documentName) => {
+    if (!documentUrl) return;
+    
     try {
-      // API call to approve all documents
-      // const response = await fetch('/api/documents/approve-all', {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify({ employeeId: selectedEmployee.id })
-      // });
+      const response = await fetch(documentUrl);
+      if (!response.ok) throw new Error('Failed to download file');
       
-      // Update local state
-      setEmployeeDocuments(prev => 
-        prev.map(doc => ({ ...doc, status: 'approved' }))
-      );
-      
-      alert('All documents approved successfully');
+      const blob = await response.blob();
+      const link = document.createElement('a');
+      link.href = window.URL.createObjectURL(blob);
+      link.download = documentName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(link.href);
     } catch (error) {
-      console.error('Error approving documents:', error);
-      alert('Failed to approve documents');
+      console.error('Download error:', error);
+      alert('Failed to download document');
     }
-  };
-
-  const handleRejectDocuments = async () => {
-    try {
-      // API call to reject selected documents
-      // const response = await fetch('/api/documents/reject', {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify({ 
-      //     employeeId: selectedEmployee.id,
-      //     documentIds: selectedDocuments 
-      //   })
-      // });
-      
-      // Update local state
-      setEmployeeDocuments(prev => 
-        prev.map(doc => 
-          selectedDocuments.includes(doc.id) 
-            ? { ...doc, status: 'rejected' }
-            : doc
-        )
-      );
-      
-      setSelectedDocuments([]);
-      setIsRejectMode(false);
-      alert(`${selectedDocuments.length} document(s) rejected`);
-    } catch (error) {
-      console.error('Error rejecting documents:', error);
-      alert('Failed to reject documents');
-    }
-  };
-
-  const handleDownloadDocument = (documentId) => {
-    console.log('Download document:', documentId);
-    // Implement download functionality
-  };
-
-  const handleApproveDocument = (employeeId, documentId) => {
-    setEmployeesData(prevData => 
-      prevData.map(employee => 
-        employee.id === employeeId 
-          ? {
-              ...employee,
-              documents: employee.documents.map(doc => 
-                doc.id === documentId 
-                  ? { ...doc, status: 'approved' }
-                  : doc
-              )
-            }
-          : employee
-      )
-    );
-    console.log('Document approved:', documentId);
-  };
-
-  const handleRejectDocument = (employeeId, documentId) => {
-    setEmployeesData(prevData => 
-      prevData.map(employee => 
-        employee.id === employeeId 
-          ? {
-              ...employee,
-              documents: employee.documents.map(doc => 
-                doc.id === documentId 
-                  ? { ...doc, status: 'rejected' }
-                  : doc
-              )
-            }
-          : employee
-      )
-    );
-    console.log('Document rejected:', documentId);
   };
 
   return (
@@ -431,90 +444,97 @@ const DocumentCollection = () => {
 
         {/* Table */}
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Employee
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Type
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Role
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Summary
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  View All Documents
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Action
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {employeesData.map((employee) => (
-                <tr key={employee.id} className="hover:bg-gray-50 transition-colors">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center">
-                      <div className={`flex-shrink-0 h-10 w-10 rounded-full ${getAvatarColor(employee.name)} flex items-center justify-center`}>
-                        <span className="text-sm font-medium text-white">
-                          {employee.name.split(' ').map(n => n[0]).join('')}
-                        </span>
-                      </div>
-                      <div className="ml-4">
-                        <div className="text-sm font-medium text-gray-900">{employee.name}</div>
-                        <div className="text-sm text-gray-500">{employee.email}</div>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className="text-sm text-gray-900">{employee.type}</span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className="text-sm text-gray-900">{employee.role}</span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center">
-                      <div className="text-sm font-medium text-gray-900">
-                        {employee.submittedDocuments}/{employee.totalDocuments}
-                      </div>
-                      <div className="ml-2 w-16 bg-gray-200 rounded-full h-2">
-                        <div 
-                          className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-                          style={{ width: `${(employee.submittedDocuments / employee.totalDocuments) * 100}%` }}
-                        ></div>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <button
-                      onClick={() => handleViewDocuments(employee)}
-                      className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium bg-gradient-to-r from-blue-100 to-indigo-100 text-blue-800 border border-blue-200 hover:from-blue-200 hover:to-indigo-200 transition-all duration-200"
-                    >
-                      <Eye className="w-3 h-3 mr-1" />
-                      View All 
-                    </button>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <button
-                      onClick={() => handleRequestDocument(employee.id)}
-                      className="inline-flex items-center px-3 py-1.5 rounded-md text-xs font-medium bg-gradient-to-r from-green-100 to-emerald-100 text-green-800 border border-green-200 hover:from-green-200 hover:to-emerald-200 transition-all duration-200"
-                    >
-                      <Send className="w-3 h-3 mr-1" />
-                      Request Doc
-                    </button>
-                  </td>
+          {loadingEmployees ? (
+            <div className="flex items-center justify-center py-12">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+              <span className="ml-2 text-gray-600">Loading employees...</span>
+            </div>
+          ) : (
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Employee
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Type
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Role
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Summary
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    View All Documents
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Action
+                  </th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {employeesData.map((employee) => (
+                  <tr key={employee.id} className="hover:bg-gray-50 transition-colors">
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center">
+                        <div className={`flex-shrink-0 h-10 w-10 rounded-full ${getAvatarColor(employee.name)} flex items-center justify-center`}>
+                          <span className="text-sm font-medium text-white">
+                            {employee.name.split(' ').map(n => n[0]).join('')}
+                          </span>
+                        </div>
+                        <div className="ml-4">
+                          <div className="text-sm font-medium text-gray-900">{employee.name}</div>
+                          <div className="text-sm text-gray-500">{employee.email}</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className="text-sm text-gray-900">{employee.type}</span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className="text-sm text-gray-900">{employee.role}</span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center">
+                        <div className="text-sm font-medium text-gray-900">
+                          {employee.submittedDocuments}/{employee.totalDocuments}
+                        </div>
+                        <div className="ml-2 w-16 bg-gray-200 rounded-full h-2">
+                          <div 
+                            className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                            style={{ width: `${(employee.submittedDocuments / employee.totalDocuments) * 100}%` }}
+                          ></div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <button
+                        onClick={() => handleViewDocuments(employee)}
+                        className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium bg-gradient-to-r from-blue-100 to-indigo-100 text-blue-800 border border-blue-200 hover:from-blue-200 hover:to-indigo-200 transition-all duration-200"
+                      >
+                        <Eye className="w-3 h-3 mr-1" />
+                        View All 
+                      </button>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <button
+                        onClick={() => handleRequestDocument(employee.id)}
+                        className="inline-flex items-center px-3 py-1.5 rounded-md text-xs font-medium bg-gradient-to-r from-green-100 to-emerald-100 text-green-800 border border-green-200 hover:from-green-200 hover:to-emerald-200 transition-all duration-200"
+                      >
+                        <Send className="w-3 h-3 mr-1" />
+                        Request Doc
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
         </div>
 
         {/* Empty State */}
-        {employeesData.length === 0 && (
+        {!loadingEmployees && employeesData.length === 0 && (
           <div className="text-center py-12">
             <FileText className="mx-auto h-12 w-12 text-gray-400" />
             <h3 className="mt-2 text-sm font-medium text-gray-900">No employees found</h3>
@@ -523,7 +543,7 @@ const DocumentCollection = () => {
         )}
       </div>
 
-      {/* Documents Modal - Using OnboardingEmployees.jsx style */}
+      {/* Documents Modal */}
       {showDocumentsModal && selectedEmployee && (
         <div className="fixed inset-0 bg-transparent backdrop-blur-[2px] flex items-center justify-center z-50">
           <div className="bg-white/80 rounded-xl shadow-2xl max-w-4xl w-full mx-4 max-h-[80vh] overflow-y-auto border border-gray-200">
@@ -584,22 +604,7 @@ const DocumentCollection = () => {
                           View
                         </button>
                         <button
-                          onClick={async () => {
-                            if (!doc.url) return;
-                            try {
-                              const response = await fetch(doc.url);
-                              if (!response.ok) throw new Error('Failed to download file');
-                              const blob = await response.blob();
-                              const link = document.createElement('a');
-                              link.href = window.URL.createObjectURL(blob);
-                              link.download = doc.name;
-                              document.body.appendChild(link);
-                              link.click();
-                              document.body.removeChild(link);
-                            } catch (error) {
-                              console.error('Download error:', error);
-                            }
-                          }}
+                          onClick={() => handleDownloadDocument(doc.url, doc.name)}
                           disabled={!doc.url}
                           className={`flex-1 inline-flex items-center justify-center px-3 py-1.5 text-xs font-medium border rounded-md transition-colors ${
                             doc.url
@@ -627,6 +632,70 @@ const DocumentCollection = () => {
             <div className="flex justify-end items-center p-6 border-t border-gray-200">
               <button onClick={handleCloseModal} className="px-4 py-2 bg-gray-100 rounded-md hover:bg-gray-200 transition-colors duration-200">
                 Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Document Request Modal */}
+      {showDocumentRequestModal && selectedEmployeeForRequest && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full mx-4 max-h-[70vh] overflow-y-auto">
+            <div className="flex items-center justify-between p-6 border-b border-gray-200">
+              <h3 className="text-xl font-semibold text-gray-900">
+                Request Document from {selectedEmployeeForRequest.name}
+              </h3>
+              <button 
+                onClick={() => {
+                  setShowDocumentRequestModal(false);
+                  setSelectedEmployeeForRequest(null);
+                }}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <X size={24} />
+              </button>
+            </div>
+            
+            <div className="p-6">
+              <p className="text-sm text-gray-600 mb-4">
+                Select which document you want to request from {selectedEmployeeForRequest.name}:
+              </p>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {getAllDocumentTypes().map((docType) => (
+                  <button
+                    key={docType.id}
+                    onClick={() => handleSpecificDocumentRequest(docType.name)}
+                    className="flex items-center p-3 text-left border border-gray-200 rounded-lg hover:border-blue-300 hover:bg-blue-50 transition-colors"
+                  >
+                    <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center mr-3">
+                      <span className="text-sm">📄</span>
+                    </div>
+                    <div>
+                      <div className="text-sm font-medium text-gray-900">{docType.name}</div>
+                      <div className="text-xs text-gray-500">{docType.type}</div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+            
+            <div className="flex justify-end items-center p-6 border-t border-gray-200 space-x-3">
+              <button 
+                onClick={() => {
+                  setShowDocumentRequestModal(false);
+                  setSelectedEmployeeForRequest(null);
+                }}
+                className="px-4 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 transition-colors"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={() => handleSpecificDocumentRequest('General Document')}
+                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+              >
+                Request General Document
               </button>
             </div>
           </div>

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Menu, UserCircle } from 'lucide-react';
-import { useLocation } from 'react-router';
+import { useLocation } from 'react-router-dom';
 import { Link } from 'react-router-dom';
 import { toAbsoluteUrl } from '@/lib/helpers';
 import { cn } from '@/lib/utils';

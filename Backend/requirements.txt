@@ -14,3 +14,6 @@ python-multipart
 aiofiles
 filetype
 bcrypt
+fastapi_mail
+python-jose[cryptography]==3.3.0
+azure-storage-blob

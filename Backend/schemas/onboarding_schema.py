@@ -1,5 +1,5 @@
 from sqlmodel import SQLModel
-from typing import Optional
+from typing import Optional,List
 from datetime import datetime,date
 from pydantic import EmailStr
 
@@ -58,3 +58,15 @@ class AssignEmployeeRequest(SQLModel):
     manager3_id: int | None = None
     hr1_id: int
     hr2_id: int | None = None
+
+class DocumentStatus(SQLModel):
+    doc_type: str
+    file_url: Optional[str]
+    uploaded_at: Optional[str]
+
+class EmployeeDocuments(SQLModel):
+    id: int
+    name: str
+    email: str
+    role: Optional[str]
+    documents: List["DocumentStatus"]

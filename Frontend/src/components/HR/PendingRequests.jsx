@@ -1,10 +1,13 @@
 import React, { useState, useMemo,useEffect } from 'react';
 import { Eye, Trash2, ChevronUp, ChevronDown, Check, X, Loader2 } from 'lucide-react';
-import axios from 'axios';
 import ViewLeaveApplication from './ViewLeaveApplication';
 import { useUser } from '@/contexts/UserContext';
 import { avatarBg } from '../../lib/avatarColors';
 import { markDeleted, filterListByDeleted } from '../../lib/localDelete';
+import { toast } from "react-toastify";
+import api from "@/lib/api";
+
+
 const PendingRequests = () => {
   
    const { user } = useUser();
@@ -28,7 +31,7 @@ const PendingRequests = () => {
     try {
       setLoading(true);
       setError(null);
-      const response = await axios.get(`http://localhost:8000/leave/hr/pending-leaves/${hrId}`);
+      const response = await api.get(`/leave/hr/pending-leaves/${hrId}`);
       
       // Map backend response to frontend format
       const mapped= response.data.map(item => ({
@@ -92,7 +95,7 @@ const PendingRequests = () => {
         ...prev,
         [requestId]: action === 'Approved' ? 'approving' : 'rejecting',
       }));
-      await axios.post(`http://localhost:8000/leave/hr/leave-action/${requestId}`, {
+      await api.post(`/leave/hr/leave-action/${requestId}`, {
         action, // Backend expects 'Approved' or 'Rejected'
       });
 
@@ -101,9 +104,11 @@ const PendingRequests = () => {
 
       // Success message for debugging/notifications
       console.log(`Leave request ${action.toLowerCase()} successfully`);
+      toast.success(`Leave request ${action.toLowerCase()} successfully`);
+
     } catch (err) {
       console.error(`Error ${action.toLowerCase()} leave request:`, err);
-      setError(`Failed to ${action.toLowerCase()} leave request. Please try again.`);
+      toast.error(`Failed to ${action.toLowerCase()} leave request. Please try again.`);
     } finally {
       setActionLoading((prev) => ({ ...prev, [requestId]: null }));
     }

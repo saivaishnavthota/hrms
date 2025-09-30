@@ -54,6 +54,7 @@ const ChangePassword = () => {
       toast.success('Password changed successfully!');
     // eslint-disable-next-line no-unused-vars
     } catch (error) {
+      console.log(error);
       toast.error('Failed to change password. Please try again.');
     } finally {
       setIsSubmitting(false);
@@ -87,23 +88,25 @@ const ChangePassword = () => {
                   <Lock className="h-4 w-4 text-gray-400" />
                 </div>
                 <input
-                  type={showPasswords.current ? "text" : "password"}
-                  id="currentPassword"
-                  name="currentPassword"
-                  value={formData.currentPassword}
+              type={showPasswords.current}
+                id="currentPassword"
+               name="currentPassword"
+                value={formData.currentPassword}
                   onChange={handleInputChange}
-                  className={`block w-full pl-9 pr-10 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 border-gray-300`}
+                  autoComplete="off"        // disables browser auto-fill & eye
+                  spellCheck="false"        // optional, avoids suggestions
+                  className="block w-full pl-9 pr-10 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 border-gray-300"
                   placeholder="Enter your current password"
-                />
+          />
                 <button
                   type="button"
                   className="absolute inset-y-0 right-0 pr-3 flex items-center"
                   onClick={() => togglePasswordVisibility('current')}
                 >
                   {showPasswords.current ? (
-                    <EyeOff className="h-4 w-4 text-gray-400 hover:text-gray-600" />
+                    <EyeOff className="h-4 w-4 text-blue-800 hover:text-blue-800" />
                   ) : (
-                    <Eye className="h-4 w-4 text-gray-400 hover:text-gray-600" />
+                    <Eye className="h-4 w-4 text-blue-800 hover:text-blue-800" />
                   )}
                 </button>
               </div>

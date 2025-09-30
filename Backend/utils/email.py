@@ -73,7 +73,7 @@ async def send_onboarding_email(email: str, name: str):
 
 async def send_credentials_email(to_email: str, company_email: str, temp_password: str, location: str, doj: str):
     try:
-        subject="Your Company Credentials",
+        subject="Your Company Credentials"
         
         body=f"""
         Hello,
@@ -91,7 +91,7 @@ async def send_credentials_email(to_email: str, company_email: str, temp_passwor
         HR Team
         """ 
         message = MessageSchema(
-            subject="Your onboarding status",
+            subject=subject,
             recipients=[to_email],
             body=body,
             subtype="plain"
@@ -99,7 +99,7 @@ async def send_credentials_email(to_email: str, company_email: str, temp_passwor
 
         fm = FastMail(mail_conf)
         await fm.send_message(message)
-        print(f"✅ Login credentials email sent to {email}")
+        print(f"✅ Login credentials email sent to {to_email}")
         return True
     except Exception as e:
         print(f"❌ Failed to send login credentials email: {e}")

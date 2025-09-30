@@ -1,12 +1,14 @@
 import React, { useMemo, useState, useCallback } from 'react';
+import axios from 'axios';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent } from '@/components/ui/chart';
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer } from 'recharts';
 import { useUser } from '@/contexts/UserContext';
 import { CheckCircle, Home, CalendarDays, X as XIcon } from 'lucide-react';
 import useLivePoll from '@/hooks/useLivePoll';
+import api from "@/lib/api";
 
-const BASE_URL = 'http://127.0.0.1:8000';
+
 
 const ManagerDashboard = () => {
   const { user } = useUser();
@@ -38,61 +40,50 @@ const ManagerDashboard = () => {
           year: String(year),
           month: String(month),
         });
-        const resp = await fetch(`${BASE_URL}/attendance/daily?${qs.toString()}`, { headers });
-        if (resp.ok) {
-          const json = await resp.json();
-          const records = Array.isArray(json) ? json : (json?.records || []);
-          setAttendanceRecords(records);
-          // Count by status aligned with EmployeesAttendance component
-          let present = 0, leave = 0, wfh = 0;
-          for (const r of records) {
-            const status = r?.status;
-            if (status === 'Present') present += 1;
-            else if (status === 'WFH') wfh += 1;
-            else if (status === 'Leave') leave += 1;
-          }
-          setAttendance({ present, leave, wfh });
+        const resp = await api.get(`/attendance/daily?${qs.toString()}`, { headers });
+        const records = Array.isArray(resp.data) ? resp.data : (resp.data?.records || []);
+        setAttendanceRecords(records);
+
+        let present = 0, leave = 0, wfh = 0;
+        for (const r of records) {
+          const status = r?.status;
+          if (status === 'Present') present += 1;
+          else if (status === 'WFH') wfh += 1;
+          else if (status === 'Leave') leave += 1;
         }
-      } catch (_) {}
+        setAttendance({ present, leave, wfh });
+      } catch (e) { console.error('Attendance fetch error:', e);}
 
       // Leave requests under manager
       try {
-        const resp = await fetch(`${BASE_URL}/leave/leave-requests/${user?.employeeId}`, { headers });
-        if (resp.ok) {
-          const json = await resp.json();
-          const list = Array.isArray(json) ? json : (json?.requests || json?.data || []);
-          let pending = 0, approved = 0, rejected = 0;
-          for (const item of list) {
-            // Backend returns manager_status / final_status for leaves
-            const raw = item?.manager_status || item?.final_status || item?.status || item?.leave_status || '';
-            const s = String(raw).toLowerCase();
-            if (['pending', 'in_review'].includes(s)) pending += 1;
-            else if (['approved', 'accepted'].includes(s)) approved += 1;
-            else if (['rejected', 'declined'].includes(s)) rejected += 1;
-          }
-          setLeaveCounts({ pending, approved, rejected });
+        const resp = await api.get(`/leave/leave-requests/${user?.employeeId}`, { headers });
+        const list = Array.isArray(resp.data) ? resp.data : (resp.data?.requests || resp.data?.data || []);
+        let pending = 0, approved = 0, rejected = 0;
+        for (const item of list) {
+          const raw = item?.manager_status || item?.final_status || item?.status || item?.leave_status || '';
+          const s = String(raw).toLowerCase();
+          if (['pending', 'in_review'].includes(s)) pending += 1;
+          else if (['approved', 'accepted'].includes(s)) approved += 1;
+          else if (['rejected', 'declined'].includes(s)) rejected += 1;
         }
-      } catch (_) {}
+        setLeaveCounts({ pending, approved, rejected });
+      } catch (e) { console.error('Leave fetch error:', e);}
 
       // Expense requests under manager
       try {
-        const resp = await fetch(
-          `${BASE_URL}/expenses/mgr-exp-list?manager_id=${encodeURIComponent(user.employeeId)}&year=${year}&month=${month}`,
-          { headers }
-        );
-        if (resp.ok) {
-          const json = await resp.json();
-          const list = Array.isArray(json) ? json : (json?.requests || json?.data || []);
-          let pending = 0, approved = 0, rejected = 0;
-          for (const item of list) {
-            // Backend uses internal status codes for expenses
-            const s = String(item?.status || '').toLowerCase();
-            if (['pending', 'pending_manager_approval'].includes(s)) pending += 1;
-            else if (['approved', 'pending_hr_approval'].includes(s)) approved += 1; // manager-approved moves to HR pending
-            else if (['rejected', 'mgr_rejected'].includes(s)) rejected += 1;
-          }
-          setExpenseCounts({ pending, approved, rejected });
+        const resp = await api.get(`/expenses/mgr-exp-list`, {
+          headers,
+          params: { manager_id: user?.employeeId, year, month }
+        });
+        const list = Array.isArray(resp.data) ? resp.data : (resp.data?.requests || resp.data?.data || []);
+        let pending = 0, approved = 0, rejected = 0;
+        for (const item of list) {
+          const s = String(item?.status || '').toLowerCase();
+          if (['pending', 'pending_manager_approval'].includes(s)) pending += 1;
+          else if (['approved', 'pending_hr_approval'].includes(s)) approved += 1;
+          else if (['rejected', 'mgr_rejected'].includes(s)) rejected += 1;
         }
+        setExpenseCounts({ pending, approved, rejected });
       } catch (_) {}
 
     } catch (e) {
@@ -102,9 +93,13 @@ const ManagerDashboard = () => {
     }
   }, [user?.employeeId, headers, month, year]);
 
-  useLivePoll(fetchAll, { intervalMs: 5000, deps: [user?.employeeId, headers, month, year] });
+  useLivePoll(
+  () => { if(user?.employeeId) fetchAll(); },
+  { intervalMs: 5000, deps: [user?.employeeId, headers, month, year] }
+);
 
-  // Helpers to compute summary counts consistent with EmployeesAttendance
+
+
   const getCounts = (records) => {
     let present = 0, wfh = 0, leave = 0;
     for (const r of records) {
@@ -152,6 +147,7 @@ const ManagerDashboard = () => {
       </select>
     </div>
   );
+
 
   return (
     <div className="min-h-screen bg-gray-50 p-6">

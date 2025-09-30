@@ -41,8 +41,9 @@ import {
 } from '@/components/ui/dialog';
 import { useUser } from '@/contexts/UserContext';
 import NewExpenseForm from '../Manager/NewExpenseForm';
+import { toast } from 'react-toastify';
+import api from '@/lib/api';
 
-const BASE_URL = 'http://localhost:8000';
 
 const ExpenseManagement = () => {
   const { user } = useUser();
@@ -139,84 +140,48 @@ const ExpenseManagement = () => {
   });
 
   const fetchPendingExpenses = async () => {
-    if (!user?.employeeId) {
-      setError('Missing HR ID in user context');
-      console.error('Missing user.employeeId:', user);
-      return;
-    }
-    if (!token) {
-      setError('Missing authentication token');
-      console.error('Missing auth token');
-      return;
-    }
+     if (!user?.employeeId) return toast.error("Missing HR ID in user context");
+    if (!token) return toast.error("Missing authentication token");
+
     setLoading(true);
-    setError(null);
-    try {
-      const url = `${BASE_URL}/expenses/hr-exp-list?hr_id=${encodeURIComponent(
-        user.employeeId
-      )}&year=${year}&month=${month}`;
-      console.log('Fetching Pending Expenses URL:', url);
-      const res = await fetch(url, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
+    
+     try {
+      const res = await api.get(`/expenses/hr-exp-list`, {
+        params: { hr_id: user.employeeId, year, month },
+        headers: { Authorization: `Bearer ${token}` },
       });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-      console.log('Raw Pending Expenses Response:', data);
-      const mapped = (data || []).map(mapExpense);
-      console.log('Mapped Pending Expenses:', mapped);
-      const filtered = mapped.filter((e) => (e.status || '').toLowerCase() === 'pending');
-      console.log('Filtered Pending Expenses:', filtered);
-      setExpenses(filtered);
+      const mapped = (res.data || []).map(mapExpense);
+      setExpenses(mapped.filter((e) => (e.status || "").toLowerCase() === "pending"));
     } catch (err) {
-      console.error('Error fetching pending expenses:', err);
-      setError('Failed to fetch pending requests: ' + err.message);
+      console.error("Error fetching pending expenses:", err);
+      toast.error("Failed to fetch pending requests");
       setExpenses([]);
     } finally {
       setLoading(false);
     }
   };
 
-  const fetchAllExpenses = async () => {
-    if (!user?.employeeId) {
-      setError('Missing HR ID in user context');
-      console.error('Missing user.employeeId:', user);
-      return;
-    }
-    if (!token) {
-      setError('Missing authentication token');
-      console.error('Missing auth token');
-      return;
-    }
+
+ const fetchAllExpenses = async () => {
+    if (!user?.employeeId) return setError("Missing HR ID in user context");
+    if (!token) return toast.error("Missing authentication token");
+
     setLoading(true);
-    setError(null);
     try {
-      const url = `${BASE_URL}/expenses/hr-exp-list?hr_id=${encodeURIComponent(
-        user.employeeId
-      )}&year=${year}&month=${month}`;
-      console.log('Fetching All Expenses URL:', url);
-      const res = await fetch(url, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
+      const res = await api.get(`/expenses/hr-exp-list`, {
+        params: { hr_id: user.employeeId, year, month },
+        headers: { Authorization: `Bearer ${token}` },
       });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-      console.log('Raw All Expenses Response:', data);
-      const mapped = (data || []).map(mapExpense);
-      console.log('Mapped All Expenses:', mapped);
-      // Show only Approved/Rejected in All tab
-      const approvedOrRejected = mapped.filter((e) => {
-        const s = (e.status || '').toLowerCase();
-        return s === 'approved' || s === 'rejected';
-      });
-      setExpenses(approvedOrRejected);
+      const mapped = (res.data || []).map(mapExpense);
+      setExpenses(
+        mapped.filter((e) => {
+          const s = (e.status || "").toLowerCase();
+          return s === "approved" || s === "rejected";
+        })
+      );
     } catch (err) {
-      console.error('Error fetching all expenses:', err);
-      setError('Failed to fetch expense list: ' + err.message);
+      console.error("Error fetching all expenses:", err);
+      toast.error("Failed to fetch expense list");
       setExpenses([]);
     } finally {
       setLoading(false);
@@ -235,38 +200,20 @@ const ExpenseManagement = () => {
   });
 
   const fetchMyExpenses = async () => {
-    if (!user?.employeeId) {
-      setMyError('Missing employee ID in user context');
-      console.error('Missing user.employeeId:', user);
-      return;
-    }
-    if (!token) {
-      setMyError('Missing authentication token');
-      console.error('Missing auth token');
-      return;
-    }
+    if (!user?.employeeId) return setError("Missing employee ID in user context");
+    if (!token) return toast.error("Missing authentication token");
+
     setMyLoading(true);
-    setMyError(null);
     try {
-      const url = `${BASE_URL}/expenses/my-expenses?employee_id=${encodeURIComponent(
-        user.employeeId
-      )}&year=${year}&month=${month}`;
-      console.log('Fetching My Expenses URL:', url);
-      const res = await fetch(url, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
+      const res = await api.get(`/expenses/my-expenses`, {
+        params: { employee_id: user.employeeId, year, month },
+        headers: { Authorization: `Bearer ${token}` },
       });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-      console.log('Raw My Expenses Response:', data);
-      const mapped = (data || []).map(mapMyExpense);
-      console.log('Mapped My Expenses:', mapped);
+      const mapped = (res.data || []).map(mapMyExpense);
       setMyExpenses(mapped);
     } catch (err) {
-      console.error('Error fetching my expenses:', err);
-      setMyError('Failed to fetch my expense history: ' + err.message);
+      console.error("Error fetching my expenses:", err);
+      toast.error("Failed to fetch my expense history");
       setMyExpenses([]);
     } finally {
       setMyLoading(false);
@@ -293,89 +240,79 @@ const ExpenseManagement = () => {
     else if (activeTab === 'my') fetchMyExpenses();
   };
 
-  const handleApprove = async (expense) => {
+   const handleApprove = async (expense) => {
     try {
       const { isConfirmed, value } = await Swal.fire({
-        title: 'Approve Expense',
-        input: 'textarea',
-        inputLabel: 'Reason (optional)',
-        inputPlaceholder: 'Enter approval reason...',
-        inputAttributes: { 'aria-label': 'Enter approval reason' },
+        title: "Approve Expense",
+        input: "textarea",
+        inputLabel: "Reason (optional)",
+        inputPlaceholder: "Enter approval reason...",
         showCancelButton: true,
-        confirmButtonText: 'Submit',
+        confirmButtonText: "Submit",
       });
       if (!isConfirmed) return;
-      const reason = (value || '-').trim() || '-';
 
-      const form = new FormData();
-      form.append('hr_id', String(user.employeeId || ''));
-      form.append('status', 'Approved');
-      form.append('reason', reason);
-      const res = await fetch(
-        `${BASE_URL}/expenses/hr-upd-status/${expense.requestId}`,
-        {
-          method: 'PUT',
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-          body: form,
-        }
-      );
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const reason = (value || "-").trim() || "-";
+
+      await api.put(`/expenses/hr-upd-status/${expense.requestId}`, {
+        hr_id: user.employeeId,
+        status: "Approved",
+        reason,
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      toast.success("Expense approved");
       setExpenses((prev) =>
-        activeTab === 'pending'
+        activeTab === "pending"
           ? prev.filter((e) => e.requestId !== expense.requestId)
           : prev.map((e) =>
-              e.requestId === expense.requestId ? { ...e, status: 'Approved' } : e
+              e.requestId === expense.requestId ? { ...e, status: "Approved" } : e
             )
       );
     } catch (err) {
-      console.error('Approve failed:', err);
-      setError('Failed to approve expense: ' + err.message);
+      console.error("Approve failed:", err);
+      toast.error("Failed to approve expense");
     }
   };
 
-  const handleReject = async (expense) => {
+
+ const handleReject = async (expense) => {
     try {
       const { isConfirmed, value } = await Swal.fire({
-        title: 'Reject Expense',
-        input: 'textarea',
-        inputLabel: 'Reason (optional)',
-        inputPlaceholder: 'Enter rejection reason...',
-        inputAttributes: { 'aria-label': 'Enter rejection reason' },
+        title: "Reject Expense",
+        input: "textarea",
+        inputLabel: "Reason (optional)",
+        inputPlaceholder: "Enter rejection reason...",
         showCancelButton: true,
-        confirmButtonText: 'Submit',
+        confirmButtonText: "Submit",
       });
       if (!isConfirmed) return;
-      const reason = (value || '-').trim() || '-';
 
-      const form = new FormData();
-      form.append('hr_id', String(user.employeeId || ''));
-      form.append('status', 'Rejected');
-      form.append('reason', reason);
-      const res = await fetch(
-        `${BASE_URL}/expenses/hr-upd-status/${expense.requestId}`,
-        {
-          method: 'PUT',
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-          body: form,
-        }
-      );
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const reason = (value || "-").trim() || "-";
+
+      await api.put(`/expenses/hr-upd-status/${expense.requestId}`, {
+        hr_id: user.employeeId,
+        status: "Rejected",
+        reason,
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      toast.success("Expense rejected");
       setExpenses((prev) =>
-        activeTab === 'pending'
+        activeTab === "pending"
           ? prev.filter((e) => e.requestId !== expense.requestId)
           : prev.map((e) =>
-              e.requestId === expense.requestId ? { ...e, status: 'Rejected' } : e
+              e.requestId === expense.requestId ? { ...e, status: "Rejected" } : e
             )
       );
     } catch (err) {
-      console.error('Reject failed:', err);
-      setError('Failed to reject expense: ' + err.message);
+      console.error("Reject failed:", err);
+      toast.error("Failed to reject expense");
     }
   };
+
 
   const filteredExpenses = expenses.filter((expense) => {
     const q = searchTerm.toLowerCase();
@@ -436,6 +373,49 @@ const ExpenseManagement = () => {
           New Expense
         </Button>
       </div>
+ <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center gap-4 flex-1">
+          <div className="relative flex-1 max-w-sm">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+            <Input
+              placeholder="Search expenses..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="w-40">
+              <SelectValue placeholder="Filter by status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Status</SelectItem>
+              <SelectItem value="pending">Pending</SelectItem>
+              <SelectItem value="approved">Approved</SelectItem>
+              <SelectItem value="rejected">Rejected</SelectItem>
+            </SelectContent>
+          </Select>
+         
+        </div>
+
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 text-sm text-gray-600">
+            <span>Per Page:</span>
+            <Select value={perPage} onValueChange={setPerPage}>
+              <SelectTrigger className="w-16 h-8">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="5">5</SelectItem>
+                <SelectItem value="10">10</SelectItem>
+                <SelectItem value="20">20</SelectItem>
+                <SelectItem value="50">50</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+      </div>
+
 
       <div className="mb-2">
         <div className="border-b border-gray-200">
@@ -473,6 +453,7 @@ const ExpenseManagement = () => {
           </nav>
         </div>
       </div>
+
 
       {activeTab === 'my' && (
         <div className="bg-white rounded-lg shadow-sm border border-gray-200">
@@ -512,18 +493,42 @@ const ExpenseManagement = () => {
                             View Details
                           </Button>
                         </DialogTrigger>
-                        <DialogContent>
-                          <DialogHeader>
-                            <DialogTitle>Submitted Expense Details</DialogTitle>
-                          </DialogHeader>
+                        <DialogContent className="max-w-2xl p-0">
+              
                           <DialogBody>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
-                              <div><span className="text-muted-foreground">Category:</span> {item.category}</div>
-                              <div><span className="text-muted-foreground">Date:</span> {item.date}</div>
-                              <div><span className="text-muted-foreground">Amount:</span> {item.amount} {item.currency}</div>
-                              <div className="md:col-span-2"><span className="text-muted-foreground">Description:</span> {item.description || '-'}</div>
-                              <div><span className="text-muted-foreground">Status:</span> {item.status}</div>
+                       {/* <div className="fixed inset-0 bg-black/20 backdrop-blur-[2px] flex items-center justify-center z-50"> */}
+                       {/* <div className="bg-gradient-to-br from-white via-gray-50 to-blue-50 rounded-xl shadow-2xl max-w-2xl w-full mx-4 max-h-[100vh] overflow-y-auto border border-gray-200"> */}
+                       <div className="flex justify-between items-center p-6 border-b border-gray-200 bg-gradient-to-r from-gray-600 to-blue-600 rounded-t-xl">
+                      <h3 className="text-lg font-semibold text-white">
+                      Submitted Expense Details
+                       </h3>
+                      </div>
+               <div className="space-y-4 p-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+
+                            <div className="rounded-lg p-4 bg-white">
+                  <div className="text-gray-500">Category</div>
+                  <div className="font-medium text-gray-800">{item.category}</div>
+                </div>
+
+                <div className="rounded-lg p-4 bg-white">
+                  <div className="text-gray-500">Date</div>
+                  <div className="font-medium text-gray-800">{item.date}</div>
+                  </div>
+            <div className="rounded-lg p-4 bg-white">
+                  <div className="text-gray-500">Amount</div>
+                  <div className="font-medium text-gray-800">{item.amount}{item.currency}</div>
+                  </div>
+                <div className="rounded-lg p-4 bg-white">
+                  <div className="text-gray-500">Description</div>
+                  <div className="font-medium text-gray-800">{item.description}</div>
+                  </div>
+                
+                     
                             </div>
+                            </div>
+                            {/* </div> */}
+                          {/* </div> */}
                           </DialogBody>
                         </DialogContent>
                       </Dialog>
@@ -541,56 +546,70 @@ const ExpenseManagement = () => {
                         {item.status}
                       </span>
                     </TableCell>
+                
                     <TableCell className="px-6 py-4">
-                      <Dialog>
-                        <DialogTrigger asChild>
-                          <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground">
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                        </DialogTrigger>
-                        <DialogContent>
-                          <DialogHeader>
-                            <DialogTitle>Manager & HR Details</DialogTitle>
-                          </DialogHeader>
-                          <DialogBody>
-                            <div className="rounded-lg border">
-                              <Table>
-                                <TableHeader>
-                                  <TableRow>
-                                    <TableHead>Name</TableHead>
-                                    <TableHead>Role</TableHead>
-                                    <TableHead>Reason</TableHead>
-                                    <TableHead>Status</TableHead>
-                                  </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                  {(item.approvals || []).map((appr, idx) => (
-                                    <TableRow key={idx}>
-                                      <TableCell>{appr.name}</TableCell>
-                                      <TableCell>{appr.role}</TableCell>
-                                      <TableCell>{appr.reason || '-'}</TableCell>
-                                      <TableCell>
-                                        <span
-                                          className={`${
-                                            appr.status === 'Approved'
-                                              ? 'text-green-700 bg-green-50 border border-green-200'
-                                              : appr.status === 'Rejected'
-                                              ? 'text-red-700 bg-red-50 border border-red-200'
-                                              : 'text-yellow-700 bg-yellow-50 border border-yellow-200'
-                                          } px-2 py-1 rounded-md text-xs`}
-                                        >
-                                          {appr.status}
-                                        </span>
-                                      </TableCell>
-                                    </TableRow>
-                                  ))}
-                                </TableBody>
-                              </Table>
-                            </div>
-                          </DialogBody>
-                        </DialogContent>
-                      </Dialog>
-                    </TableCell>
+                     <Dialog>
+  <DialogTrigger asChild>
+    <Button
+      variant="ghost"
+      size="sm"
+      className="text-blue-800 hover:text-foreground blue-800 "
+    >
+      <Eye className="h-4 w-4" />
+    </Button>
+  </DialogTrigger>
+
+  {/* Apply same themed dialog */}
+  <DialogContent className="max-w-2xl p-0">
+    <div className="w-full bg-gradient-to-br from-white via-gray-50 to-blue-50 rounded-xl shadow-2xl max-h-[100vh] overflow-y-auto border border-gray-200">
+      <div className="flex justify-between items-center p-6 border-b border-gray-200 bg-gradient-to-r from-gray-600 to-blue-600 rounded-t-xl">
+        <h3 className="text-lg font-semibold text-white">
+          Manager & HR Details
+        </h3>
+      </div>
+
+      <div className="space-y-4 p-6">
+        {(item.approvals || []).map((appr, idx) => (
+          <div
+            key={idx}
+            className="rounded-lg border border-gray-200 bg-white shadow-sm p-4 space-y-2"
+          >
+            <div className="flex justify-between">
+              <p className="font-medium text-gray-700">Name</p>
+              <p className="text-gray-900">{appr.name}</p>
+            </div>
+
+            <div className="flex justify-between">
+              <p className="font-medium text-gray-700">Role</p>
+              <p className="text-gray-900">{appr.role}</p>
+            </div>
+
+            <div className="flex justify-between">
+              <p className="font-medium text-gray-700">Reason</p>
+              <p className="text-gray-900">{appr.reason || '-'}</p>
+            </div>
+
+            <div className="flex justify-between">
+              <p className="font-medium text-gray-700">Status</p>
+              <span
+                className={`${
+                  appr.status === "Approved"
+                    ? "text-green-700 bg-green-50 border border-green-200"
+                    : appr.status === "Rejected"
+                    ? "text-red-700 bg-red-50 border border-red-200"
+                    : "text-yellow-700 bg-yellow-50 border border-yellow-200"
+                } px-3 py-1 rounded-md text-xs font-medium`}
+              >
+                {appr.status}
+              </span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  </DialogContent>
+</Dialog>
+</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -599,54 +618,9 @@ const ExpenseManagement = () => {
         </div>
       )}
 
-      <div className="flex items-center justify-between gap-4">
-        <div className="flex items-center gap-4 flex-1">
-          <div className="relative flex-1 max-w-sm">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-            <Input
-              placeholder="Search expenses..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
-            />
-          </div>
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-40">
-              <SelectValue placeholder="Filter by status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Status</SelectItem>
-              <SelectItem value="pending">Pending</SelectItem>
-              <SelectItem value="approved">Approved</SelectItem>
-              <SelectItem value="rejected">Rejected</SelectItem>
-            </SelectContent>
-          </Select>
-          <Button variant="outline" className="gap-2">
-            <Filter className="h-4 w-4" />
-            More Filters
-          </Button>
-        </div>
-
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2 text-sm text-gray-600">
-            <span>Per Page:</span>
-            <Select value={perPage} onValueChange={setPerPage}>
-              <SelectTrigger className="w-16 h-8">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="5">5</SelectItem>
-                <SelectItem value="10">10</SelectItem>
-                <SelectItem value="20">20</SelectItem>
-                <SelectItem value="50">50</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-      </div>
-
+    
       {activeTab !== 'my' && (
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+        <div>
           {loading ? (
             <div className="px-6 py-10 text-center text-gray-600">Loading expenses...</div>
           ) : error ? (
@@ -845,7 +819,7 @@ const ExpenseManagement = () => {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={isNewExpenseOpen} onOpenChange={setIsNewExpenseOpen}>
+      {/* <Dialog open={isNewExpenseOpen} onOpenChange={setIsNewExpenseOpen}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>New Expense</DialogTitle>
@@ -856,7 +830,7 @@ const ExpenseManagement = () => {
             onCancel={() => setIsNewExpenseOpen(false)}
           />
         </DialogContent>
-      </Dialog>
+      </Dialog> */}
     </div>
   );
 };

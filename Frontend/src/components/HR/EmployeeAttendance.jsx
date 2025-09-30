@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { User, Trash2, Eye, X, Search, CheckCircle, Home, CalendarDays } from 'lucide-react';
-import axios from 'axios';
 import { avatarBg } from '../../lib/avatarColors';
+import api from '@/lib/api';
+import { toast } from 'react-toastify';
 
 const EmployeeAttendance = () => {
   const [attendanceRecords, setAttendanceRecords] = useState([]);
@@ -17,8 +18,6 @@ const EmployeeAttendance = () => {
   const [userId, setUserId] = useState(null);
   const [error, setError] = useState(null);
 
-  // Set axios base URL
-  axios.defaults.baseURL = 'http://127.0.0.1:8000';
 
   // Fetch userId from localStorage on component mount
   useEffect(() => {
@@ -37,13 +36,13 @@ const EmployeeAttendance = () => {
 
       try {
         setError(null);
-        const response = await axios.get('/attendance/hr-daily', {
+        const response = await api.get('/attendance/hr-daily', {
           params: { hr_id: userId, year, month }
         });
         setAttendanceRecords(transformData(response.data));
       } catch (error) {
         console.error('Error fetching attendance:', error);
-        setError(`Failed to fetch attendance records: ${error.message}. Please try again.`);
+        toast.error(`Failed to fetch attendance records: ${error.message}. Please try again.`);
         setAttendanceRecords([]);
       }
     };

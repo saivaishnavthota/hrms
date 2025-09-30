@@ -117,7 +117,7 @@ export function SidebarMenu({ menu }) {
             <item.icon
               data-slot="accordion-menu-icon"
               className="shrink-0"
-              style={{ color: 'rgb(110, 38, 253)' }}
+               style={{ color: 'rgb(53, 4, 151)' }}
             />
           )}
           <span data-slot="accordion-menu-title" className="flex-1">{item.title}</span>

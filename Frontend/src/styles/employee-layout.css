@@ -95,7 +95,7 @@
   width: 100vw;
   background-color: white;
   border-top: 1px solid #e5e7eb; /* border-gray-200 */
-  margin-top: auto;
+
 }
 
 .employee-footer-container {
@@ -188,6 +188,7 @@
   border-radius: 0.5rem; /* rounded-lg */
   padding: 1.5rem; /* p-6 */
   color: white;
+  
 }
 
 /* Quick Actions Grid */

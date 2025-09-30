@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { User, Trash2, Eye, X, Search, CheckCircle, Home, CalendarDays } from 'lucide-react';
-import axios from 'axios';
 import { avatarBg } from '../../lib/avatarColors';
+import api from "@/lib/api";
+
 
 const ManagerEmployeeAttendance = () => {
   const [attendanceRecords, setAttendanceRecords] = useState([]);
@@ -19,8 +20,7 @@ const ManagerEmployeeAttendance = () => {
 
    const getAvatarColor = (name) => avatarBg(name);
 
-  // Set axios base URL
-  axios.defaults.baseURL = 'http://127.0.0.1:8000';
+ 
 
   // Fetch userId from localStorage on component mount
   useEffect(() => {
@@ -39,7 +39,7 @@ const ManagerEmployeeAttendance = () => {
 
       try {
         setError(null);
-        const response = await axios.get('/attendance/daily', {
+        const response = await api.get('/attendance/daily', {
           params: { manager_id: userId, year, month }
         });
         setAttendanceRecords(transformData(response.data));

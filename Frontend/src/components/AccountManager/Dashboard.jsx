@@ -1,11 +1,16 @@
 import React, { useMemo, useState, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent } from '@/components/ui/chart';
+import {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+  ChartLegend,
+  ChartLegendContent,
+} from '@/components/ui/chart';
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer } from 'recharts';
 import { useUser } from '@/contexts/UserContext';
 import useLivePoll from '@/hooks/useLivePoll';
-
-const BASE_URL = 'http://localhost:8000';
+import api from '@/lib/api';
 
 const Dashboard = () => {
   const { user } = useUser();
@@ -29,30 +34,30 @@ const Dashboard = () => {
   const fetchData = useCallback(async () => {
     const accMgrId = user?.employeeId || localStorage.getItem('userId');
     if (!accMgrId) return;
+
     setLoading(true);
     setError(null);
+
     try {
-      const url = `${BASE_URL}/expenses/acc-mgr-exp-list?acc_mgr_id=${encodeURIComponent(
-        accMgrId
-      )}&year=${year}&month=${month}`;
-      const res = await fetch(url, {
-        headers: {
-          Authorization: token ? `Bearer ${token}` : '',
-        },
+      const res = await api.get(`/expenses/acc-mgr-exp-list`, {
+        params: { acc_mgr_id: accMgrId, year, month },
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const json = await res.json();
-      const list = Array.isArray(json) ? json : json?.results || [];
+
+      const list = Array.isArray(res.data) ? res.data : res.data?.results || [];
+
       const counts = { Pending: 0, Approved: 0, Rejected: 0 };
-      (list || []).forEach((item) => {
+      list.forEach((item) => {
         const s = mapStatus(item);
         if (counts[s] !== undefined) counts[s] += 1;
       });
+
       const chartData = [
         { label: 'Pending', value: counts.Pending },
         { label: 'Approved', value: counts.Approved },
         { label: 'Rejected', value: counts.Rejected },
       ];
+
       setData(chartData);
     } catch (err) {
       console.error('Error fetching manager expenses for dashboard:', err);
@@ -91,7 +96,6 @@ const Dashboard = () => {
                     <YAxis allowDecimals={false} />
                     <ChartTooltip content={<ChartTooltipContent />} />
                     <Bar dataKey="value" fill="var(--color-Pending)" name="Pending" />
-                    {/* Using one bar; categories distinguished by labels */}
                   </BarChart>
                 </ResponsiveContainer>
                 <ChartLegend content={<ChartLegendContent />} />

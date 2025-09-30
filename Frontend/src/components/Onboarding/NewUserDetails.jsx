@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { User, Mail, Phone, MapPin, Calendar, Building, Users, GraduationCap, Briefcase } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
-import axios from 'axios';
+import api from '@/lib/api';
 import { useUser } from '../../contexts/UserContext';
 import OnboardingHeader from './OnboardingHeader';
 import OnboardingFooter from './OnboardingFooter';
@@ -45,7 +45,7 @@ export default function NewUserDetails() {
         // Then try to fetch additional details from backend
         const employee_id = user?.employeeId || 0;
         if (employee_id) {
-          const response = await axios.get(`http://localhost:8000/onboarding/details/${employee_id}`);
+          const response = await api.get(`/onboarding/details/${employee_id}`);
           if (response.data && response.data.status === 'success' && response.data.data) {
             const backendData = response.data.data;
             setFormData(prev => ({
@@ -179,7 +179,7 @@ export default function NewUserDetails() {
     
     try {
       // POST request to save user details as draft
-      const response = await axios.post("http://localhost:8000/onboarding/details", {
+      const response = await api.post("/onboarding/details", {
         ...formData,
         is_draft: true
       });
@@ -207,7 +207,7 @@ export default function NewUserDetails() {
     
     try {
       // POST request to save user details
-      const response = await axios.post("http://localhost:8000/onboarding/details", formData);
+      const response = await api.post("/onboarding/details", formData);
       
       if (response.data) {
         toast.success('User details saved successfully!');

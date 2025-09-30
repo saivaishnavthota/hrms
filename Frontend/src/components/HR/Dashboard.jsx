@@ -4,11 +4,9 @@ import { Users, Building, TrendingUp, Calendar, RefreshCw, Clock, Briefcase, Use
 import api, { userAPI } from '../../lib/api';
 import { useUser } from '../../contexts/UserContext';
 import useLivePoll from '../../hooks/useLivePoll';
-import axios from 'axios';
 const Dashboard = () => {
   const [totalEmployees, setTotalEmployees] = useState(0);
   const [isLoadingEmployees, setIsLoadingEmployees] = useState(false);
-  const [employeeError, setEmployeeError] = useState(null);
   const { user } = useUser();
   const hrId = useMemo(() => {
     return (

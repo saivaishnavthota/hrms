@@ -15,6 +15,7 @@ import {
   SheetHeader,
   SheetTrigger,
 } from '@/components/ui/sheet';
+
 import { UserDropdownMenu } from '@/components/layouts/layout-1/shared/topbar/user-dropdown-menu';
 // Removed MegaMenu and MegaMenuMobile imports as they are no longer used
 import { SidebarMenu } from './sidebar-menu';

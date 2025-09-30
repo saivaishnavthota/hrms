@@ -183,7 +183,10 @@ export const onboardingAPI = {
     const response = await api.get(`/onboarding/details/${employeeId}`);
     return response.data;
   },
-
+  handleAssignEmployee: async (employeeData) => {
+    const response = await api.post('/onboarding/hr/assign', employeeData);
+    return response.data;
+  },
   // POST /onboarding/hr/approve/{onboarding_id} - Approve employee
   approveEmployee: async (onboardingId) => {
     const response = await api.post(`/onboarding/hr/approve/${onboardingId}`);

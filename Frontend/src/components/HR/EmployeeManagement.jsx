@@ -148,7 +148,8 @@ const BASE_URL = import.meta.env.VITE_API_URL;
     } catch (err) {
       console.error('Error fetching data:', err);
       console.error('Error details:', err.response?.data || err.message);
-      setError('Failed to fetch data. Please try again.');
+      toast.error("Failed to fetch data. Please try again.");
+
       
       
     } finally {
@@ -157,6 +158,39 @@ const BASE_URL = import.meta.env.VITE_API_URL;
   };
 
   // Assignment functionality
+  const handleAssignEmployee = async (employeeData) => {
+    try {
+      setIsSubmitting(true);
+      
+      const assignmentData = {
+        employee_id: employeeData.employee_id,
+        location_id: employeeData.location_id,
+        doj: employeeData.doj,
+        to_email: employeeData.to_email,
+        company_email: employeeData.company_email,
+        manager1_id: employeeData.manager1_id,
+        manager2_id: employeeData.manager2_id || null,
+        manager3_id: employeeData.manager3_id || null,
+        hr1_id: employeeData.hr1_id,
+        hr2_id: employeeData.hr2_id || null
+      };
+
+      const response = await api.post('onboarding/hr/assign', assignmentData);
+      
+      if (response.status === 200) {
+        toast.success('Employee assigned successfully!');
+        // Refresh the employee list
+        await fetchAllData();
+        setIsEditModalOpen(false);
+      }
+    } catch (err) {
+      console.log(employeeData);
+      console.error('Error assigning employee:', err);
+      toast.error('Failed to assign employee. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   const handleInputChange = (field, value) => {
     setFormData(prev => ({
@@ -205,44 +239,25 @@ const BASE_URL = import.meta.env.VITE_API_URL;
     }
 
     setIsSubmitting(true);
-    
     try {
-      const response = await fetch(`/onboarding/hr/create_employee`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(formData)
-      });
+      await api.post("/onboarding/hr/create_employee", formData);
 
-      if (response.ok) {
-        const result = await response.json();
-        console.log('Employee created successfully:', result);
-        
-        // Reset form and close modal
-        setFormData({
-          name: '',
-          email: '',
-          role: '',
-          type: ''
-        });
-        setIsModalOpen(false);
-        
-        // You might want to refresh the employee list here
-        toast.success('Employee created successfully!');
-      } else {
-        const errorData = await response.json();
-        console.error('Error creating employee:', errorData);
-        toast.error('Error creating employee: ' + (errorData.detail || 'Unknown error'));
-      }
-    } catch (error) {
-      console.error('Network error:', error);
-      toast.error('Network error. Please try again.');
+      toast.success("Employee created successfully!");
+
+      setFormData({ name: "", email: "", role: "", type: "" });
+      setIsModalOpen(false);
+
+      await fetchAllData();
+    } catch (err) {
+      console.error("Error creating employee:", err.response?.data || err.message);
+      toast.error(
+        "Error creating employee: " + (err.response?.data?.detail || "Unknown error")
+      );
     } finally {
       setIsSubmitting(false);
     }
   };
-
+  
   const closeModal = () => {
     setIsModalOpen(false);
     setFormData({
@@ -385,35 +400,23 @@ const BASE_URL = import.meta.env.VITE_API_URL;
       
       console.log('Sending request body:', requestBody);
       
-      const response = await fetch('http://127.0.0.1:8000/hr/assign', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(requestBody)
-      });
-
-      if (response.ok) {
-        const result = await response.json();
-        console.log('Employee assignment successful:', result);
-        toast.success('Employee assigned successfully!');
-        
-        // Refresh the employee list
+      const response = await api.post('/onboarding/hr/assign', requestBody);
+      
+      if (response.status === 200) {
+        toast.success("Employee assigned successfully!");
         await fetchAllData();
         closeEditModal();
-      } else {
-        const errorData = await response.json();
-        console.error('Error assigning employee:', errorData);
-        toast.error('Error assigning employee: ' + (errorData.detail || 'Unknown error'));
       }
-    } catch (error) {
-      console.error('Network error:', error);
-      toast.error('Network error. Please try again.');
+    } catch (err) {
+      console.error("Error assigning employee:", err.response?.data || err.message);
+      toast.error(
+        "Error assigning employee: " + (err.response?.data?.detail || "Unknown error")
+      );
     } finally {
       setIsSubmitting(false);
     }
   };
-
+  
   const getAvatarColor = (name) => avatarBg(name);
 
   const filteredEmployees = employees.filter(employee => {
@@ -431,7 +434,7 @@ const BASE_URL = import.meta.env.VITE_API_URL;
     return matchesSearch && matchesStatus && matchesType && matchesLocation && matchesHr && matchesManager;
   });
 
-  const ActionButton = ({ icon: Icon, onClick, variant = "ghost", size = "sm", className = "" }) => (
+  const ActionButton = ({  icon: Icon, onClick, variant = "ghost", size = "sm", className = "" }) => (
     <Button
       variant={variant}
       size={size}
@@ -697,7 +700,7 @@ const BASE_URL = import.meta.env.VITE_API_URL;
       <div className="flex items-center justify-between text-sm text-gray-600">
         <span>Showing {filteredEmployees.length} of {employees.length} entries</span>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" disabled>
+          <Button variant="outline" size="sm" disab led>
             Previous
           </Button>
           <Button variant="outline" size="sm" className="bg-blue-500 text-white border-blue-500">

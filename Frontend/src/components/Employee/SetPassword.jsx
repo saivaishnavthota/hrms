@@ -41,7 +41,7 @@ const SetPassword = () => {
     try {
       // Simulate API call
       await new Promise(resolve => setTimeout(resolve, 2000));
-      setMessage('Password updated successfully! Please use your new password for future logins.');
+      toast.success('Password updated successfully! Please use your new password for future logins.');
       
       // Reset form after success
       setTimeout(() => {
@@ -53,7 +53,7 @@ const SetPassword = () => {
         setMessage('');
       }, 3000);
     } catch (error) {
-      setMessage('Failed to update password. Please check your current password and try again.');
+      toast.error('Failed to update password. Please check your current password and try again.');
     } finally {
       setIsSubmitting(false);
     }

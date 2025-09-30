@@ -14,3 +14,4 @@ class Document(SQLModel, table=True):
     file_name: str  # original file name
     file_url: str  # Azure Blob URL
     uploaded_at: datetime = Field(default_factory=datetime.utcnow)
+

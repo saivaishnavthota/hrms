@@ -8,8 +8,8 @@ const DocumentCollection = () => {
   const [employeeDocuments, setEmployeeDocuments] = useState([]);
   const [loadingDocuments, setLoadingDocuments] = useState(false);
   const [loadingEmployees, setLoadingEmployees] = useState(true);
-  const [isRejectMode, setIsRejectMode] = useState(false);
-  const [selectedDocuments, setSelectedDocuments] = useState([]);
+  const [, setIsRejectMode] = useState(false);
+  const [, setSelectedDocuments] = useState([]);
   const [requestLogs, setRequestLogs] = useState([]);
   const [showRequestLogs, setShowRequestLogs] = useState(false);
   const [showDocumentRequestModal, setShowDocumentRequestModal] = useState(false);
@@ -310,23 +310,6 @@ const DocumentCollection = () => {
   };
 
   // Helper function to get status badge
-  const getStatusBadge = (status) => {
-    const statusConfig = {
-      approved: { color: 'bg-green-100 text-green-800 border-green-200', icon: CheckCircle },
-      pending: { color: 'bg-yellow-100 text-yellow-800 border-yellow-200', icon: Clock },
-      rejected: { color: 'bg-red-100 text-red-800 border-red-200', icon: AlertCircle }
-    };
-    
-    const config = statusConfig[status] || statusConfig.pending;
-    const IconComponent = config.icon;
-    
-    return (
-      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${config.color}`}>
-        <IconComponent className="w-3 h-3 mr-1" />
-        {status.charAt(0).toUpperCase() + status.slice(1)}
-      </span>
-    );
-  };
 
   const handleViewDocuments = async (employee) => {
     setSelectedEmployee(employee);
@@ -356,13 +339,6 @@ const DocumentCollection = () => {
     setSelectedEmployeeForRequest(null);
   };
 
-  const handleDocumentSelection = (documentId) => {
-    setSelectedDocuments(prev => 
-      prev.includes(documentId) 
-        ? prev.filter(id => id !== documentId)
-        : [...prev, documentId]
-    );
-  };
 
   const handleDownloadDocument = async (documentUrl, documentName) => {
     if (!documentUrl) return;

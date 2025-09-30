@@ -52,6 +52,7 @@ const ChangePassword = () => {
       });
       
       toast.success('Password changed successfully!');
+    // eslint-disable-next-line no-unused-vars
     } catch (error) {
       toast.error('Failed to change password. Please try again.');
     } finally {

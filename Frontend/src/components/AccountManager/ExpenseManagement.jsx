@@ -42,7 +42,7 @@ import { avatarBg } from '../../lib/avatarColors';
 
 const AccountManagerExpenseManagement = () => {
   const navigate = useNavigate();
-  const [userId, setUserId] = useState(localStorage.getItem('userId')); // Fetch userId from localStorage
+  const [, setUserId] = useState(localStorage.getItem('userId')); // Fetch userId from localStorage
   const [activeTab, setActiveTab] = useState('pending');
   const [expenses, setExpenses] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');

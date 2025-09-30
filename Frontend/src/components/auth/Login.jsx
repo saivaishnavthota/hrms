@@ -3,10 +3,10 @@ import { Eye, EyeOff, Mail, Lock } from 'lucide-react';
 import { authAPI } from '@/lib/api';
 import { useNavigate } from 'react-router-dom';
 import { useUser } from '@/contexts/UserContext';
-
+const API_URL = import.meta.env.VITE_API_URL;
 export default function Login() {
   const navigate = useNavigate();
-  const { loginUser, getRedirectPath } = useUser();
+  const { loginUser } = useUser();
   
   // Helper function to calculate redirect path from login response
   const calculateRedirectPath = (onboarding_status, login_status, role) => {
@@ -54,7 +54,7 @@ export default function Login() {
     password: ''
   });
   const [showPassword, setShowPassword] = useState(false);
-  const [rememberMe, setRememberMe] = useState(false);
+  
   const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState({});
   const [showForgotPassword, setShowForgotPassword] = useState(false);
@@ -73,20 +73,7 @@ export default function Login() {
   const [resetPasswordLoading, setResetPasswordLoading] = useState(false);
   const [resetPasswordMessage, setResetPasswordMessage] = useState('');
 
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
-    // Clear error when user starts typing
-    if (errors[name]) {
-      setErrors(prev => ({
-        ...prev,
-        [name]: ''
-      }));
-    }
-  };
+ 
 
   const validateForm = () => {
     const newErrors = {};

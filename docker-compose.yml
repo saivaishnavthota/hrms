@@ -1,3 +1,5 @@
+version: "3.9"
+
 services:
   backend:
     build:
@@ -7,9 +9,15 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      - ./Backend:/app  # match the folder name!
+      - postgres_data:/var/lib/postgresql/data
+      - ./Backend/init.sql:/docker-entrypoint-initdb.d/init.sql  # Add this line
+    
     depends_on:
       - db
+    environment:
+      DATABASE_URL: postgresql://admin:nxzen%40123@db:5432/Nxzen
+    networks:
+      - app-network
 
   frontend:
     build:
@@ -17,7 +25,11 @@ services:
       dockerfile: Dockerfile
     container_name: react_app
     ports:
-      - "5173:80"
+      - "3000:80"
+    depends_on:
+      - backend
+    networks:
+      - app-network
 
   db:
     image: postgres:15
@@ -30,7 +42,12 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    networks:
+      - app-network
 
 volumes:
   postgres_data:
 
+networks:
+  app-network:
+    driver: bridge

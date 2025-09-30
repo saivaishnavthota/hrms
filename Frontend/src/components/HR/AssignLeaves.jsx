@@ -181,7 +181,7 @@ const AssignLeaves = () => {
 
   const isAllSelected = sortedData.length > 0 && sortedData.every(emp => selectedIds.has(emp.id));
   const toggleSelectAll = () => {
-    setSelectedIds(prev => {
+    setSelectedIds(() => {
       if (isAllSelected) return new Set();
       const next = new Set();
       sortedData.forEach(emp => next.add(emp.id));
@@ -410,7 +410,7 @@ const AssignLeaves = () => {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {sortedData.map((employee, index) => (
+              {sortedData.map((employee) => (
                 <tr key={employee.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                     <input

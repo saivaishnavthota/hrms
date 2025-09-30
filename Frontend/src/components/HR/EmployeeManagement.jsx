@@ -46,14 +46,16 @@ import {
 import { Label } from '@/components/ui/label';
 import { avatarBg } from '../../lib/avatarColors';
 
+const BASE_URL = import.meta.env.VITE_API_URL;
+
 
   const EmployeeManagement = () => {
   const [employees, setEmployees] = useState([]);
   const [managers, setManagers] = useState([]);
   const [hrs, setHrs] = useState([]);
   const [locations, setLocations] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [, setLoading] = useState(true);
+  const [, setError] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [typeFilter, setTypeFilter] = useState('all');
@@ -155,33 +157,6 @@ import { avatarBg } from '../../lib/avatarColors';
   };
 
   // Assignment functionality
-  const handleAssignEmployee = async (employeeData) => {
-    try {
-      setIsSubmitting(true);
-      
-      const assignmentData = {
-        employee_id: employeeData.employee_id,
-        location_id: employeeData.location_id,
-        manager_ids: employeeData.manager_ids, // Array of manager IDs
-        hr_ids: employeeData.hr_ids // Array of HR IDs
-      };
-
-      const response = await axios.post('http://127.0.0.1:8000/hr/assign', assignmentData);
-      
-      if (response.status === 200) {
-        toast.success('Employee assigned successfully!');
-        // Refresh the employee list
-        await fetchAllData();
-        setIsEditModalOpen(false);
-      }
-    } catch (err) {
-      console.log(employeeData);
-      console.error('Error assigning employee:', err);
-      toast.error('Failed to assign employee. Please try again.');
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
 
   const handleInputChange = (field, value) => {
     setFormData(prev => ({
@@ -232,7 +207,7 @@ import { avatarBg } from '../../lib/avatarColors';
     setIsSubmitting(true);
     
     try {
-      const response = await fetch('http://127.0.0.1:8000/onboarding/hr/create_employee', {
+      const response = await fetch(`/onboarding/hr/create_employee`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -464,7 +439,7 @@ import { avatarBg } from '../../lib/avatarColors';
       onClick={onClick}
       className={`h-8 w-8 p-0 ${className}`}
     >
-      <Icon className="h-4 w-4" />
+      {Icon && <Icon className="h-4 w-4" />}
     </Button>
   );
 

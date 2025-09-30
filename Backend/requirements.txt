@@ -2,8 +2,6 @@ fastapi
 uvicorn
 sqlmodel
 psycopg2-binary
-fastapi
-uvicorn
 sqlalchemy
 pydantic
 python-dotenv

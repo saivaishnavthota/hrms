@@ -6,7 +6,7 @@ from middleware.cors import add_cors_middleware
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 import uvicorn
-from fastapi import FastA
+from fastapi import FastAPI
 import os
 from dotenv import load_dotenv
 load_dotenv()
@@ -24,8 +24,10 @@ origins = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
     # Include alternate dev ports to avoid CORS during local testing
-    "http://localhost:5174",
-    "http://127.0.0.1:5174",
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "http://react_app",  # Add this - Docker container name
+    "http://react_app:80",
 ]
 
 app.add_middleware(

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useLocation } from 'react-router';
+import { useLocation } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
@@ -22,7 +22,7 @@ const Projects = ({ viewOnly = false }) => {
   const [error, setError] = useState(null);
   const [selectedProject, setSelectedProject] = useState(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
-  const [isEditOpen, setIsEditOpen] = useState(false);
+
   const storageKey = 'accountManagerProjects';
 
   const form = useForm({

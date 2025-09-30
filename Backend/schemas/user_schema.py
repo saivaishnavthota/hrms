@@ -31,8 +31,8 @@ class UseronboardingResponse(SQLModel):
     role: str
     email: str
     type:str
-    onboarding_status: bool
-    login_status: bool
+    onboarding_status: bool=False
+    login_status: bool=False
     
     
     access_token: Optional[str] = None

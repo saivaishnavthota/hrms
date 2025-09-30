@@ -1,20 +1,18 @@
-# ---------- Backend: FastAPI ----------
-FROM python:3.11-slim
+FROM python:3.11
 
-# Set working directory
+# Prevents Python from writing .pyc files
+ENV PYTHONDONTWRITEBYTECODE=1
+# Ensures output is shown directly
+ENV PYTHONUNBUFFERED=1
+
 WORKDIR /app
 
 # Install dependencies
 COPY requirements.txt .
-
-
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy app files
 COPY . .
 
-# Expose FastAPI port
-EXPOSE 8080
-
-# Run FastAPI server
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080"]
+EXPOSE 8000
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]

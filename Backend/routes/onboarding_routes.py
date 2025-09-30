@@ -550,3 +550,38 @@ def generate_temp_password(length: int = 10) -> str:
 def hash_password(password: str) -> str:
     return pwd_context.hash(password)
 
+@router.delete("/hr/reject/{onboarding_id}")
+async def reject_employee(onboarding_id: int, session: Session = Depends(get_session)):
+    """
+    Reject an employee → delete from onboarding_employees
+    """
+    try:
+        with session.connection().connection.cursor() as cur:
+            cur.execute("DELETE FROM onboarding_employees WHERE id = %s", (onboarding_id,))
+            if cur.rowcount == 0:
+                raise HTTPException(status_code=404, detail=f"Employee {onboarding_id} not found")
+        session.commit()
+        return {"status": "success", "message": f"Employee {onboarding_id} rejected and removed"}
+    except Exception as e:
+        session.rollback()
+        logger.error(f"Error rejecting employee {onboarding_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error rejecting employee: {str(e)}")
+
+
+# Route: Delete employee (same as reject, for admin use)
+@router.delete("/hr/delete/{onboarding_id}")
+async def delete_employee(onboarding_id: int, session: Session = Depends(get_session)):
+    """
+    Delete an employee → same as reject
+    """
+    try:
+        with session.connection().connection.cursor() as cur:
+            cur.execute("DELETE FROM onboarding_employees WHERE id = %s", (onboarding_id,))
+            if cur.rowcount == 0:
+                raise HTTPException(status_code=404, detail=f"Employee {onboarding_id} not found")
+        session.commit()
+        return {"status": "success", "message": f"Employee {onboarding_id} deleted successfully"}
+    except Exception as e:
+        session.rollback()
+        logger.error(f"Error deleting employee {onboarding_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error deleting employee: {str(e)}")

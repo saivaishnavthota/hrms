@@ -9,6 +9,7 @@ class candidate(SQLModel, table=True):
     email: Optional[str] = Field(max_length=100)
     password: Optional[str]
     role: Optional[str] = Field(max_length=100)
+    type: Optional[str] = Field(max_length=100)
     o_status :Optional[bool]=Field(default=False)
     login_status :Optional[bool]=Field(default=False)
 

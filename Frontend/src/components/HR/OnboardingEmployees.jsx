@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Eye, Trash2, X, FileText, Download, Check, XCircle, User } from 'lucide-react';
 import Swal from 'sweetalert2';
+import { onboardingAPI } from '../../lib/api';
 
 const OnboardingEmployees = () => {
   console.log("OnboardedEmployees component mounted");
@@ -8,7 +9,7 @@ const OnboardingEmployees = () => {
   const [selectedEmployee, setSelectedEmployee] = useState(null);
   const [employees, setEmployees] = useState([]);
   const [loading, setLoading] = useState(true);
-const [ error,setError] = useState(null);
+  const [error, setError] = useState(null);
 
   const [employeeDocuments, setEmployeeDocuments] = useState([]);
   const [loadingDocuments, setLoadingDocuments] = useState(false);
@@ -17,8 +18,6 @@ const [ error,setError] = useState(null);
   const [showEmployeeDetailsModal, setShowEmployeeDetailsModal] = useState(false);
   const [employeeDetails, setEmployeeDetails] = useState(null);
   const [loadingEmployeeDetails, setLoadingEmployeeDetails] = useState(false);
-
- const BASE_URL = import.meta.env.VITE_API_URL;
 
   // Avatar color generator
   const getAvatarColor = (name) => {
@@ -31,8 +30,6 @@ const [ error,setError] = useState(null);
   };
 
   useEffect(() => {
-    
-
     fetchOnboardedEmployees();
   }, []);
 
@@ -42,32 +39,27 @@ const [ error,setError] = useState(null);
       setLoading(true);
       setError(null);
 
-      const response = await fetch(`/onboarding/all`);
-      console.log(response);
-      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-
-      const result = await response.json();
+      const result = await onboardingAPI.getAllOnboardingEmployees();
+      console.log(result);
 
       if (result.status === 'success') {
         // Fetch document count for each employee
         const employeesWithDocCount = await Promise.all(
           result.data.map(async (employee) => {
             try {
-              
-              const docResp = await fetch(`/onboarding/doc/${employee.id}`);
+              const docData = await onboardingAPI.getEmployeeDocuments(employee.id);
               console.log("Employees state:", employees);
-console.log("Error state:", error);
-              if (docResp.ok) {
-                const docData = await docResp.json();
-               return { 
-  ...employee, 
-  document_count: docData.length, 
-  status: employee.o_status === true ? 'Active' : employee.o_status === false ? 'Inactive' : 'Pending' 
-};
-              }
-              return { ...employee, document_count: 0, status: employee.o_status || 'Pending' };
+              console.log("Error state:", error);
+              
+              const docCount = Array.isArray(docData) ? docData.length : 0;
+              
+              return { 
+                ...employee, 
+                document_count: docCount,
+                status: employee.o_status === true ? 'Active' : employee.o_status === false ? 'Inactive' : 'Pending' 
+              };
             } catch {
-              return { ...employee, document_count: 0, status: employee.o_status || 'Pending' };
+              return { ...employee, document_count: 0, status: employee.o_status === true ? 'Active' : employee.o_status === false ? 'Inactive' : 'Pending' };
             }
           })
         );
@@ -88,20 +80,9 @@ console.log("Error state:", error);
   const fetchEmployeeDocuments = async (employeeId) => {
     try {
       setLoadingDocuments(true);
-      console.log(`Fetching documents for employee ${employeeId} from: /onboarding/emp/${employeeId}`);
+      console.log(`Fetching documents for employee ${employeeId}`);
       
-      const response = await fetch(`/onboarding/emp/${employeeId}`);
-      
-      if (!response.ok) {
-        if (response.status === 404) {
-          console.log(`No documents found for employee ${employeeId}`);
-          setEmployeeDocuments([]);
-          return;
-        }
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      
-      const documents = await response.json();
+      const documents = await onboardingAPI.getEmployeeDocuments(employeeId);
       console.log('Received documents:', documents);
       
       // Transform the response to match UI expectations
@@ -176,9 +157,7 @@ console.log("Error state:", error);
   const fetchEmployeeDetails = async (employeeId) => {
     try {
       setLoadingEmployeeDetails(true);
-      const response = await fetch(`/onboarding/details/${employeeId}`);
-      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-      const result = await response.json();
+      const result = await onboardingAPI.getEmployeeDetails(employeeId);
       setEmployeeDetails(result.data);
     } catch (error) {
       console.error('Error fetching employee details:', error);
@@ -215,87 +194,62 @@ console.log("Error state:", error);
   // Approve all documents - POST /onboarding/hr/approve/{onboarding_id}
   const handleApproveAll = async () => {
     try {
-      const response = await fetch(`/onboarding/hr/approve/${selectedEmployee.id}`, { 
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
-      });
-      
-      if (response.ok) {
-        const result = await response.json();
-        Swal.fire('Success', result.message || 'All documents approved!', 'success');
-        handleCloseModal();
-        fetchOnboardedEmployees();
-      } else {
-        throw new Error('Failed to approve documents');
-      }
+      const result = await onboardingAPI.approveEmployee(selectedEmployee.id);
+      Swal.fire('Success', result.message || 'All documents approved!', 'success');
+      handleCloseModal();
+      fetchOnboardedEmployees();
     } catch (error) {
       console.error('Error approving documents:', error);
       Swal.fire('Error', 'Failed to approve documents', 'error');
     }
   };
 
-  // Reject documents - POST /onboarding/hr/reject/{onboarding_id}
-  // Reject Employee (moves to rejected state in DB)
-const handleRejectDocuments = async (employeeId) => {
-  Swal.fire({
-    title: "Reject Employee?",
-    text: "This will mark the employee as rejected.",
-    icon: "warning",
-    showCancelButton: true,
-    confirmButtonColor: "#d33",
-    cancelButtonColor: "#3085d6",
-    confirmButtonText: "Yes, reject"
-  }).then(async (result) => {
-    if (result.isConfirmed) {
-      try {
-        const response = await fetch(`/onboarding/hr/reject/${employeeId}`, {
-          method: "DELETE"
-        });
-
-        if (!response.ok) {
-          throw new Error("Failed to reject employee");
+  // Reject Employee - DELETE /onboarding/hr/reject/{onboarding_id}
+  const handleRejectDocuments = async (employeeId) => {
+    Swal.fire({
+      title: "Reject Employee?",
+      text: "This will mark the employee as rejected.",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonColor: "#d33",
+      cancelButtonColor: "#3085d6",
+      confirmButtonText: "Yes, reject"
+    }).then(async (result) => {
+      if (result.isConfirmed) {
+        try {
+          await onboardingAPI.rejectEmployee(employeeId);
+          setEmployees((prev) => prev.filter((e) => e.id !== employeeId));
+          handleCloseModal();
+          Swal.fire("Rejected!", "Employee has been moved to rejected list.", "success");
+        } catch (error) {
+          Swal.fire("Error!", error.message, "error");
         }
-
-        setEmployees((prev) => prev.filter((e) => e.id !== employeeId));
-        Swal.fire("Rejected!", "Employee has been moved to rejected list.", "success");
-      } catch (error) {
-        Swal.fire("Error!", error.message, "error");
       }
-    }
-  });
-};
+    });
+  };
 
-  // Delete employee locally
-// Delete Employee (remove permanently from DB)
-const handleDeleteEmployee = async (employeeId) => {
-  Swal.fire({
-    title: "Are you sure?",
-    text: "This will permanently delete the employee from the database!",
-    icon: "warning",
-    showCancelButton: true,
-    confirmButtonColor: "#d33",
-    cancelButtonColor: "#3085d6",
-    confirmButtonText: "Yes, delete it!"
-  }).then(async (result) => {
-    if (result.isConfirmed) {
-      try {
-        const response = await fetch(`/onboarding/hr/delete/${employeeId}`, {
-          method: "DELETE"
-        });
-
-        if (!response.ok) {
-          throw new Error("Failed to delete employee");
+  // Delete Employee - DELETE /onboarding/hr/delete/{onboarding_id}
+  const handleDeleteEmployee = async (employeeId) => {
+    Swal.fire({
+      title: "Are you sure?",
+      text: "This will permanently delete the employee from the database!",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonColor: "#d33",
+      cancelButtonColor: "#3085d6",
+      confirmButtonText: "Yes, delete it!"
+    }).then(async (result) => {
+      if (result.isConfirmed) {
+        try {
+          await onboardingAPI.deleteEmployee(employeeId);
+          setEmployees((prev) => prev.filter((e) => e.id !== employeeId));
+          Swal.fire("Deleted!", "Employee has been permanently removed.", "success");
+        } catch (error) {
+          Swal.fire("Error!", error.message, "error");
         }
-
-        setEmployees((prev) => prev.filter((e) => e.id !== employeeId));
-        Swal.fire("Deleted!", "Employee has been permanently removed.", "success");
-      } catch (error) {
-        Swal.fire("Error!", error.message, "error");
       }
-    }
-  });
-};
-
+    });
+  };
 
   return (
     <div className="p-6 bg-gray-50 min-h-screen">
@@ -600,4 +554,3 @@ const handleDeleteEmployee = async (employeeId) => {
 };
 
 export default OnboardingEmployees;
-

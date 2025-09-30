@@ -100,6 +100,7 @@ def upgrade() -> None:
     sa.Column('email', sa.String(length=100), nullable=True),
     sa.Column('password', sa.String(), nullable=True),
     sa.Column('role', sa.String(length=100), nullable=True),
+    sa.Column('type', sa.String(length=100), nullable=True),
     sa.Column('o_status', sa.Boolean(), nullable=True),
     sa.Column('login_status', sa.Boolean(), nullable=True),
     sa.PrimaryKeyConstraint('id')
@@ -216,8 +217,8 @@ def upgrade() -> None:
     sa.Column('sick_leaves', sa.Integer(), nullable=False),
     sa.Column('casual_leaves', sa.Integer(), nullable=False),
     sa.Column('paid_leaves', sa.Integer(), nullable=False),
-    sa.Column('maternity_leave', sa.Integer(), nullable=False),
-    sa.Column('paternity_leave', sa.Integer(), nullable=False),
+    sa.Column('maternity_leave', sa.Integer(), nullable=True),
+    sa.Column('paternity_leave', sa.Integer(), nullable=True),
     sa.Column('created_at', sa.DateTime(), nullable=True),
     sa.Column('updated_at', sa.DateTime(), nullable=True),
     sa.PrimaryKeyConstraint('id')

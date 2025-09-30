@@ -1,7 +1,10 @@
 # app/models/leave_balance_model.py
 from sqlmodel import SQLModel, Field, Relationship
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 from datetime import datetime
+
+if TYPE_CHECKING:
+    from .user_model import User
 
 class LeaveBalance(SQLModel, table=True):
     __tablename__ = "leave_balance"
@@ -15,4 +18,4 @@ class LeaveBalance(SQLModel, table=True):
     
     created_at: Optional[datetime] = Field(default_factory=datetime.now)
     updated_at: Optional[datetime] = Field(default_factory=datetime.now)
-    employee: Optional["User"] = Relationship(back_populates="leave_balance")
+    

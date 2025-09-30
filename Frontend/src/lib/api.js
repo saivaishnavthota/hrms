@@ -164,5 +164,44 @@ export const leaveAPI = {
   },
 };
 
+// Onboarding API endpoints
+export const onboardingAPI = {
+  // GET /onboarding/all - Get all onboarding employees
+  getAllOnboardingEmployees: async () => {
+    const response = await api.get('/onboarding/all');
+    return response.data;
+  },
+
+  // GET /onboarding/emp/{employee_id} - Get employee documents
+  getEmployeeDocuments: async (employeeId) => {
+    const response = await api.get(`/onboarding/emp/${employeeId}`);
+    return response.data;
+  },
+
+  // GET /onboarding/details/{employee_id} - Get employee details
+  getEmployeeDetails: async (employeeId) => {
+    const response = await api.get(`/onboarding/details/${employeeId}`);
+    return response.data;
+  },
+
+  // POST /onboarding/hr/approve/{onboarding_id} - Approve employee
+  approveEmployee: async (onboardingId) => {
+    const response = await api.post(`/onboarding/hr/approve/${onboardingId}`);
+    return response.data;
+  },
+
+  // DELETE /onboarding/hr/reject/{onboarding_id} - Reject employee
+  rejectEmployee: async (onboardingId) => {
+    const response = await api.delete(`/onboarding/hr/reject/${onboardingId}`);
+    return response.data;
+  },
+
+  // DELETE /onboarding/hr/delete/{onboarding_id} - Delete employee
+  deleteEmployee: async (onboardingId) => {
+    const response = await api.delete(`/onboarding/hr/delete/${onboardingId}`);
+    return response.data;
+  }
+};
+
 // Export the axios instance for custom requests
 export default api;

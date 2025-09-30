@@ -92,10 +92,10 @@ const [viewEmployee, setViewEmployee] = useState(null);
     setViewEmployee(employee);
     setIsViewModalOpen(true);
   };
-const handleCloseViewModal = () => {
-  setIsViewModalOpen(false);
-  setViewEmployee(null);
-};
+// const handleCloseViewModal = () => {
+//   setIsViewModalOpen(false);
+//   setViewEmployee(null);
+// };
 
   const handleEdit = (employee) => {
     setSelectedEmployee(employee);

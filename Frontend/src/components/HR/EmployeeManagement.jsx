@@ -422,7 +422,7 @@ import { avatarBg } from '../../lib/avatarColors';
     return matchesSearch && matchesStatus && matchesType && matchesLocation && matchesHr && matchesManager;
   });
 
-  const ActionButton = ({ icon: Icon, onClick, variant = "ghost", size = "sm", className = "" }) => (
+  const ActionButton = ({ onClick, variant = "ghost", size = "sm", className = "" }) => (
     <Button
       variant={variant}
       size={size}

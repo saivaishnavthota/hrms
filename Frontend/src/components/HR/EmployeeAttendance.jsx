@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { User, Trash2, Eye, X, Search, CheckCircle, Home, CalendarDays } from 'lucide-react';
-import axios from 'axios';
 import { avatarBg } from '../../lib/avatarColors';
 import api from '@/lib/api';
 import { toast } from 'react-toastify';

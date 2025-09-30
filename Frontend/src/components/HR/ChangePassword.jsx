@@ -53,6 +53,7 @@ const ChangePassword = () => {
       
       toast.success('Password changed successfully!');
     } catch (error) {
+      console.log(error);
       toast.error('Failed to change password. Please try again.');
     } finally {
       setIsSubmitting(false);

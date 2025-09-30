@@ -22,7 +22,7 @@ const Projects = ({ viewOnly = false }) => {
   const [error, setError] = useState(null);
   const [selectedProject, setSelectedProject] = useState(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
-  const [isEditOpen, setIsEditOpen] = useState(false);
+ 
   const storageKey = 'accountManagerProjects';
 
   const form = useForm({
@@ -37,17 +37,6 @@ const Projects = ({ viewOnly = false }) => {
     },
   });
 
-  const editForm = useForm({
-    defaultValues: {
-      projectName: '',
-      projectObjective: '',
-      technology: '',
-      clientRequirements: '',
-      budget: '',
-      startDate: '',
-      endDate: '',
-    },
-  });
 
   const onSubmit = async (values) => {
     try {
@@ -61,6 +50,7 @@ const Projects = ({ viewOnly = false }) => {
         skills_required: values.technology || '',
       };
       const res = await api.post('/projects/', payload);
+      console.log("Error:",res);
       toast.success('Project created successfully');
       form.reset();
       // Refresh projects list if user is on view tab
@@ -123,7 +113,8 @@ const Projects = ({ viewOnly = false }) => {
       } else if ((location.pathname || '').toLowerCase().includes('/hr/view-projects')) {
         setActiveTab('view');
       }
-    } catch (_) {
+    } catch (e) {
+      console.log(e);
       // No-op
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -131,7 +122,7 @@ const Projects = ({ viewOnly = false }) => {
 
   useEffect(() => {
     if (activeTab === 'view') fetchProjects();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+
   }, [activeTab]);
 
 

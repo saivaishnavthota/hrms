@@ -371,6 +371,7 @@ const AddAttendance = () => {
 
       setLoading(true);
       const response = await api.post('/weekoffs', payload);
+      console.log(response);
       toast.success('Week-off saved successfully');
       setTimeout(() => setMessage(''), 3000);
       await fetchWeekOffs();
@@ -638,9 +639,9 @@ const AddAttendance = () => {
   const weekDates = getWeekDates(currentWeek);
 
   return (
-    <div className="max-w-6xl mx-auto p-6 bg-gradient-to-br from-purple-50 to-lavender-100 min-h-screen">
+    <div className="max-w-6xl mx-auto p-6 bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen">
       <div className="bg-white rounded-2xl shadow-xl overflow-hidden">
-        <div className="bg-gradient-to-r from-purple-500 to-purple-600 text-white p-6">
+        <div className="bg-gradient-to-r from-blue-500 to-indigo-600 text-white p-6">
           <h1 className="text-2xl font-bold flex items-center gap-3">
             <Calendar className="text-blue-200" />
             Attendance Management
@@ -736,7 +737,7 @@ const AddAttendance = () => {
               <div className="bg-white rounded-xl shadow-lg overflow-hidden border border-gray-200">
                 <div className="overflow-x-auto">
                   <table className="w-full">
-                    <thead className="bg-gradient-to-r from-purple-500 to-purple-600 text-white p-6">
+                    <thead className="bg-gradient-to-r from-blue-500 to-indigo-600 text-white p-6">
                       <tr>
                         <th className="px-4 py-4 text-left font-semibold">Day</th>
                         <th className="px-4 py-4 text-left font-semibold">Date</th>
@@ -820,7 +821,7 @@ const AddAttendance = () => {
                                        
                                 <button
                                   onClick={() => openProjectPopup(index)}
-                                  className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-gradient-to-r from-purple-500 to-purple-600 text-white rounded-lg hover:from-purple-600 hover:to-purple-600 transition-all duration-200 shadow-sm"
+                                  className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-gradient-to-r from-blue-700 to-indigo-600 text-white rounded-lg hover:from-blue-600 hover:to-indigo-600 transition-all duration-200 shadow-sm"
                                 >
                                   <Edit3 size={16} />
                                   {row.projects.length > 0 ? 'Edit Projects' : 'Projects'}

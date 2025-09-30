@@ -1,51 +1,46 @@
-import React, { useState, useEffect } from 'react';
-import { Eye, FileText, Download, ExternalLink, X, CheckCircle, Clock, AlertCircle, Send, Check, XCircle } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { toast } from 'react-toastify';
+import api from '@/lib/api';
+import { CheckCircle, Clock, AlertCircle,FileText  } from 'lucide-react';
 
 const DocumentCollection = () => {
-  const [showDocumentsModal, setShowDocumentsModal] = useState(false);
-  const [selectedEmployee, setSelectedEmployee] = useState(null);
   const [employeesData, setEmployeesData] = useState([]);
+  const [loadingEmployees, setLoadingEmployees] = useState(false);
   const [employeeDocuments, setEmployeeDocuments] = useState([]);
   const [loadingDocuments, setLoadingDocuments] = useState(false);
-  const [loadingEmployees, setLoadingEmployees] = useState(true);
-  const [isRejectMode, setIsRejectMode] = useState(false);
-  const [selectedDocuments, setSelectedDocuments] = useState([]);
   const [requestLogs, setRequestLogs] = useState([]);
-  const [showRequestLogs, setShowRequestLogs] = useState(false);
-  const [showDocumentRequestModal, setShowDocumentRequestModal] = useState(false);
+  const [selectedEmployee, setSelectedEmployee] = useState(null);
   const [selectedEmployeeForRequest, setSelectedEmployeeForRequest] = useState(null);
+  const [selectedDocuments, setSelectedDocuments] = useState([]);
+  const [showDocumentsModal, setShowDocumentsModal] = useState(false);
+  const [showDocumentRequestModal, setShowDocumentRequestModal] = useState(false);
+  const [isRejectMode, setIsRejectMode] = useState(false);
 
-  // API Functions
+  // ------------------ API Functions ------------------
   const fetchEmployeesData = async () => {
     setLoadingEmployees(true);
     try {
-      const response = await fetch('http://127.0.0.1:8000/documents/all-documents');
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      const data = await response.json();
-      
-      // Transform API data to match component structure
+      const { data } = await api.get('/documents/all-documents');
+
       const transformedData = data.map(employee => {
-        // Count uploaded documents
         const uploadedDocs = employee.documents ? employee.documents.length : 0;
-        
         return {
           id: employee.id,
           name: employee.name,
           email: employee.email,
-          type: 'Employee', // Default since not provided in API
+          type: 'Employee',
           role: employee.role || 'Employee',
-          totalDocuments: 16, // Standard document count
+          totalDocuments: 16,
           submittedDocuments: uploadedDocs,
           documents: employee.documents || []
         };
       });
-      
+
       setEmployeesData(transformedData);
     } catch (error) {
       console.error('Error fetching employees data:', error);
-      setEmployeesData([]); // Set empty array on error
+      setEmployeesData([]);
+      toast.error('Failed to fetch employees data');
     } finally {
       setLoadingEmployees(false);
     }
@@ -54,21 +49,9 @@ const DocumentCollection = () => {
   const fetchEmployeeDocuments = async (employeeId) => {
     setLoadingDocuments(true);
     try {
-      const response = await fetch(`http://127.0.0.1:8000/documents/emp/${employeeId}`);
-      
-      if (!response.ok) {
-        // If no documents found, show empty state with all possible document types
-        if (response.status === 404) {
-          setEmployeeDocuments(getEmptyDocumentsList());
-          return;
-        }
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      
-      const documents = await response.json();
-      
-      // Transform API response to match component structure
-      const transformedDocs = documents.map(doc => ({
+      const { data } = await api.get(`/documents/emp/${employeeId}`);
+
+      const transformedDocs = data.map(doc => ({
         id: doc.doc_type,
         name: getDocumentDisplayName(doc.doc_type),
         type: 'PDF',
@@ -77,23 +60,17 @@ const DocumentCollection = () => {
         status: 'uploaded'
       }));
 
-      // Merge with all possible document types to show missing ones
       const allDocTypes = getAllDocumentTypes();
       const completeDocList = allDocTypes.map(docType => {
         const uploadedDoc = transformedDocs.find(doc => doc.id === docType.id);
-        return uploadedDoc || {
-          ...docType,
-          upload_date: 'N/A',
-          url: null,
-          status: 'not_uploaded'
-        };
+        return uploadedDoc || { ...docType, upload_date: 'N/A', url: null, status: 'not_uploaded' };
       });
 
       setEmployeeDocuments(completeDocList);
     } catch (error) {
       console.error('Error fetching employee documents:', error);
-      // Fallback to empty document list
       setEmployeeDocuments(getEmptyDocumentsList());
+      toast.error('Failed to fetch employee documents');
     } finally {
       setLoadingDocuments(false);
     }
@@ -101,42 +78,11 @@ const DocumentCollection = () => {
 
   const requestDocument = async (employeeId, documentType = 'General Document') => {
     try {
-      const response = await fetch('http://127.0.0.1:8000/documents/request-doc', {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ 
-          employee_id: employeeId,
-          document_type: documentType
-        })
+      const { data: result } = await api.post('/documents/request-doc', {
+        employee_id: employeeId,
+        document_type: documentType
       });
-      
-      if (!response.ok) {
-        // Handle authentication errors gracefully
-        if (response.status === 401) {
-          console.warn('Authentication required for document requests');
-          // Fallback to local logging
-          const employee = employeesData.find(emp => emp.id === employeeId);
-          const newLog = {
-            id: Date.now(),
-            employeeId,
-            employeeName: employee?.name || 'Unknown',
-            documentType,
-            requestDate: new Date().toISOString(),
-            status: 'pending'
-          };
-          
-          setRequestLogs(prev => [newLog, ...prev]);
-          alert(`Document request logged locally for ${employee?.name || 'employee'} (Authentication required for backend)`);
-          return;
-        }
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      
-      const result = await response.json();
-      
-      // Add to request logs
+
       const employee = employeesData.find(emp => emp.id === employeeId);
       const newLog = {
         id: result.id || Date.now(),
@@ -146,133 +92,82 @@ const DocumentCollection = () => {
         requestDate: result.requested_at || new Date().toISOString(),
         status: result.status || 'pending'
       };
-      
+
       setRequestLogs(prev => [newLog, ...prev]);
-      
-      // Show success message
-      alert(result.message || `Document request sent to ${employee?.name || 'employee'}`);
-      
+      toast.success(result.message || `Document request sent to ${employee?.name || 'employee'}`);
     } catch (error) {
       console.error('Error requesting document:', error);
-      alert('Failed to send document request. Please try again.');
+
+      // Handle 401 separately
+      if (error.response?.status === 401) {
+        const employee = employeesData.find(emp => emp.id === employeeId);
+        const newLog = {
+          id: Date.now(),
+          employeeId,
+          employeeName: employee?.name || 'Unknown',
+          documentType,
+          requestDate: new Date().toISOString(),
+          status: 'pending'
+        };
+        setRequestLogs(prev => [newLog, ...prev]);
+        toast.info(`Document request logged locally for ${employee?.name || 'employee'} (Authentication required)`);
+        return;
+      }
+
+      toast.error('Failed to send document request. Please try again.');
     }
   };
 
   const fetchRequestLogs = async () => {
     try {
-      const response = await fetch('http://127.0.0.1:8000/documents/request-logs');
-      if (!response.ok) {
-        console.warn('Request logs endpoint not available or has errors');
-        return;
-      }
-      const logs = await response.json();
-      console.log('Raw request logs:', logs); // Debug log
-      
-      // Fetch employee data to get names
-      try {
-        const employeesResponse = await fetch('http://127.0.0.1:8000/users/employees');
-        console.log('Employees response status:', employeesResponse.status); // Debug log
-        
-        let employeesMap = {};
-        
-        if (employeesResponse.ok) {
-          const employees = await employeesResponse.json();
-          console.log('Fetched employees:', employees); // Debug log
-          
-          // Create a map of employee_id -> employee data
-          employeesMap = employees.reduce((map, emp) => {
-            map[emp.employeeId] = emp;
-            return map;
-          }, {});
-          console.log('Employees map:', employeesMap); // Debug log
-        } else {
-          console.error('Failed to fetch employees:', employeesResponse.status);
-          // Fallback: use the employeesData we already have
-          employeesMap = employeesData.reduce((map, emp) => {
-            map[emp.employeeId] = emp;
-            return map;
-          }, {});
-        }
-        
-        // Transform logs to match component structure with actual employee names
-        const transformedLogs = logs.map(log => {
-          const employee = employeesMap[log.employee_id];
-          console.log(`Looking up employee ${log.employee_id}:`, employee); // Debug log
-          
-          return {
-            id: log.id,
-            employeeId: log.employee_id,
-            employeeName: employee?.name ,
-            documentType: log.document_type,
-            requestDate: log.requested_at,
-            status: log.status
-          };
-        });
-        
-        console.log('Transformed logs:', transformedLogs); // Debug log
-        setRequestLogs(transformedLogs);
-        
-      } catch (employeeError) {
-        console.error('Error fetching employees:', employeeError);
-        // Use existing employeesData as fallback
-        const employeesMap = employeesData.reduce((map, emp) => {
-          map[emp.id] = emp;
-          return map;
-        }, {});
-        
-        const transformedLogs = logs.map(log => {
-          const employee = employeesMap[log.employee_id];
-          return {
-            id: log.id,
-            employeeId: log.employee_id,
-            employeeName: employee?.name ,
-            documentType: log.document_type,
-            requestDate: log.requested_at,
-            status: log.status
-          };
-        });
-        
-        setRequestLogs(transformedLogs);
-      }
-      
+      const { data: logs } = await api.get('/documents/request-logs');
+
+      const { data: employees } = await api.get('/users/employees');
+      const employeesMap = employees.reduce((map, emp) => {
+        map[emp.employeeId] = emp;
+        return map;
+      }, {});
+
+      const transformedLogs = logs.map(log => ({
+        id: log.id,
+        employeeId: log.employee_id,
+        employeeName: employeesMap[log.employee_id]?.name,
+        documentType: log.document_type,
+        requestDate: log.requested_at,
+        status: log.status
+      }));
+
+      setRequestLogs(transformedLogs);
     } catch (error) {
       console.error('Error fetching request logs:', error);
+      toast.error('Failed to fetch document request logs');
     }
   };
 
-  // Helper function to get all possible document types
-  const getAllDocumentTypes = () => {
-    return [
-      { id: 'aadhar', name: 'Aadhar Card', type: 'PDF' },
-      { id: 'pan', name: 'PAN Card', type: 'PDF' },
-      { id: 'latest_graduation_certificate', name: 'Graduation Certificate', type: 'PDF' },
-      { id: 'updated_resume', name: 'Resume', type: 'PDF' },
-      { id: 'offer_letter', name: 'Offer Letter', type: 'PDF' },
-      { id: 'latest_compensation_letter', name: 'Compensation Letter', type: 'PDF' },
-      { id: 'experience_relieving_letter', name: 'Experience Letter', type: 'PDF' },
-      { id: 'latest_3_months_payslips', name: 'Payslips', type: 'PDF' },
-      { id: 'form16_or_12b_or_taxable_income', name: 'Tax Documents', type: 'PDF' },
-      { id: 'ssc_certificate', name: 'SSC Certificate', type: 'PDF' },
-      { id: 'hsc_certificate', name: 'HSC Certificate', type: 'PDF' },
-      { id: 'hsc_marksheet', name: 'HSC Marksheet', type: 'PDF' },
-      { id: 'graduation_marksheet', name: 'Graduation Marksheet', type: 'PDF' },
-      { id: 'postgraduation_marksheet', name: 'Post Graduation Marksheet', type: 'PDF' },
-      { id: 'postgraduation_certificate', name: 'Post Graduation Certificate', type: 'PDF' },
-      { id: 'passport', name: 'Passport', type: 'PDF' }
-    ];
-  };
+  // ------------------ Helper Functions ------------------
+  const getAllDocumentTypes = () => [
+    { id: 'aadhar', name: 'Aadhar Card', type: 'PDF' },
+    { id: 'pan', name: 'PAN Card', type: 'PDF' },
+    { id: 'latest_graduation_certificate', name: 'Graduation Certificate', type: 'PDF' },
+    { id: 'updated_resume', name: 'Resume', type: 'PDF' },
+    { id: 'offer_letter', name: 'Offer Letter', type: 'PDF' },
+    { id: 'latest_compensation_letter', name: 'Compensation Letter', type: 'PDF' },
+    { id: 'experience_relieving_letter', name: 'Experience Letter', type: 'PDF' },
+    { id: 'latest_3_months_payslips', name: 'Payslips', type: 'PDF' },
+    { id: 'form16_or_12b_or_taxable_income', name: 'Tax Documents', type: 'PDF' },
+    { id: 'ssc_certificate', name: 'SSC Certificate', type: 'PDF' },
+    { id: 'hsc_certificate', name: 'HSC Certificate', type: 'PDF' },
+    { id: 'hsc_marksheet', name: 'HSC Marksheet', type: 'PDF' },
+    { id: 'graduation_marksheet', name: 'Graduation Marksheet', type: 'PDF' },
+    { id: 'postgraduation_marksheet', name: 'Post Graduation Marksheet', type: 'PDF' },
+    { id: 'postgraduation_certificate', name: 'Post Graduation Certificate', type: 'PDF' },
+    { id: 'passport', name: 'Passport', type: 'PDF' }
+  ];
 
-  const getEmptyDocumentsList = () => {
-    return getAllDocumentTypes().map(docType => ({
-      ...docType,
-      upload_date: 'N/A',
-      url: null,
-      status: 'not_uploaded'
-    }));
-  };
+  const getEmptyDocumentsList = () => getAllDocumentTypes().map(docType => ({ ...docType, upload_date: 'N/A', url: null, status: 'not_uploaded' }));
 
   const getDocumentDisplayName = (docType) => {
-    const displayNameMap = {
+    const map = {
       aadhar: 'Aadhar Card',
       pan: 'PAN Card',
       latest_graduation_certificate: 'Graduation Certificate',
@@ -290,36 +185,24 @@ const DocumentCollection = () => {
       postgraduation_certificate: 'Post Graduation Certificate',
       passport: 'Passport',
     };
-    return displayNameMap[docType] || docType.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase());
+    return map[docType] || docType.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
   };
 
-  // Initialize data on component mount
-  useEffect(() => {
-    fetchEmployeesData();
-    fetchRequestLogs();
-  }, []);
-
-  // Helper function to get avatar color
   const getAvatarColor = (name) => {
-    const colors = [
-      'bg-blue-500', 'bg-green-500', 'bg-purple-500', 'bg-pink-500', 
-      'bg-indigo-500', 'bg-yellow-500', 'bg-red-500', 'bg-teal-500'
-    ];
+    const colors = ['bg-blue-500', 'bg-green-500', 'bg-purple-500', 'bg-pink-500', 'bg-indigo-500', 'bg-yellow-500', 'bg-red-500', 'bg-teal-500'];
     const index = name.charCodeAt(0) % colors.length;
     return colors[index];
   };
 
-  // Helper function to get status badge
   const getStatusBadge = (status) => {
     const statusConfig = {
       approved: { color: 'bg-green-100 text-green-800 border-green-200', icon: CheckCircle },
       pending: { color: 'bg-yellow-100 text-yellow-800 border-yellow-200', icon: Clock },
       rejected: { color: 'bg-red-100 text-red-800 border-red-200', icon: AlertCircle }
     };
-    
     const config = statusConfig[status] || statusConfig.pending;
     const IconComponent = config.icon;
-    
+
     return (
       <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${config.color}`}>
         <IconComponent className="w-3 h-3 mr-1" />
@@ -328,50 +211,12 @@ const DocumentCollection = () => {
     );
   };
 
-  const handleViewDocuments = async (employee) => {
-    setSelectedEmployee(employee);
-    setShowDocumentsModal(true);
-    await fetchEmployeeDocuments(employee.id);
-  };
-
-  const handleCloseModal = () => {
-    setShowDocumentsModal(false);
-    setSelectedEmployee(null);
-    setEmployeeDocuments([]);
-    setIsRejectMode(false);
-    setSelectedDocuments([]);
-  };
-
-  const handleRequestDocument = (employeeId) => {
-    const employee = employeesData.find(emp => emp.id === employeeId);
-    setSelectedEmployeeForRequest(employee);
-    setShowDocumentRequestModal(true);
-  };
-
-  const handleSpecificDocumentRequest = async (documentType) => {
-    if (!selectedEmployeeForRequest) return;
-    
-    await requestDocument(selectedEmployeeForRequest.id, documentType);
-    setShowDocumentRequestModal(false);
-    setSelectedEmployeeForRequest(null);
-  };
-
-  const handleDocumentSelection = (documentId) => {
-    setSelectedDocuments(prev => 
-      prev.includes(documentId) 
-        ? prev.filter(id => id !== documentId)
-        : [...prev, documentId]
-    );
-  };
-
   const handleDownloadDocument = async (documentUrl, documentName) => {
     if (!documentUrl) return;
-    
+
     try {
-      const response = await fetch(documentUrl);
-      if (!response.ok) throw new Error('Failed to download file');
-      
-      const blob = await response.blob();
+      const response = await api.get(documentUrl, { responseType: 'blob' });
+      const blob = new Blob([response.data]);
       const link = document.createElement('a');
       link.href = window.URL.createObjectURL(blob);
       link.download = documentName;
@@ -379,11 +224,19 @@ const DocumentCollection = () => {
       link.click();
       document.body.removeChild(link);
       window.URL.revokeObjectURL(link.href);
+      toast.success(`${documentName} downloaded successfully`);
     } catch (error) {
       console.error('Download error:', error);
-      alert('Failed to download document');
+      toast.error('Failed to download document');
     }
   };
+
+  // ------------------ Initialization ------------------
+  useEffect(() => {
+    fetchEmployeesData();
+    fetchRequestLogs();
+  }, []);
+
 
   return (
     <div className="p-6 bg-gray-50 min-h-screen">

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useLocation } from 'react-router';
+import { useLocation } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
@@ -104,10 +104,10 @@ const Projects = ({ viewOnly = false }) => {
     try {
       markDeleted(storageKey, project.id);
       setProjects((prev) => prev.filter((p) => p.id !== project.id));
-      toast.success('Project deleted locally');
+      toast.success('Project deleted');
     } catch (err) {
       console.error('Error deleting project locally:', err);
-      toast.error('Failed to delete project locally');
+      toast.error('Failed to delete project');
     }
   };
 
@@ -313,10 +313,10 @@ const Projects = ({ viewOnly = false }) => {
                               <Tooltip>
                                 <TooltipTrigger asChild>
                                   <Button 
-                                    variant="outline" 
+                                    variant="ghost" 
                                     size="sm" 
                                     onClick={() => { setSelectedProject(p); setIsDetailsOpen(true); }}
-                                    className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium text-blue-800 transition-colors duration-200 border-none"
+                                    className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium text-blue-900"
                           
                                   >
                                     <Eye className="h-4 w-4" />
@@ -327,10 +327,10 @@ const Projects = ({ viewOnly = false }) => {
                               <Tooltip>
                                 <TooltipTrigger asChild>
                                   <Button 
-                                    variant="outline" 
+                                    variant="ghost" 
                                     size="sm" 
                                     onClick={() => handleDeleteProject(p)}
-                                    className="text-red-600 hover:text-red-700 hover:bg-red-50 border-none"
+                                    className="text-red-900 hover:text-red-600 hover:bg-red-50"
                                   >
                                     <Trash2 className="h-4 w-4" />
                                   </Button>
@@ -346,60 +346,85 @@ const Projects = ({ viewOnly = false }) => {
                 </Table>
               </div>
             )}
+<Dialog open={isDetailsOpen} onOpenChange={setIsDetailsOpen} >
+  <DialogContent className="bg-gradient-to-br from-white via-gray-50 to-blue-50 rounded-xl shadow-2xl max-w-2xl w-full mx-4 max-h-[80vh] overflow-y-auto border border-gray-200">
+    <DialogHeader> 
+      <DialogTitle className="flex items-center gap-2 text-xl font-semibold text-gray-900">
+         Project Details
+      </DialogTitle>
+    </DialogHeader>
 
-            <Dialog open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Project Details</DialogTitle>
-                </DialogHeader>
-                {selectedProject && (
-                  <div className="space-y-3 text-sm">
-                    <div>
-                      <span className="font-medium">Name:</span> {selectedProject.name}
-                    </div>
-                    <div>
-                      <span className="font-medium">Objective:</span> {selectedProject.objective || '-'}
-                    </div>
-                    <div>
-                      <span className="font-medium">Requirements:</span> {selectedProject.requirements || '-'}
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <span className="font-medium">Start Date:</span> {selectedProject.startDate ? new Date(selectedProject.startDate).toLocaleDateString() : '-'}
-                      </div>
-                      <div>
-                        <span className="font-medium">End Date:</span> {selectedProject.endDate ? new Date(selectedProject.endDate).toLocaleDateString() : '-'}
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <span className="font-medium">Budget:</span> {selectedProject.budget ?? '-'}
-                      </div>
-                      <div>
-                        <span className="font-medium">Skills:</span> {selectedProject.skills || '-'}
-                      </div>
-                    </div>
-                    <div>
-                      <span className="font-medium">Status:</span> {selectedProject.status || '-'}
-                    </div>
-                    <div>
-                      <span className="font-medium">Assigned Employees:</span>
-                      <ul className="list-disc list-inside">
-                        {(selectedProject.assignments || []).length === 0 ? (
-                          <li className="text-muted-foreground">None</li>
-                        ) : (
-                          selectedProject.assignments.map((a) => (
-                            <li key={a.assignment_id}>{a.name} ({a.email})</li>
-                          ))
-                        )}
-                      </ul>
-                    </div>
-                  </div>
-                )}
-              </DialogContent>
-            </Dialog>
+    {selectedProject && (
+      <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4 text-gray-700">
+        <div className="flex flex-col">
+          <span className="font-medium text-gray-900">Name:</span>
+          <span>{selectedProject.name}</span>
+        </div>
 
-           
+        <div className="flex flex-col">
+          <span className="font-medium text-gray-900">Objective:</span>
+          <span>{selectedProject.objective || '-'}</span>
+        </div>
+
+        <div className="flex flex-col col-span-2">
+          <span className="font-medium text-gray-900">Client Requirements:</span>
+          <span>{selectedProject.requirements || '-'}</span>
+        </div>
+
+        <div className="flex flex-col">
+          <span className="font-medium text-gray-900">Start Date:</span>
+          <span>{selectedProject.startDate ? new Date(selectedProject.startDate).toLocaleDateString() : '-'}</span>
+        </div>
+
+        <div className="flex flex-col">
+          <span className="font-medium text-gray-900">End Date:</span>
+          <span>{selectedProject.endDate ? new Date(selectedProject.endDate).toLocaleDateString() : '-'}</span>
+        </div>
+
+        <div className="flex flex-col">
+          <span className="font-medium text-gray-900">Budget:</span>
+          <span>{selectedProject.budget ?? '-'}</span>
+        </div>
+
+        <div className="flex flex-col">
+          <span className="font-medium text-gray-900">Skills:</span>
+          <span>{selectedProject.skills || '-'}</span>
+        </div>
+
+        <div className="flex flex-col">
+          <span className="font-medium text-gray-900">Status:</span>
+          <span>{selectedProject.status || '-'}</span>
+        </div>
+
+        <div className="flex flex-col col-span-2">
+          <span className="font-medium text-gray-900">Assigned Employees:</span>
+          <ul className="list-disc list-inside mt-1 text-gray-800">
+            {(selectedProject.assignments || []).length === 0 ? (
+              <li className="text-gray-500">None</li>
+            ) : (
+              selectedProject.assignments.map((a) => (
+                <li key={a.assignment_id}>
+                  {a.name} 
+                </li>
+              ))
+            )}
+          </ul>
+        </div>
+
+        <div className="flex justify-end col-span-2 pt-4">
+          <Button
+            variant="outline"
+            onClick={() => setIsDetailsOpen(false)}
+            className="bg-gray-100 text-gray-700 hover:bg-gray-200"
+          >
+            Close
+          </Button>
+        </div>
+      </div>
+    )}
+  </DialogContent>
+</Dialog>
+
               
           </TabsContent>
         </Tabs>

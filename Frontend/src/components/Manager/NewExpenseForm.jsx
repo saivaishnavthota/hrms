@@ -1,22 +1,12 @@
-import React, { useMemo, useState } from 'react';
+import React, { use, useMemo, useState } from 'react';
+
 import { useUser } from '@/contexts/UserContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from '@/components/ui/select';
+import { toast } from 'react-toastify';
+import api from '@/lib/api'; //
 
-// Backend base URL
-const BASE_URL = 'http://127.0.0.1:8000';
-
-/**
- * Manager NewExpenseForm
- * A standalone form component that mirrors the Employee SubmitExpense form fields and behavior.
- * It is NOT rendered by default; intended to be used later (e.g., opened via a dialog on button click).
- *
- * Props:
- * - employeeIdOverride?: number | string  // optionally submit on behalf of a specific employee
- * - onSuccess?: (response: any) => void   // callback on successful submission
- * - onCancel?: () => void                 // callback when cancel is pressed
- */
 const NewExpenseForm = ({ employeeIdOverride, onSuccess, onCancel }) => {
   const { user } = useUser();
 
@@ -29,24 +19,15 @@ const NewExpenseForm = ({ employeeIdOverride, onSuccess, onCancel }) => {
     description: '',
     tax_included: false,
   });
-
   const [receiptFile, setReceiptFile] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [message, setMessage] = useState('');
+  const [message,setMessage]=useState();
 
   const token = useMemo(() => localStorage.getItem('authToken'), []);
 
   const expenseCategories = [
-    'Travel',
-    'Food',
-    'Entertainment',
-    'Office Supplies',
-    'Software & Subscriptions',
-    'Training & Education',
-    'Communication',
-    'Marketing',
-    'Equipment',
-    'Other',
+    'Travel', 'Food', 'Entertainment', 'Office Supplies', 'Software & Subscriptions',
+    'Training & Education', 'Communication', 'Marketing', 'Equipment', 'Other',
   ];
 
   const handleFileChange = (e) => {
@@ -57,27 +38,22 @@ const NewExpenseForm = ({ employeeIdOverride, onSuccess, onCancel }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsSubmitting(true);
-    setMessage('');
 
     try {
-      // Determine employeeId (override -> context -> localStorage)
+      // Determine employeeId
       let employeeId = employeeIdOverride || user?.employeeId;
       if (!employeeId) {
-        try {
-          const stored = localStorage.getItem('userData');
-          if (stored) {
-            const parsed = JSON.parse(stored);
-            employeeId = parsed?.employeeId;
-          }
-        } catch (_) {}
+        const stored = localStorage.getItem('userData');
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          employeeId = parsed?.employeeId;
+        }
       }
       if (!employeeId) throw new Error('Employee ID not found. Please log in.');
 
       if (!expenseData.category) throw new Error('Please select an expense category.');
       const amountNum = parseFloat(expenseData.amount);
-      if (Number.isNaN(amountNum) || amountNum <= 0) {
-        throw new Error('Please enter a valid amount greater than 0.');
-      }
+      if (Number.isNaN(amountNum) || amountNum <= 0) throw new Error('Please enter a valid amount.');
 
       const form = new FormData();
       form.append('employee_id', Number(employeeId));
@@ -87,26 +63,18 @@ const NewExpenseForm = ({ employeeIdOverride, onSuccess, onCancel }) => {
       form.append('description', expenseData.description || expenseData.title || '');
       form.append('expense_date', expenseData.date);
       form.append('tax_included', expenseData.tax_included);
-      if (receiptFile) {
-        form.append('file', receiptFile);
-      }
+      if (receiptFile) form.append('file', receiptFile);
 
-      const res = await fetch(`${BASE_URL}/expenses/submit-exp`, {
-        method: 'POST',
+      const res = await api.post(`/expenses/submit-exp`, form, {
         headers: {
           Authorization: token ? `Bearer ${token}` : '',
+          'Content-Type': 'multipart/form-data',
         },
-        body: form,
       });
 
-      if (!res.ok) {
-        const errText = await res.text();
-        throw new Error(errText || 'Failed to submit expense');
-      }
+      toast.success(`Expense submitted successfully! Reference: ${res.data.request_code || res.data.request_id}`);
 
-      const data = await res.json();
-      setMessage(`Expense submitted successfully! Reference: ${data.request_code || data.request_id}`);
-      if (typeof onSuccess === 'function') onSuccess(data);
+      if (typeof onSuccess === 'function') onSuccess(res.data);
 
       // Reset form
       setExpenseData({
@@ -119,12 +87,15 @@ const NewExpenseForm = ({ employeeIdOverride, onSuccess, onCancel }) => {
         tax_included: false,
       });
       setReceiptFile(null);
+
     } catch (error) {
-      setMessage(error.message || 'Failed to submit expense. Please try again.');
+      console.error('Expense submission failed:', error);
+      toast.error(error.response?.data?.message || error.message || 'Failed to submit expense.');
     } finally {
       setIsSubmitting(false);
     }
   };
+
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">

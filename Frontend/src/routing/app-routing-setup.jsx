@@ -107,6 +107,7 @@ export const AppRoutingSetup = () => {
         <Route path="expense-management" element={<AccountManagerExpenseManagement />} />
         <Route path="projects" element={<Projects />} />
         <Route path="change-password" element={<SetPassword />} />
+        {/* <Route path="my-profile" element={<MyProfile />} /> */}
       </Route>
 
       {/* My Profile route */}

@@ -28,34 +28,51 @@ const MyProfile = () => {
   const [profileData, setProfileData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-
+  const [projects, setProjects] = useState(null);
   useEffect(() => {
     fetchEmployeeProfile();
   }, [user]);
 
-  const fetchEmployeeProfile = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      
-      // Use employeeId from UserContext if available, otherwise fallback to localStorage
-      const employeeId = user?.employeeId || JSON.parse(localStorage.getItem('userData'))?.employeeId;
-      if (!employeeId) {
-        setError('Missing employee ID. Please re-login.');
-        setLoading(false);
-        return;
-      }
+const fetchEmployeeProfile = async () => {
+  try {
+    setLoading(true);
+    setError(null);
 
-      const response = await api.get(`/users/${employeeId}`);
-      setProfileData(response.data);
-    } catch (error) {
-      console.error('Error fetching employee profile:', error);
-      setError('Failed to load profile data');
-      toast.error('Failed to load profile data');
-    } finally {
+    // Get employeeId
+    const employeeId = user?.employeeId || JSON.parse(localStorage.getItem('userData'))?.employeeId;
+    if (!employeeId) {
+      setError('Missing employee ID. Please re-login.');
       setLoading(false);
+      return;
     }
-  };
+
+    // Fetch profile data
+    const response = await api.get(`/users/${employeeId}`);
+    setProfileData(response.data);
+
+    // Fetch projects for this employee
+    try {
+      const projRes = await api.get('/attendance/active-projects', {
+        params: { employee_id: employeeId }
+      });
+      setProjects(projRes.data || []);
+    } catch (projError) {
+      console.error('Error fetching projects:', projError);
+      toast.error('Error fetching assigned projects');
+      setProjects([]);
+    }
+
+  } catch (error) {
+    console.error('Error fetching employee profile:', error);
+    setError('Failed to load profile data');
+    toast.error('Failed to load profile data');
+  } finally {
+    setLoading(false);
+  }
+};
+
+
+
 
   if (loading) {
     return (
@@ -104,6 +121,7 @@ const MyProfile = () => {
       </div>
     );
   }
+
 
   return (
     <div className="container mx-auto p-6 max-w-4xl">
@@ -248,32 +266,41 @@ const MyProfile = () => {
         </Card>
 
         {/* Projects */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Briefcase className="h-5 w-5" />
-              Assigned Projects
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {profileData.projects && profileData.projects.length > 0 ? (
-              <div className="space-y-2">
-                {profileData.projects.map((project, index) => (
-                  <Badge key={index} variant="secondary" className="mr-2 mb-2">
-                    {project}
-                  </Badge>
-                ))}
-              </div>
-            ) : (
-              <p className="text-sm text-muted-foreground">No projects assigned</p>
-            )}
-          </CardContent>
-        </Card>
+       {/* Projects */}
+<Card>
+  <CardHeader>
+    <CardTitle className="flex items-center gap-2">
+      <Briefcase className="h-5 w-5" />
+      Assigned Projects
+    </CardTitle>
+  </CardHeader>
+  <CardContent>
+    {projects && projects.length > 0 ? (
+      <div className="flex flex-wrap gap-2">
+        {projects.map((project) => (
+          <Badge
+            key={project.project_id}
+            variant="secondary"
+            className="mr-2 mb-2"
+          >
+            {project.project_name}
+          </Badge>
+        ))}
+      </div>
+    ) : (
+      <p className="text-sm text-muted-foreground">
+        No projects assigned
+      </p>
+    )}
+  </CardContent>
+</Card>
+
+
       </div>
 
       {/* Refresh Button */}
-      <div className="mt-6 flex justify-center">
-        <Button onClick={fetchEmployeeProfile} variant="outline">
+      <div className="mt-6 flex justify-center ">
+        <Button onClick={fetchEmployeeProfile} variant="outline" className="mb-6">
           Refresh Profile
         </Button>
       </div>

@@ -1,9 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import axios from 'axios';
 import { Eye, ChevronUp, ChevronDown, Check, X } from 'lucide-react';
 import { useUser } from '@/contexts/UserContext';
 import ViewLeaveApplication from '../HR/ViewLeaveApplication';
 import { avatarBg } from '../../lib/avatarColors';
+import api from '@/lib/api';
+import { toast } from 'react-toastify';
 
 const ManagerLeaveRequests = () => {
   const { user } = useUser();
@@ -27,7 +28,7 @@ const ManagerLeaveRequests = () => {
     try {
       setLoading(true);
       setError(null);
-      const response = await axios.get(`http://127.0.0.1:8000/leave/manager/pending-leaves/${managerId}`);
+      const response = await api.get(`/leave/manager/pending-leaves/${managerId}`);
       const mapped = (response.data || []).map((item) => ({
         id: item.id,
         employee: item.employee_name,
@@ -57,7 +58,7 @@ const ManagerLeaveRequests = () => {
     try {
       setLoading(true);
       setError(null);
-      const response = await axios.get(`http://127.0.0.1:8000/leave/leave-requests/${managerId}`);
+      const response = await api.get(`/leave/leave-requests/${managerId}`);
       const mapped = (response.data || []).map((item) => ({
         id: item.leave_id ?? item.id,
         employee: item.employee_name,
@@ -127,20 +128,26 @@ const ManagerLeaveRequests = () => {
     setSelectedLeave(null);
   };
 
-  const handleApproveReject = async (leaveId, action) => {
-    try {
-      setActionLoading((prev) => ({ ...prev, [leaveId]: action }));
-      await axios.post(`http://127.0.0.1:8000/leave/manager/leave-action/${leaveId}`, { action });
-      await fetchPendingRequests();
-    } catch (err) {
-      console.error(`Error ${action.toLowerCase()} leave:`, err);
-      setError(`Failed to ${action.toLowerCase()} leave.`);
-    } finally {
-      setActionLoading((prev) => ({ ...prev, [leaveId]: null }));
-    }
-  };
 
-   const getAvatarColor = (name) => avatarBg(name);
+
+const handleApproveReject = async (leaveId, action) => {
+  try {
+    setActionLoading((prev) => ({ ...prev, [leaveId]: action }));
+
+    await api.post(`/leave/manager/leave-action/${leaveId}`, { action });
+
+    toast.success(`Leave ${action.toLowerCase()}ed successfully!`); // ✅ success toast
+    await fetchPendingRequests(); // refresh pending requests
+  } catch (err) {
+    console.error(`Error ${action.toLowerCase()} leave:`, err);
+    toast.error(`Failed to ${action.toLowerCase()} leave.`); // ❌ error toast
+    setError(`Failed to ${action.toLowerCase()} leave.`);
+  } finally {
+    setActionLoading((prev) => ({ ...prev, [leaveId]: null }));
+  }
+};
+
+const getAvatarColor = (name) => avatarBg(name);
 
 
   return (
@@ -208,7 +215,7 @@ const ManagerLeaveRequests = () => {
                 </tr>
               </thead>
               <tbody>
-                {sortedData(activeTab === 'pending' ? pendingRequests : leaveRequests).map((req, idx) => (
+                {sortedData(activeTab === 'pending' ? pendingRequests :leaveRequests.filter(req => req.status !== 'pending') ).map((req, idx) => (
                   <tr key={req.id} className="border-b border-gray-200 hover:bg-gray-50">
                     <td className="text-center text-gray-600 px-6 py-4">{idx + 1}</td>
                     <td className="px-6 py-4">

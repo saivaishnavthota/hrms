@@ -1,15 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { Eye, Trash2, X, FileText, Download, Check, XCircle, User } from 'lucide-react';
-import Swal from 'sweetalert2';
 import { avatarBg } from '../../lib/avatarColors';
 import { markDeleted, filterListByDeleted } from '../../lib/localDelete';
+import { toast } from "react-toastify";
+import api from "@/lib/api";
 
 const OnboardingEmployees = () => {
   const [showDocumentsModal, setShowDocumentsModal] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState(null);
   const [employees, setEmployees] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
   const [employeeDocuments, setEmployeeDocuments] = useState([]);
   const [loadingDocuments, setLoadingDocuments] = useState(false);
   const [selectedDocuments, setSelectedDocuments] = useState([]);
@@ -18,53 +18,41 @@ const OnboardingEmployees = () => {
   const [employeeDetails, setEmployeeDetails] = useState(null);
   const [loadingEmployeeDetails, setLoadingEmployeeDetails] = useState(false);
 
-  const API_BASE_URL = 'http://127.0.0.1:8000';
-
   useEffect(() => {
     fetchOnboardedEmployees();
   }, []);
 
-  // Fetch employees AND their document counts on page load
+  // ✅ Fetch employees with doc count
   const fetchOnboardedEmployees = async () => {
     try {
       setLoading(true);
-      setError(null);
-
-      const response = await fetch(`${API_BASE_URL}/onboarding/all`);
-      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-
-      const result = await response.json();
-
-      if (result.status === 'success') {
+      const { data } = await api.get("/onboarding/all");
+      if (data.status === "success") {
         const employeesWithDocCount = await Promise.all(
-          result.data.map(async (employee) => {
-            const docResp = await fetch(`${API_BASE_URL}/onboarding/doc/${employee.id}`);
-            const docData = await docResp.json();
+          data.data.map(async (employee) => {
+            const docResp = await api.get(`/onboarding/doc/${employee.id}`);
+            const docData = docResp.data;
             const count = Object.entries(docData)
               .filter(([key, value]) => key !== 'employeeId' && key !== 'uploaded_at' && value === true)
               .length;
             return { ...employee, document_count: count };
           })
         );
-        setEmployees(filterListByDeleted('onboardingEmployees', employeesWithDocCount));
-      } else {
-        throw new Error('Failed to fetch employees');
+        setEmployees(filterListByDeleted("onboardingEmployees", employeesWithDocCount));
       }
     } catch (err) {
-      console.error('Error fetching onboarded employees:', err);
-      setError(err.message);
+      console.error("Error fetching onboarded employees:", err);
       setEmployees([]);
     } finally {
       setLoading(false);
     }
   };
 
+  // ✅ Fetch employee documents
   const fetchEmployeeDocuments = async (employeeId) => {
     try {
       setLoadingDocuments(true);
-      const response = await fetch(`${API_BASE_URL}/onboarding/doc/${employeeId}`);
-      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-      const data = await response.json();
+      const { data } = await api.get(`/onboarding/doc/${employeeId}`);
 
       const documentTypes = {
         aadhar: 'Aadhar Card',
@@ -86,19 +74,19 @@ const OnboardingEmployees = () => {
       };
 
       const documents = Object.entries(data)
-        .filter(([key, value]) => key !== 'employeeId' && key !== 'uploaded_at' && value === true)
-        .map(([key, value]) => ({
+        .filter(([key, value]) => key !== "employeeId" && key !== "uploaded_at" && value === true)
+        .map(([key]) => ({
           id: key,
           type: documentTypes[key] || key,
           name: documentTypes[key] || key,
-          upload_date: data.uploaded_at || 'N/A',
-          url: `${API_BASE_URL}/onboarding/doc/${employeeId}/${key}`,
-          available: value
+          upload_date: data.uploaded_at || "N/A",
+          url: `${import.meta.env.VITE_API_BASE_URL}/onboarding/doc/${employeeId}/${key}`,
+          available: true,
         }));
 
       setEmployeeDocuments(documents);
     } catch (err) {
-      console.error('Error fetching employee documents:', err);
+      console.error("Error fetching employee documents:", err);
       setEmployeeDocuments([]);
     } finally {
       setLoadingDocuments(false);
@@ -109,12 +97,16 @@ const OnboardingEmployees = () => {
 
   const getStatusBadge = (status) => {
     const statusStyles = {
-      'Active': 'bg-green-100 text-green-800 border-green-200',
-      'Pending': 'bg-yellow-100 text-yellow-800 border-yellow-200',
-      'Inactive': 'bg-red-100 text-red-800 border-red-200'
+      Active: "bg-green-100 text-green-800 border-green-200",
+      Pending: "bg-yellow-100 text-yellow-800 border-yellow-200",
+      Inactive: "bg-red-100 text-red-800 border-red-200",
     };
     return (
-      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${statusStyles[status] || 'bg-gray-100 text-gray-800 border-gray-200'}`}>
+      <span
+        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${
+          statusStyles[status] || "bg-gray-100 text-gray-800 border-gray-200"
+        }`}
+      >
         {status}
       </span>
     );
@@ -135,17 +127,10 @@ const OnboardingEmployees = () => {
   const fetchEmployeeDetails = async (employeeId) => {
     try {
       setLoadingEmployeeDetails(true);
-      const response = await fetch(`${API_BASE_URL}/onboarding/details/${employeeId}`);
-      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-      const data = await response.json();
+      const { data } = await api.get(`/onboarding/details/${employeeId}`);
       setEmployeeDetails(data.data);
     } catch (error) {
-      console.error('Error fetching employee details:', error);
-      Swal.fire({
-        icon: 'error',
-        title: 'Error',
-        text: 'Failed to fetch employee details. Please try again.',
-      });
+      console.error("Error fetching employee details:", error);
     } finally {
       setLoadingEmployeeDetails(false);
     }
@@ -166,53 +151,72 @@ const OnboardingEmployees = () => {
   };
 
   const handleDocumentSelection = (documentId) => {
-    setSelectedDocuments(prev =>
-      prev.includes(documentId) ? prev.filter(id => id !== documentId) : [...prev, documentId]
+    setSelectedDocuments((prev) =>
+      prev.includes(documentId) ? prev.filter((id) => id !== documentId) : [...prev, documentId]
     );
   };
 
+  // ✅ Approve All
   const handleApproveAll = async () => {
-    try {
-      const response = await fetch(`${API_BASE_URL}/onboarding/hr/approve/${selectedEmployee.id}`, { method: 'POST' });
-      if (response.ok) {
-        Swal.fire('Success', 'All documents approved!', 'success');
-        handleCloseModal();
-        fetchOnboardedEmployees();
-      }
-    } catch (error) {
-      Swal.fire('Error', 'Failed to approve documents', 'error');
+  try {
+    await api.post(`/onboarding/hr/approve/${selectedEmployee.id}`);
+    toast.success("All documents approved!");
+    handleCloseModal();
+    fetchOnboardedEmployees();
+  } catch (error) {
+    // Axios error handling
+    if (error.response) {
+      // Server returned an error response
+      toast.error(error.response.data?.message || "Failed to approve documents");
+    } else if (error.request) {
+      // Request made but no response
+      toast.error("No response from server. Please try again.");
+    } else {
+      // Something else caused the error
+      toast.error(error.message || "Failed to approve documents");
     }
-  };
+    console.error("Approve documents error:", error);
+  }
+};
 
+
+  // ✅ Reject Selected
   const handleRejectDocuments = async () => {
-    if (selectedDocuments.length === 0) {
-      Swal.fire('Warning', 'Select at least one document', 'warning');
-      return;
-    }
-    const { value: reason } = await Swal.fire({
-      title: 'Rejection Reason',
-      input: 'textarea',
-      inputPlaceholder: 'Enter reason...',
-      showCancelButton: true
-    });
-    if (!reason) return;
+  if (selectedDocuments.length === 0) {
+    toast.warn("Select at least one document");
+    return;
+  }
 
-    try {
-      const response = await fetch(`${API_BASE_URL}/onboarding/hr/reject/${selectedEmployee.id}`, {
-        method: 'POST',
-        headers: {'Content-Type':'application/json'},
-        body: JSON.stringify({ action:'Rejected', document_types:selectedDocuments, rejection_reason:reason })
-      });
-      if (response.ok) {
-        Swal.fire('Success', 'Selected documents rejected!', 'success');
-        setSelectedDocuments([]);
-        setIsRejectMode(false);
-        fetchEmployeeDocuments(selectedEmployee.id);
-      }
-    } catch (error) {
-      Swal.fire('Error', 'Failed to reject documents', 'error');
+  const reason = prompt("Enter rejection reason:");
+  if (!reason) return;
+
+  try {
+    await api.post(`/onboarding/hr/reject/${selectedEmployee.id}`, {
+      action: "Rejected",
+      document_types: selectedDocuments,
+      rejection_reason: reason,
+    });
+    toast.success("Selected documents rejected!");
+    setSelectedDocuments([]);
+    setIsRejectMode(false);
+    fetchEmployeeDocuments(selectedEmployee.id);
+  } catch (error) {
+    // Axios error handling
+    if (error.response) {
+      // Server responded with a status other than 2xx
+      toast.error(error.response.data?.message || "Failed to reject documents");
+    } else if (error.request) {
+      // Request was made but no response received
+      toast.error("No response from server. Please try again.");
+    } else {
+      // Something else caused the error
+      toast.error(error.message || "Failed to reject documents");
     }
-  };
+    console.error("Reject documents error:", error);
+  }
+};
+
+
 
   return (
     <div className="p-6 bg-gray-50 min-h-screen">

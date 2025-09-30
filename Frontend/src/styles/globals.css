@@ -168,3 +168,23 @@ html {
 
 /* Metronic Configs */
 @import './config.metronic.css';
+
+/* Hide Chrome's built-in password reveal button */
+input[type="password"]::-ms-reveal,
+input[type="password"]::-ms-clear {
+    display: none;
+}
+
+input[type="password"]::-webkit-inner-spin-button,
+input[type="password"]::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+input[type="password"]::-webkit-textfield-decoration-container {
+    display: none;
+}
+
+input[type="password"]::-webkit-password-toggle-button {
+    display: none !important;
+}

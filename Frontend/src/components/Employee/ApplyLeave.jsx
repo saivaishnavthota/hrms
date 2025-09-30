@@ -4,7 +4,15 @@ import { Button } from '@/components/ui/button';
 import { useUser } from '@/contexts/UserContext';
 import { leaveAPI } from '@/lib/api';
 import ViewLeaveApplication from '@/components/HR/ViewLeaveApplication';
-
+import { toast } from 'react-toastify';
+import {
+  Table,
+  TableHeader,
+  TableBody,
+  TableRow,
+  TableHead,
+  TableCell,
+} from "@/components/ui/table";
 const ApplyLeave = () => {
   const formatStatus = (status) => {
     const s = String(status || '').toLowerCase();
@@ -34,16 +42,34 @@ const ApplyLeave = () => {
     return type || 'Leave';
   };
 
-  const getLeaveTypeClass = (type) => {
-    const t = String(type || '').toLowerCase();
-    if (t === 'sick') return 'bg-red-50 text-red-700 border-red-200';
-    if (t === 'casual') return 'bg-blue-50 text-blue-700 border-blue-200';
-    if (t === 'earned' || t === 'annual') return 'bg-green-50 text-green-700 border-green-200';
-    if (t === 'unpaid') return 'bg-gray-100 text-gray-800 border-gray-200';
-    if (t === 'wfh') return 'bg-indigo-50 text-indigo-700 border-indigo-200';
-    if (t === 'maternity' || t === 'paternity') return 'bg-pink-50 text-pink-700 border-pink-200';
-    return 'bg-purple-50 text-purple-700 border-purple-200';
+const getLeaveTypeColor = (leaveType) => {
+    switch (leaveType) {
+      case 'Annual Leave':
+        return 'text-green-600';
+      case 'Sick Leave':
+        return 'text-orange-600';
+      case 'Casual Leave':
+        return 'text-purple-600';
+      default:
+        return 'text-gray-600';
+    }
   };
+
+  const getLeaveTypeDot = (leaveType) => {
+    switch (leaveType) {
+      case 'Annual Leave':
+        return 'bg-green-500';
+      case 'Sick Leave':
+        return 'bg-orange-500';
+      case 'Casual Leave':
+        return 'bg-purple-500';
+      default:
+        return 'bg-gray-500';
+    }
+  };
+ 
+
+ 
   const [activeTab, setActiveTab] = useState('apply'); // 'apply' | 'past'
   const [leaveData, setLeaveData] = useState({
     leaveType: '',
@@ -217,7 +243,7 @@ const ApplyLeave = () => {
       });
 
       const days = response?.totalDays ?? calculateDays();
-      setMessage(`Leave application submitted successfully for ${days} day(s).`);
+      toast.success(`Leave application submitted successfully for ${days} day(s).`);
       
       // Reset form after success
       setTimeout(() => {
@@ -231,14 +257,14 @@ const ApplyLeave = () => {
         setMessage('');
       }, 3000);
     } catch (error) {
-      setMessage('Failed to submit leave application. Please try again.');
+      toast.error('Failed to submit leave application. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
   };
 
   return (
-    <div className="max-w-2xl mx-auto">
+    <div className="max-w-4xl mx-auto">
       {/* Leave balance status bars - placed outside the form card */}
       <div className="mb-6">
         {balancesLoading ? (
@@ -375,7 +401,7 @@ const ApplyLeave = () => {
           </div>
         )}
       </div>
-      <div className="bg-card rounded-lg shadow-sm border p-6">
+      <div className="bg-card rounded-lg shadow-sm border p-6 w-225">
         {/* Tabs header */}
         <div className="flex items-center gap-2 mb-6 border-b">
           <button
@@ -427,15 +453,6 @@ const ApplyLeave = () => {
               <label className="block text-sm font-medium text-card-foreground">
                 Leave Type *
               </label>
-              <label className="flex items-center gap-2 text-sm text-muted-foreground">
-                <input
-                  type="checkbox"
-                  checked={leaveData.halfDay}
-                  onChange={(e) => setLeaveData(prev => ({ ...prev, halfDay: e.target.checked }))}
-                  className="h-4 w-4 rounded border-border"
-                />
-                Half Day
-              </label>
             </div>
             <select
               name="leaveType"
@@ -485,13 +502,6 @@ const ApplyLeave = () => {
             </div>
           </div>
 
-          {leaveData.startDate && leaveData.endDate && (
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-              <p className="text-sm text-blue-700">
-                <strong>Duration:</strong> {calculateDays()} day{calculateDays() !== 1 ? 's' : ''}
-              </p>
-            </div>
-          )}
 
           <div>
             <label className="block text-sm font-medium text-card-foreground mb-2">
@@ -568,50 +578,57 @@ const ApplyLeave = () => {
             )}
             {!pastLeavesLoading && !pastLeavesError && (
               <div className="overflow-x-auto">
-                <table className="min-w-full text-sm">
-                  <thead>
-                    <tr className="text-left border-b">
-                      <th className="px-3 py-2">Leave Type</th>
-                      <th className="px-3 py-2">Start</th>
-                      <th className="px-3 py-2">End</th>
-                      <th className="px-3 py-2">Status</th>
-                      <th className="px-3 py-2">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {allLeaves.length === 0 ? (
-                      <tr>
-                        <td className="px-3 py-4 text-muted-foreground" colSpan={5}>No leave records found.</td>
-                      </tr>
-                    ) : (
-                      allLeaves.map((lv) => (
-                        <tr key={lv.id} className="border-b hover:bg-muted/30">
-                          <td className="px-3 py-2">
-                            <span className={`px-3 py-1 rounded-full text-xs font-medium border ${getLeaveTypeClass(lv.leave_type)}`}>
-                              {formatLeaveType(lv.leave_type)}
-                            </span>
-                          </td>
-                          <td className="px-3 py-2">{new Date(lv.start_date).toLocaleDateString()}</td>
-                          <td className="px-3 py-2">{new Date(lv.end_date).toLocaleDateString()}</td>
-                          <td className="px-3 py-2">
-                            <span className={`px-3 py-1 rounded-full text-xs font-medium border ${getStatusClass(lv.status)}`}>
-                              {formatStatus(lv.status)}
-                            </span>
-                          </td>
-                          <td className="px-3 py-2">
-                            <button
-                              type="button"
-                              className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-700"
-                              onClick={() => setSelectedLeave(lv)}
-                            >
-                              <Eye className="h-4 w-4" /> View
-                            </button>
-                          </td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
+                <Table className="border">
+        <TableHeader>
+          <TableRow className="bg-gray-50">
+            <TableHead  className=" text-left" >Leave Type</TableHead>
+            <TableHead>Start</TableHead>
+            <TableHead>End</TableHead>
+            <TableHead>Status</TableHead>
+            <TableHead>Action</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {allLeaves.length === 0 ? (
+            <TableRow>
+              <TableCell colSpan={5} className="text-center text-muted-foreground py-4">
+                No leave records found.
+              </TableCell>
+            </TableRow>
+          ) : (
+            [...allLeaves]
+              .sort((a, b) => new Date(b.start_date) - new Date(a.start_date))
+              .map((lv) => (
+                <TableRow key={lv.id} className="hover:bg-muted/30">
+                  <TableCell>
+                    <div className="flex items-center">
+                      <div className={`w-2 h-2 rounded-full mr-2 ${getLeaveTypeDot(lv.leave_type)}`}></div>
+                      <span className={`text-sm font-medium ${getLeaveTypeColor(lv.leave_type)}`}>
+                        {formatLeaveType(lv.leave_type)}
+                      </span>
+                    </div>
+                  </TableCell>
+                  <TableCell>{new Date(lv.start_date).toLocaleDateString()}</TableCell>
+                  <TableCell>{new Date(lv.end_date).toLocaleDateString()}</TableCell>
+                  <TableCell>
+                    <span className={`px-3 py-1 rounded-full text-xs font-medium border ${getStatusClass(lv.status)}`}>
+                      {formatStatus(lv.status)}
+                    </span>
+                  </TableCell>
+                  <TableCell>
+                    <button
+                      type="button"
+                      className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-700"
+                      onClick={() => setSelectedLeave(lv)}
+                    >
+                      <Eye className="h-4 w-4" /> View
+                    </button>
+                  </TableCell>
+                </TableRow>
+              ))
+          )}
+        </TableBody>
+      </Table>
               </div>
             )}
           </div>

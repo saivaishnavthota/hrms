@@ -13,6 +13,9 @@ import {
 import Swal from 'sweetalert2';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
+
 import {
   Table,
   TableBody,
@@ -146,7 +149,7 @@ const AccountManagerExpenseManagement = () => {
   const fetchPendingExpenses = async () => {
     const userId = localStorage.getItem('userId');
     if (!userId) {
-      setError('Missing account manager ID. Please log in.');
+      toast.error('Missing account manager ID. Please log in.');
       navigate('/login', { replace: true });
       return;
     }
@@ -174,7 +177,7 @@ const AccountManagerExpenseManagement = () => {
       console.log('Filtered pending expenses:', mapped.filter((e) => e.status.toLowerCase() === 'pending'));
     } catch (err) {
       console.error('Error in fetchPendingExpenses:', err, err.response?.data);
-      setError(`Failed to fetch pending requests: ${err.message}`);
+      toast.error(`Failed to fetch pending requests: ${err.message}`);
       setExpenses([]);
     } finally {
       setLoading(false);
@@ -184,7 +187,7 @@ const AccountManagerExpenseManagement = () => {
   const fetchAllExpenses = async () => {
     const userId = localStorage.getItem('userId');
     if (!userId) {
-      setError('Missing account manager ID. Please log in.');
+    toast.error('Missing account manager ID. Please log in.');
       navigate('/login', { replace: true });
       return;
     }
@@ -215,7 +218,7 @@ const AccountManagerExpenseManagement = () => {
 
     } catch (err) {
       console.error('Error in fetchAllExpenses:', err, err.response?.data);
-      setError(`Failed to fetch expense list: ${err.message}`);
+       toast.error(`Failed to fetch expense list: ${err.message}`);
       setExpenses([]);
     } finally {
       setLoading(false);
@@ -225,7 +228,7 @@ const AccountManagerExpenseManagement = () => {
   const handleApprove = async (expense) => {
     const userId = localStorage.getItem('userId');
     if (!userId) {
-      setError('Missing account manager ID. Please log in.');
+      toast.error('Missing account manager ID. Please log in.');
       navigate('/login', { replace: true });
       return;
     }
@@ -272,18 +275,18 @@ const AccountManagerExpenseManagement = () => {
               e.requestId === expense.requestId ? { ...e, status: 'Approved' } : e
             )
       );
-      Swal.fire('Success', 'Expense approved successfully', 'success');
+      toast.success('Expense approved successfully!');
     } catch (err) {
       console.error('Approve failed:', err, err.response?.data);
-      setError(`Failed to approve expense: ${err.message}`);
-      Swal.fire('Error', `Failed to approve expense: ${err.message}`, 'error');
+     
+      toast.error(`Failed to approve expense: ${err.message}`);
     }
   };
 
   const handleReject = async (expense) => {
     const userId = localStorage.getItem('userId');
     if (!userId) {
-      setError('Missing account manager ID. Please log in.');
+      toast.error('Missing account manager ID. Please log in.');
       navigate('/login', { replace: true });
       return;
     }
@@ -330,11 +333,11 @@ const AccountManagerExpenseManagement = () => {
               e.requestId === expense.requestId ? { ...e, status: 'Rejected' } : e
             )
       );
-      Swal.fire('Success', 'Expense rejected successfully', 'success');
+       toast.success('Expense rejected successfully!');
     } catch (err) {
       console.error('Reject failed:', err, err.response?.data);
-      setError(`Failed to reject expense: ${err.message}`);
-      Swal.fire('Error', `Failed to reject expense: ${err.message}`, 'error');
+     
+     toast.error(`Failed to reject expense: ${err.message}`);
     }
   };
 
@@ -569,7 +572,7 @@ const AccountManagerExpenseManagement = () => {
                     <Button
                       variant="outline"
                       size="sm"
-                      className="h-7 px-3 text-xs bg-blue-50 text-blue-600 border-blue-200 hover:bg-blue-100"
+                      className="h-7 px-3 text-xs bg-blue-50 text-blue-800 border-blue-200 hover:bg-blue-100"
                       onClick={() => handleViewDetails(expense)}
                       aria-label={`View details for ${expense.category}`}
                     >
@@ -584,7 +587,7 @@ const AccountManagerExpenseManagement = () => {
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="h-8 w-8 p-0 text-blue-600 hover:bg-blue-50"
+                        className="h-8 w-8 p-0 text-blue-800 hover:bg-blue-50"
                         onClick={() => handleViewDetails(expense)}
                         aria-label={`View details for expense ${expense.requestId}`}
                       >
@@ -593,7 +596,7 @@ const AccountManagerExpenseManagement = () => {
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="h-8 w-8 p-0 text-green-600 hover:bg-green-50"
+                        className="h-8 w-8 p-0 text-green-800 hover:bg-green-50"
                         onClick={() => handleApprove(expense)}
                         disabled={expense.status !== 'Pending'}
                         aria-label={`Approve expense ${expense.requestId}`}
@@ -603,7 +606,7 @@ const AccountManagerExpenseManagement = () => {
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="h-8 w-8 p-0 text-red-600 hover:bg-red-50"
+                        className="h-8 w-8 p-0 text-red-800 hover:bg-red-50"
                         onClick={() => handleReject(expense)}
                         disabled={expense.status !== 'Pending'}
                         aria-label={`Reject expense ${expense.requestId}`}

@@ -1,4 +1,4 @@
-import { generalSettings } from '@/config/general.config';
+
 
 export function Footer() {
   const currentYear = new Date().getFullYear();

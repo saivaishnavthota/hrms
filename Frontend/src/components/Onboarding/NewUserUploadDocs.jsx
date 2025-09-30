@@ -6,6 +6,7 @@ import axios from 'axios';
 import { useUser } from '../../contexts/UserContext';
 import OnboardingHeader from './OnboardingHeader';
 import OnboardingFooter from './OnboardingFooter';
+import api from '@/lib/api';
 
 export default function NewUserUploadDocs() {
   const navigate = useNavigate();
@@ -66,7 +67,7 @@ export default function NewUserUploadDocs() {
         }
         
         // GET request to fetch existing uploaded documents from Azure Blob Storage
-        const response = await axios.get(`http://localhost:8000/onboarding/emp/${employee_id}`);
+        const response = await api.get(`/onboarding/emp/${employee_id}`);
         if (response.data && response.data.length > 0) {
           const uploadedFilesData = {};
           
@@ -374,7 +375,7 @@ export default function NewUserUploadDocs() {
       formData.append('is_draft', 'true');
 
       // POST request to upload documents to Azure Blob Storage
-      const response = await axios.post(`http://localhost:8000/onboarding/upload`, formData, {
+      const response = await api.post(`/onboarding/upload`, formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         }
@@ -437,7 +438,7 @@ export default function NewUserUploadDocs() {
         formData.append('employeeId', employee_id.toString());
 
         // POST request to upload documents to Azure Blob Storage
-        const response = await axios.post(`http://localhost:8000/onboarding/upload`, formData, {
+        const response = await api.post(`/onboarding/upload`, formData, {
           headers: {
             'Content-Type': 'multipart/form-data',
           },

@@ -6,7 +6,7 @@ from middleware.cors import add_cors_middleware
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 import uvicorn
-from fastapi import FastA
+from fastapi import FastAPI
 import os
 from dotenv import load_dotenv
 load_dotenv()

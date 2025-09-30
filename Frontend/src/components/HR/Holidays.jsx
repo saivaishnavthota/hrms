@@ -1,6 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { Search, Plus, Edit, Trash2, Eye, X } from 'lucide-react';
 import { markDeleted, filterListByDeleted } from '../../lib/localDelete';
+import { toast } from "react-toastify";
+import api from "@/lib/api";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogBody,
+} from '@/components/ui/dialog';
 
 const Holidays = () => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -19,6 +30,9 @@ const Holidays = () => {
     date: '',
     status: 'Active'
   });
+
+  const [selectedHoliday, setSelectedHoliday] = useState(null);
+  const [isDetailsOpen, setIsDetailsOpen] = useState(false);
 
   // Fetch locations from backend
   useEffect(() => {
@@ -50,93 +64,91 @@ const Holidays = () => {
 
   const fetchLocations = async () => {
     try {
-      const response = await fetch('http://localhost:8000/locations/');
-      const result = await response.json();
-      if (result.status === 'success') {
-        setLocations(result.data);
+      const { data } = await api.get("/locations/");
+      if (data.status === "success") {
+        setLocations(data.data);
       }
     } catch (error) {
-      console.error('Error fetching locations:', error);
+      console.error("Error fetching locations:", error);
+      toast.error("Failed to fetch locations");
     }
   };
 
-  const handleAddLocation = async (e) => {
+ const handleAddLocation = async (e) => {
     e.preventDefault();
     if (!newLocationName.trim()) return;
+
     try {
-      const response = await fetch('http://localhost:8000/locations', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ name: newLocationName.trim() }),
+      const { data } = await api.post("/locations", {
+        name: newLocationName.trim(),
       });
-      const result = await response.json();
-      if (result.status === 'success') {
-        const created = result.data; // { id, name }
-        setLocations(prev => [...prev, created]);
-        setNewLocationName('');
+      if (data.status === "success") {
+        setLocations((prev) => [...prev, data.data]);
+        setNewLocationName("");
         setShowLocationModal(false);
+        toast.success("Location added successfully");
       }
     } catch (error) {
-      console.error('Error adding location:', error);
+      console.error("Error adding location:", error);
+      toast.error("Failed to add location");
     }
   };
 
-  const fetchHolidays = async () => {
+
+ const fetchHolidays = async () => {
     try {
-      const response = await fetch('http://localhost:8000/calendar/');
-      const result = await response.json();
-      if (result.status === 'success') {
-        // Transform backend data to match our component structure
-        const transformedHolidays = result.data.map(holiday => ({
+      const { data } = await api.get("/calendar/");
+      if (data.status === "success") {
+        const transformed = data.data.map((holiday) => ({
           id: holiday.id,
           location_id: holiday.location_id,
           title: holiday.holiday_name,
           date: holiday.holiday_date,
-          status: 'Active'
+          status: "Active",
         }));
-        setHolidays(transformedHolidays);
+        setHolidays(transformed);
       }
     } catch (error) {
-      console.error('Error fetching holidays:', error);
+      console.error("Error fetching holidays:", error);
+      toast.error("Failed to fetch holidays");
     }
   };
+  
 
   const getLocationName = (locationId) => {
-    const location = locations.find(loc => loc.id === locationId);
-    return location ? location.name : 'Unknown Location';
+    const location = locations.find((loc) => loc.id === locationId);
+    return location ? location.name : "Unknown Location";
   };
-
-  const handleSubmit = async (e) => {
+  
+ const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      const response = await fetch('http://localhost:8000/calendar/add', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          location_id: parseInt(formData.location_id),
-          holiday_date: formData.date,
-          holiday_name: formData.title
-        }),
+      const { data } = await api.post("/calendar/add", {
+        location_id: parseInt(formData.location_id),
+        holiday_date: formData.date,
+        holiday_name: formData.title,
       });
-      
-      const result = await response.json();
-      if (result.status === 'success') {
+
+      if (data.status === "success") {
         setShowModal(false);
         setFormData({
-          location_id: '',
-          title: '',
-          date: '',
-          status: 'Active'
+          location_id: "",
+          title: "",
+          date: "",
+          status: "Active",
         });
-        fetchHolidays(); // Refresh the holidays list
+        fetchHolidays();
+        toast.success("Holiday added successfully");
       }
     } catch (error) {
-      console.error('Error adding holiday:', error);
+      console.error("Error adding holiday:", error);
+      toast.error("Failed to add holiday");
     }
+  };
+
+ const handleViewDetails = (holiday) => {
+    setSelectedHoliday(holiday);
+    setIsDetailsOpen(true);
   };
 
   const handleInputChange = (e) => {
@@ -248,8 +260,6 @@ const Holidays = () => {
               <th className="border border-gray-300 px-4 py-3 text-left">Title</th>
               <th className="border border-gray-300 px-4 py-3 text-left">Date</th>
               <th className="border border-gray-300 px-4 py-3 text-left">Location</th>
-          
-              <th className="border border-gray-300 px-4 py-3 text-left">Status</th>
               <th className="border border-gray-300 px-4 py-3 text-center">Actions</th>
             </tr>
           </thead>
@@ -260,16 +270,14 @@ const Holidays = () => {
                 <td className="border border-gray-300 px-4 py-3">{holiday.date}</td>
                 <td className="border border-gray-300 px-4 py-3">{getLocationName(holiday.location_id)}</td>
 
-                <td className="border border-gray-300 px-4 py-3">
-                  <span className="bg-green-100 text-green-800 px-2 py-1 rounded-full text-sm">
-                    {holiday.status}
-                  </span>
-                </td>
                 <td className="border border-gray-300 px-4 py-3 text-center">
                   <div className="flex justify-center gap-2">
-                    <button className="text-blue-600 hover:text-blue-800">
-                      <Edit size={16} />
+
+                     <button className="text-blue-400 hover:text-gray-800"
+                     onClick={() => handleViewDetails(holiday)}>
+                      <Eye size={16} />
                     </button>
+                    
                     <button
                       className="text-red-600 hover:text-red-800"
                       onClick={() => {
@@ -283,9 +291,7 @@ const Holidays = () => {
                     >
                       <Trash2 size={16} />
                     </button>
-                    <button className="text-gray-600 hover:text-gray-800">
-                      <Eye size={16} />
-                    </button>
+                   
                   </div>
                 </td>
               </tr>
@@ -480,6 +486,34 @@ const Holidays = () => {
           </div>
         </div>
       )}
+
+  <Dialog open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
+  <DialogContent className="max-w-lg">
+    <DialogHeader>
+      <DialogTitle>Holiday Details</DialogTitle>
+      <DialogDescription>
+        View the full information for the selected holiday
+      </DialogDescription>
+    </DialogHeader>
+
+    {selectedHoliday && (
+      <div className="space-y-2">
+        <p>
+          <strong>Title:</strong> {selectedHoliday.title}
+        </p>
+        <p>
+          <strong>Date:</strong> {selectedHoliday.date}
+        </p>
+        <p>
+          <strong>Location:</strong>{" "}
+          {getLocationName(selectedHoliday.location_id)}
+        </p>
+      </div>
+    )}
+  </DialogContent>
+</Dialog>
+
+
     </div>
   );
 };

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import api from '@/lib/api';
 import { Calendar, Clock, Plus, X, Save, ChevronLeft, ChevronRight, Trash2, Edit3, Search, Filter, Eye, Briefcase } from 'lucide-react';
 import { useUser } from '../../contexts/UserContext';
+import { toast } from 'react-toastify';
 
 // Local date helpers to avoid UTC offsets
 const formatDateLocal = (date) => {
@@ -96,7 +97,7 @@ const AddAttendance = () => {
   const fetchWeekOffs = async () => {
     try {
       if (!user?.employeeId) {
-        setMessage('Employee ID not found');
+        toast.error('Employee ID not found');
         return;
       }
 
@@ -341,7 +342,7 @@ const AddAttendance = () => {
         return prev.filter(d => d !== day);
       }
       if (prev.length >= 2) {
-        setMessage('You can select up to 2 week-off days');
+        toast.info('You can select up to 2 week-off days');
         setTimeout(() => setMessage(''), 2500);
         return prev;
       }
@@ -352,7 +353,7 @@ const AddAttendance = () => {
   const submitWeekOffs = async () => {
     try {
       if (!user?.employeeId) {
-        setMessage('Employee ID not found');
+        toast.warn('Employee ID not found');
         setTimeout(() => setMessage(''), 5000);
         return;
       }
@@ -370,13 +371,13 @@ const AddAttendance = () => {
 
       setLoading(true);
       const response = await api.post('/weekoffs', payload);
-      setMessage('Week-off saved successfully');
+      toast.success('Week-off saved successfully');
       setTimeout(() => setMessage(''), 3000);
       await fetchWeekOffs();
     } catch (error) {
       console.error('Error saving week-offs:', error);
       const errorMessage = error.response?.data?.detail || 'Error saving week-offs';
-      setMessage(errorMessage);
+      toast.error(errorMessage);
       setTimeout(() => setMessage(''), 5000);
     } finally {
       setLoading(false);
@@ -386,7 +387,7 @@ const AddAttendance = () => {
   const submitAttendance = async () => {
     try {
       if (!user?.employeeId) {
-        setMessage('Employee ID not found');
+        toast.warn('Employee ID not found');
         return;
       }
 
@@ -400,7 +401,7 @@ const AddAttendance = () => {
 
       if (weekOffViolations.length > 0) {
         const violationDays = weekOffViolations.map(row => row.day).join(', ');
-        setMessage(`Cannot submit attendance for week-off days: ${violationDays}`);
+        toast.warn(`Cannot submit attendance for week-off days: ${violationDays}`);
         setTimeout(() => setMessage(''), 5000);
         return;
       }
@@ -411,7 +412,7 @@ const AddAttendance = () => {
         )
       );
       if (!hasValidData) {
-        setMessage('Please provide attendance data for at least one non-week-off day');
+        toast.warn('Please provide attendance data for at least one non-week-off day');
         setTimeout(() => setMessage(''), 5000);
         return;
       }
@@ -420,7 +421,7 @@ const AddAttendance = () => {
         !weekOffDays.includes(row.day) && (row.hours < 0 || row.hours > 24)
       );
       if (invalidHours) {
-        setMessage('Hours must be between 0 and 24 for non-week-off days');
+        toast.warn('Hours must be between 0 and 24 for non-week-off days');
         setTimeout(() => setMessage(''), 5000);
         return;
       }
@@ -456,7 +457,7 @@ const AddAttendance = () => {
       });
 
       if (Object.keys(dataToSubmit).length === 0) {
-        setMessage('No valid attendance data to submit for non-week-off days');
+        toast.error('No valid attendance data to submit for non-week-off days');
         setTimeout(() => setMessage(''), 5000);
         setLoading(false);
         return;
@@ -467,14 +468,14 @@ const AddAttendance = () => {
       });
 
       if (response.data.success) {
-        setMessage('Attendance submitted successfully!');
+        toast.success('Attendance submitted successfully!');
         setTimeout(() => setMessage(''), 3000);
         await Promise.all([fetchWeeklyAttendance(), fetchDailyAttendance()]);
       }
     } catch (error) {
       console.error('Error submitting attendance:', error);
       const errorMessage = error.response?.data?.detail || 'Error submitting attendance';
-      setMessage(errorMessage);
+      toast.error(errorMessage);
       setTimeout(() => setMessage(''), 5000);
     } finally {
       setLoading(false);
@@ -492,6 +493,7 @@ const AddAttendance = () => {
 
     const addProject = () => {
       setSelectedProjects([...selectedProjects, { projectId: '', projectName: '', subtasks: [''] }]);
+      
     };
 
     const updateProject = (index, field, value) => {
@@ -507,28 +509,35 @@ const AddAttendance = () => {
         updated[index][field] = value;
       }
       setSelectedProjects(updated);
+      
+
     };
 
     const addSubtask = (projectIndex) => {
       const updated = [...selectedProjects];
       updated[projectIndex].subtasks.push('');
       setSelectedProjects(updated);
+     
+
     };
 
     const updateSubtask = (projectIndex, subtaskIndex, value) => {
       const updated = [...selectedProjects];
       updated[projectIndex].subtasks[subtaskIndex] = value;
       setSelectedProjects(updated);
+      
     };
 
     const removeSubtask = (projectIndex, subtaskIndex) => {
       const updated = [...selectedProjects];
       updated[projectIndex].subtasks.splice(subtaskIndex, 1);
       setSelectedProjects(updated);
+      
     };
 
     const removeProject = (index) => {
       setSelectedProjects(selectedProjects.filter((_, i) => i !== index));
+      
     };
 
     return (
@@ -811,7 +820,7 @@ const AddAttendance = () => {
                                        
                                 <button
                                   onClick={() => openProjectPopup(index)}
-                                  className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-gradient-to-r from-purple-500 to-purple-600 text-white rounded-lg hover:from-blue-600 hover:to-indigo-600 transition-all duration-200 shadow-sm"
+                                  className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-gradient-to-r from-purple-500 to-purple-600 text-white rounded-lg hover:from-purple-600 hover:to-purple-600 transition-all duration-200 shadow-sm"
                                 >
                                   <Edit3 size={16} />
                                   {row.projects.length > 0 ? 'Edit Projects' : 'Projects'}
@@ -1182,10 +1191,10 @@ const AddAttendance = () => {
       )}
 
       {showProjectModal && selectedRecord && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[80vh] overflow-y-auto">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold text-gray-800">
+       <div className="fixed inset-0 bg-transparent backdrop-blur-[2px] flex items-center justify-center z-50">
+        <div className="bg-gradient-to-br from-white via-gray-50 to-blue-50 rounded-xl shadow-2xl max-w-2xl w-full mx-4 max-h-[80vh] overflow-y-auto border border-gray-200">
+          <div className="flex justify-between items-center p-6 border-b border-gray-200 bg-gradient-to-r from-gray-600 to-blue-600 rounded-t-xl">
+              <h3 className="text-lg font-semibold text-white-800">
                 Projects for {new Date(selectedRecord.date).toLocaleDateString('en-US', {
                   weekday: 'long',
                   year: 'numeric',
@@ -1201,29 +1210,29 @@ const AddAttendance = () => {
               </button>
             </div>
             <div className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-sm">
-                <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols- gap-2 text-sm">
+                <div className="  rounded-lg p-5">
                   <div className="text-gray-500">Date</div>
                   <div className="font-medium text-gray-800">
                     {new Date(selectedRecord.date).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}
                   </div>
                 </div>
-                <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+                <div className=" rounded-lg p-5">
                   <div className="text-gray-500">Hours</div>
                   <div className="font-medium text-gray-800">{selectedRecord.hours || 0}</div>
                 </div>
-                <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+                <div className=" rounded-lg p-5">
                   <div className="text-gray-500">Status</div>
                   <div className="font-medium text-gray-800">{selectedRecord.status || 'Not set'}</div>
                 </div>
-                <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+                <div className="  rounded-lg p-5">
                   <div className="text-gray-500">Projects</div>
                   <div className="font-medium text-gray-800">{selectedRecord.projects?.length || 0}</div>
                 </div>
               </div>
               {selectedRecord.projects && selectedRecord.projects.length > 0 ? (
                 selectedRecord.projects.map((project, index) => (
-                  <div key={index} className="border border-gray-200 rounded-lg p-4">
+                  <div key={index} className=" rounded-lg p-5">
                     <div className="flex items-center justify-between mb-2">
                       <h4 className="font-medium text-gray-800">{project.projectName}</h4>
                       <span className="text-sm text-gray-500">Project {index + 1}</span>

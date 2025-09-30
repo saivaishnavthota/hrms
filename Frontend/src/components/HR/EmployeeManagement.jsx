@@ -146,7 +146,8 @@ import { avatarBg } from '../../lib/avatarColors';
     } catch (err) {
       console.error('Error fetching data:', err);
       console.error('Error details:', err.response?.data || err.message);
-      setError('Failed to fetch data. Please try again.');
+      toast.error("Failed to fetch data. Please try again.");
+
       
       
     } finally {
@@ -166,7 +167,7 @@ import { avatarBg } from '../../lib/avatarColors';
         hr_ids: employeeData.hr_ids // Array of HR IDs
       };
 
-      const response = await axios.post('http://127.0.0.1:8000/hr/assign', assignmentData);
+      const response = await api.post('/hr/assign', assignmentData);
       
       if (response.status === 200) {
         toast.success('Employee assigned successfully!');
@@ -230,44 +231,25 @@ import { avatarBg } from '../../lib/avatarColors';
     }
 
     setIsSubmitting(true);
-    
     try {
-      const response = await fetch('http://127.0.0.1:8000/onboarding/hr/create_employee', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(formData)
-      });
+      await api.post("/onboarding/hr/create_employee", formData);
 
-      if (response.ok) {
-        const result = await response.json();
-        console.log('Employee created successfully:', result);
-        
-        // Reset form and close modal
-        setFormData({
-          name: '',
-          email: '',
-          role: '',
-          type: ''
-        });
-        setIsModalOpen(false);
-        
-        // You might want to refresh the employee list here
-        toast.success('Employee created successfully!');
-      } else {
-        const errorData = await response.json();
-        console.error('Error creating employee:', errorData);
-        toast.error('Error creating employee: ' + (errorData.detail || 'Unknown error'));
-      }
-    } catch (error) {
-      console.error('Network error:', error);
-      toast.error('Network error. Please try again.');
+      toast.success("Employee created successfully!");
+
+      setFormData({ name: "", email: "", role: "", type: "" });
+      setIsModalOpen(false);
+
+      await fetchAllData();
+    } catch (err) {
+      console.error("Error creating employee:", err.response?.data || err.message);
+      toast.error(
+        "Error creating employee: " + (err.response?.data?.detail || "Unknown error")
+      );
     } finally {
       setIsSubmitting(false);
     }
   };
-
+  
   const closeModal = () => {
     setIsModalOpen(false);
     setFormData({
@@ -410,35 +392,19 @@ import { avatarBg } from '../../lib/avatarColors';
       
       console.log('Sending request body:', requestBody);
       
-      const response = await fetch('http://127.0.0.1:8000/hr/assign', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(requestBody)
-      });
-
-      if (response.ok) {
-        const result = await response.json();
-        console.log('Employee assignment successful:', result);
-        toast.success('Employee assigned successfully!');
-        
-        // Refresh the employee list
-        await fetchAllData();
-        closeEditModal();
-      } else {
-        const errorData = await response.json();
-        console.error('Error assigning employee:', errorData);
-        toast.error('Error assigning employee: ' + (errorData.detail || 'Unknown error'));
-      }
-    } catch (error) {
-      console.error('Network error:', error);
-      toast.error('Network error. Please try again.');
+     toast.success("Employee assigned successfully!");
+      await fetchAllData();
+      closeEditModal();
+    } catch (err) {
+      console.error("Error assigning employee:", err.response?.data || err.message);
+      toast.error(
+        "Error assigning employee: " + (err.response?.data?.detail || "Unknown error")
+      );
     } finally {
       setIsSubmitting(false);
     }
   };
-
+  
   const getAvatarColor = (name) => avatarBg(name);
 
   const filteredEmployees = employees.filter(employee => {
@@ -722,7 +688,7 @@ import { avatarBg } from '../../lib/avatarColors';
       <div className="flex items-center justify-between text-sm text-gray-600">
         <span>Showing {filteredEmployees.length} of {employees.length} entries</span>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" disabled>
+          <Button variant="outline" size="sm" disab led>
             Previous
           </Button>
           <Button variant="outline" size="sm" className="bg-blue-500 text-white border-blue-500">

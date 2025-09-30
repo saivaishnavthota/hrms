@@ -18,13 +18,13 @@ export function SidebarHeader() {
         <div className="dark:hidden flex items-center gap-2">
           <img
             src={toAbsoluteUrl('/media/app/NxzenLogo.png')}
-            className="default-logo h-[40px] max-w-[200px]"
+            className="default-logo h-[40px] max-w-[200px] rounded-tl-lg rounded-br-lg object-cover w-40 h-40"
             alt="Nxzen Logo"
           />
          
           <img
             src={toAbsoluteUrl('/media/app/Nxzen.png')}
-            className="small-logo h-[40px] max-w-[50px]"
+            className="small-logo h-[40px] max-w-[50px] rounded-tl-lg rounded-br-lg object-cover w-40 h-40"
             alt="Nxzen Mini Logo"
           />
         </div>

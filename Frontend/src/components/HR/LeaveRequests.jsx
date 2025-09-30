@@ -3,9 +3,11 @@ import { Eye, Trash2, ChevronUp, ChevronDown } from 'lucide-react';
 import ViewLeaveApplication from './ViewLeaveApplication';
 import PendingRequests from './PendingRequests';
 import { useUser } from '@/contexts/UserContext';
-import axios from 'axios';
 import { avatarBg } from '../../lib/avatarColors';
 import { markDeleted, filterListByDeleted } from '../../lib/localDelete';
+import api from '@/lib/api';
+import { toast } from "react-toastify";
+
 
 const LeaveRequests = () => {
   const { user } = useUser();
@@ -28,7 +30,7 @@ const LeaveRequests = () => {
     try {
       setLoading(true);
       setError(null);
-      const response = await axios.get(`http://127.0.0.1:8000/leave/hr/leave-requests/${hrId}`);
+      const response = await api.get(`/leave/hr/leave-requests/${hrId}`);
       const mapped = (response.data || []).map((item) => ({
         id: item.leave_id ?? item.id,
         employee: item.employee_name,
@@ -46,7 +48,7 @@ const LeaveRequests = () => {
       setLeaveRequests(filterListByDeleted('leaveRequests', mapped));
     } catch (err) {
       console.error('Error fetching HR leave requests:', err);
-      setError('Failed to fetch leave requests. Please try again.');
+      toast.error('Failed to fetch leave requests. Please try again.');
       // Fallback sample data for development
      
     } finally {
@@ -245,6 +247,8 @@ const LeaveRequests = () => {
                       </span>
                     </div>
                   </td>
+
+      
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                     {request.startDate}
                   </td>

@@ -2,8 +2,8 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Eye, Edit, Plus, X, Trash2 } from 'lucide-react';
 import { avatarBg } from '../../lib/avatarColors';
 import { markDeleted, filterListByDeleted } from '../../lib/localDelete';
-
-// Helper to get current user (manager) from localStorage
+import api from '@/lib/api'; 
+import { toast } from 'react-toastify';
 const getCurrentUser = () => {
   try {
     const userId = localStorage.getItem('userId');
@@ -15,14 +15,6 @@ const getCurrentUser = () => {
   }
 };
 
-const api = {
-  managerEmployees: (managerId) => `http://127.0.0.1:8000/projects/manager-employees?manager_id=${managerId}`,
-  allEmployees: 'http://127.0.0.1:8000/users/employees',
-  employeeProfile: (empId) => `http://127.0.0.1:8000/users/employee/${empId}`,
-  allProjects: 'http://127.0.0.1:8000/projects/get_projects',
-  assignProjects: (empId) => `http://127.0.0.1:8000/projects/employees/${empId}/projects`,
-  updateEmployee: (empId) => `http://127.0.0.1:8000/users/employees/${empId}`,
-};
 
 const cellCls = 'px-4 py-3 border-b border-gray-200 align-top';
 const headCls = 'px-4 py-3 text-left text-sm font-semibold text-gray-700 bg-gray-50 border-b border-gray-200';
@@ -47,46 +39,36 @@ const getAvatarColor = (name) => avatarBg(name);
 
 const ManagerEmployees = () => {
   const { userId: managerId } = getCurrentUser();
-
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [employees, setEmployees] = useState([]);
-
   const [viewOpen, setViewOpen] = useState(false);
   const [projectsOpen, setProjectsOpen] = useState(false);
-
   const [selectedEmployee, setSelectedEmployee] = useState(null);
   const [profile, setProfile] = useState(null);
-
   const [allProjects, setAllProjects] = useState([]);
   const [selectedProjects, setSelectedProjects] = useState([]);
-
   const [projectsSummaryOpen, setProjectsSummaryOpen] = useState(false);
   const [projectsSummary, setProjectsSummary] = useState({ employeeName: '', projects: [] });
 
-  // Edit turns into project editing per requirement; no details editing state
-
-  useEffect(() => {
+   useEffect(() => {
     if (!managerId) return;
+
     const fetchData = async () => {
       setLoading(true);
       setError(null);
       try {
-        // Get employees for this manager
-        const resMgr = await fetch(api.managerEmployees(managerId));
-        const dataMgr = await resMgr.json();
+        // Manager employees
+        const { data: dataMgr } = await api.get(`/projects/manager-employees?manager_id=${managerId}`);
         const mgrEmployees = Array.isArray(dataMgr?.employees) ? dataMgr.employees : (Array.isArray(dataMgr) ? dataMgr : []);
 
-        // Get all employees to enrich type/role if available
-        const resAll = await fetch(api.allEmployees);
-        const dataAll = await resAll.json();
+        // All employees for type mapping
+        const { data: dataAll } = await api.get('/users/employees');
         const mapType = new Map();
         const allList = Array.isArray(dataAll?.employees) ? dataAll.employees : (Array.isArray(dataAll) ? dataAll : []);
         allList.forEach((e) => {
           const id = e?.employeeId ?? e?.id ?? e?.employeeid;
-          if (id != null) {
-            mapType.set(Number(id), e?.role || e?.type || e?.employment_type || 'Employee');
-          }
+          if (id != null) mapType.set(Number(id), e?.role || e?.type || e?.employment_type || 'Employee');
         });
 
         const normalized = mgrEmployees.map((e, idx) => {
@@ -109,6 +91,7 @@ const ManagerEmployees = () => {
         setLoading(false);
       }
     };
+
     fetchData();
   }, [managerId]);
 
@@ -116,8 +99,7 @@ const ManagerEmployees = () => {
     setSelectedEmployee(emp);
     setViewOpen(true);
     try {
-      const res = await fetch(api.employeeProfile(emp.id));
-      const data = await res.json();
+      const { data } = await api.get(`/users/employee/${emp.id}`);
       setProfile(data?.employee || data);
     } catch (e) {
       setProfile(null);
@@ -125,25 +107,18 @@ const ManagerEmployees = () => {
   };
 
   const openEdit = (emp) => {
-    // Edit should modify projects, not details
     openProjects(emp);
   };
 
-  // Delete action: clear all projects (unassign) for employee
   const clearProjects = async (emp) => {
     if (!managerId) return;
     const confirmed = window.confirm(`Remove all projects for ${emp.name}?`);
     if (!confirmed) return;
     try {
-      const res = await fetch(api.assignProjects(emp.id), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ manager_id: managerId, projects: [] }),
-      });
-      if (!res.ok) throw new Error('Failed to clear projects');
+      await api.post(`/projects/employees/${emp.id}/projects`, { manager_id: managerId, projects: [] });
       setEmployees((prev) => prev.map((e) => (e.id === emp.id ? { ...e, projects: [] } : e)));
     } catch (e) {
-      alert(e.message || 'Clear projects failed');
+      toast.error(e.message || 'Clear projects failed');
     }
   };
 
@@ -152,38 +127,39 @@ const ManagerEmployees = () => {
     setSelectedProjects(emp.projects || []);
     setProjectsOpen(true);
     try {
-      const res = await fetch(api.allProjects);
-      const data = await res.json();
-      const names = Array.isArray(data?.projects) ? data.projects.map((p) => p?.project_name || p?.name).filter(Boolean) : (Array.isArray(data) ? data.map((p) => p?.project_name || p?.name).filter(Boolean) : []);
+      const { data } = await api.get('/projects/get_projects');
+      const names = Array.isArray(data?.projects)
+        ? data.projects.map((p) => p?.project_name || p?.name).filter(Boolean)
+        : (Array.isArray(data) ? data.map((p) => p?.project_name || p?.name).filter(Boolean) : []);
       setAllProjects(names);
     } catch (e) {
       setAllProjects([]);
     }
   };
 
-  const toggleProject = (name) => {
+  const toggleProject = (name) =>
     setSelectedProjects((prev) => (prev.includes(name) ? prev.filter((n) => n !== name) : [...prev, name]));
-  };
 
   const saveProjects = async () => {
     if (!selectedEmployee || !managerId) return;
     try {
-      const res = await fetch(api.assignProjects(selectedEmployee.id), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ manager_id: managerId, projects: selectedProjects }),
+      await api.post(`/projects/employees/${selectedEmployee.id}/projects`, {
+        manager_id: managerId,
+        projects: selectedProjects,
       });
-      if (!res.ok) throw new Error('Failed to assign projects');
-      setEmployees((prev) => prev.map((e) => (e.id === selectedEmployee.id ? { ...e, projects: selectedProjects } : e)));
+      setEmployees((prev) =>
+        prev.map((e) => (e.id === selectedEmployee.id ? { ...e, projects: selectedProjects } : e))
+      );
       setProjectsOpen(false);
       setProjectsSummary({ employeeName: selectedEmployee.name, projects: selectedProjects });
       setProjectsSummaryOpen(true);
+      toast.success("Assigned project(s) successfully")
     } catch (e) {
-      alert(e.message || 'Assign projects failed');
+      toast.error(e.message || 'Assign projects failed');
     }
   };
 
-  const tableRows = useMemo(() => employees, [employees]);
+  const tableRows = useMemo(() => employees, [employees])
 
   return (
     <div className="p-6">

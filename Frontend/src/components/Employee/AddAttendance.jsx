@@ -32,6 +32,7 @@ const AddAttendance = () => {
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
   const [weekOffDays, setWeekOffDays] = useState([]);
+  const [allWeekOffs, setAllWeekOffs] = useState([]);
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [searchDate, setSearchDate] = useState('');
@@ -55,6 +56,18 @@ const AddAttendance = () => {
     return week;
   };
 
+  const isWeekOffForDate = (date) => {
+    const weekDates = getWeekDates(date);
+    const weekStart = formatDateLocal(weekDates[0]);
+    const weekEnd = formatDateLocal(weekDates[6]);
+    const weekOff = allWeekOffs.find(wo => wo.week_start === weekStart && wo.week_end === weekEnd);
+    if (weekOff) {
+      const dayOfWeek = date.toLocaleDateString('en-US', { weekday: 'long' });
+      return weekOff.off_days.includes(dayOfWeek);
+    }
+    return false;
+  };
+
   useEffect(() => {
     const weekDates = getWeekDates(currentWeek);
     const initialData = {};
@@ -73,8 +86,7 @@ const AddAttendance = () => {
 
     setAttendanceData(initialData);
     fetchWeeklyAttendance();
-    fetchWeekOffs();
-  }, [currentWeek]);
+  }, [currentWeek, user]);
 
   useEffect(() => {
     if (user?.employeeId) {
@@ -83,6 +95,18 @@ const AddAttendance = () => {
       fetchWeekOffs();
     }
   }, [user]);
+
+  useEffect(() => {
+    if (allWeekOffs.length > 0) {
+      const weekDates = getWeekDates(currentWeek);
+      const weekStart = formatDateLocal(weekDates[0]);
+      const weekEnd = formatDateLocal(weekDates[6]);
+      const currentWeekOff = allWeekOffs.find(
+        (wo) => wo.week_start === weekStart && wo.week_end === weekEnd
+      );
+      setWeekOffDays(currentWeekOff ? currentWeekOff.off_days || [] : []);
+    }
+  }, [currentWeek, allWeekOffs]);
 
   useEffect(() => {
     filterDailyAttendance();
@@ -97,25 +121,11 @@ const AddAttendance = () => {
   const fetchWeekOffs = async () => {
     try {
       if (!user?.employeeId) {
-        toast.error('Employee ID not found');
         return;
       }
 
       const response = await api.get(`/weekoffs/${user.employeeId}`);
-      const weekOffs = response.data || [];
-      const weekDates = getWeekDates(currentWeek);
-      const weekStart = formatDateLocal(weekDates[0]);
-      const weekEnd = formatDateLocal(weekDates[6]);
-
-      const currentWeekOff = weekOffs.find(
-        (wo) => wo.week_start === weekStart && wo.week_end === weekEnd
-      );
-
-      if (currentWeekOff) {
-        setWeekOffDays(currentWeekOff.off_days || []);
-      } else {
-        setWeekOffDays([]);
-      }
+      setAllWeekOffs(response.data || []);
     } catch (error) {
       console.error('Error fetching week-offs:', error);
       setMessage(error.response?.data?.detail || 'Error fetching week-offs');
@@ -160,6 +170,8 @@ const AddAttendance = () => {
         }
       });
 
+      console.log('Daily Attendance Response:', response.data); // Debugging
+
       if (response.data && response.data.length > 0) {
         const formattedData = response.data.map(record => ({
           date: record.date,
@@ -167,7 +179,7 @@ const AddAttendance = () => {
           hours: record.hours || 0,
           type: record.type || 'Full-Time',
           projects: (record.projects || []).map(p => ({
-            projectId: p.value,
+            projectId: String(p.value), // Now value is project_id
             projectName: p.label,
             subtasks: (record.subTasks || [])
               .filter(st => st.project === p.label)
@@ -203,7 +215,6 @@ const AddAttendance = () => {
   const fetchProjects = async () => {
     try {
       if (!user?.employeeId) {
-        setMessage('Employee ID not found');
         return;
       }
 
@@ -240,6 +251,8 @@ const AddAttendance = () => {
         params: { employee_id: user.employeeId }
       });
 
+      console.log('Weekly Attendance Response:', response.data); // Debugging
+
       if (response.data) {
         const updatedData = { ...baseData };
         Object.keys(response.data).forEach(dateStr => {
@@ -250,7 +263,7 @@ const AddAttendance = () => {
 
           if (rowIndex !== undefined) {
             const projects = (attendance.projects || []).map(p => ({
-              projectId: p.value,
+              projectId: String(p.value), // Now value is project_id
               projectName: p.label,
               subtasks: (attendance.subTasks || [])
                 .filter(st => st.project === p.label)
@@ -371,7 +384,6 @@ const AddAttendance = () => {
 
       setLoading(true);
       const response = await api.post('/weekoffs', payload);
-      console.log(response);
       toast.success('Week-off saved successfully');
       setTimeout(() => setMessage(''), 3000);
       await fetchWeekOffs();
@@ -437,15 +449,18 @@ const AddAttendance = () => {
           const project_ids = row.projects
             .map(p => (p.projectId ? parseInt(p.projectId, 10) : null))
             .filter(id => Number.isInteger(id));
+
           const sub_tasks = row.projects
-            .map(p =>
-              (p.subtasks || []).map(subtask => ({
-                project_id: parseInt(p.projectId, 10),
-                sub_task: subtask
-              }))
-            )
-            .flat()
-            .filter(st => st.project_id && st.sub_task);
+          .map(p =>
+           (p.subtasks || []).map(subtask => ({
+             project_id: parseInt(p.projectId, 10),
+             sub_task: subtask.name,
+             hours: subtask.hours
+             }))
+             )
+             .flat()
+             .filter(st => st.project_id && st.sub_task);
+
 
           dataToSubmit[row.date] = {
             date: row.date,
@@ -463,6 +478,8 @@ const AddAttendance = () => {
         setLoading(false);
         return;
       }
+
+      console.log('Submitting Attendance Data:', dataToSubmit); // Debugging
 
       const response = await api.post('/attendance', dataToSubmit, {
         params: { employee_id: user.employeeId }
@@ -492,60 +509,61 @@ const AddAttendance = () => {
   const ProjectPopup = ({ onClose, onSave, existingProjects = [] }) => {
     const [selectedProjects, setSelectedProjects] = useState(existingProjects);
 
-    const addProject = () => {
-      setSelectedProjects([...selectedProjects, { projectId: '', projectName: '', subtasks: [''] }]);
-      
-    };
+    useEffect(() => {
+      console.log('Existing Projects in ProjectPopup:', existingProjects);
+    }, [existingProjects]);
+
+
+const addProject = () => {
+  setSelectedProjects([
+    ...selectedProjects,
+    { projectId: '', projectName: '', subtasks: [{ name: '', hours: 0 }] }
+  ]);
+};
+
 
     const updateProject = (index, field, value) => {
       const updated = [...selectedProjects];
       if (field === 'projectId') {
-        const project = projects.find(p => p.project_id === parseInt(value));
+        const project = projects.find(p => String(p.project_id) === value);
         updated[index] = {
           ...updated[index],
           projectId: value,
-          projectName: project ? project.project_name : ''
+          projectName: project ? project.project_name : '',
+          subtasks: updated[index].subtasks.length > 0 ? updated[index].subtasks : ['']
         };
       } else {
         updated[index][field] = value;
       }
       setSelectedProjects(updated);
-      
-
     };
 
-    const addSubtask = (projectIndex) => {
-      const updated = [...selectedProjects];
-      updated[projectIndex].subtasks.push('');
-      setSelectedProjects(updated);
-     
+const addSubtask = (projectIndex) => {
+  const updated = [...selectedProjects];
+  updated[projectIndex].subtasks.push({ name: '', hours: 0 });
+  setSelectedProjects(updated);
+};
 
-    };
-
-    const updateSubtask = (projectIndex, subtaskIndex, value) => {
-      const updated = [...selectedProjects];
-      updated[projectIndex].subtasks[subtaskIndex] = value;
-      setSelectedProjects(updated);
-      
-    };
-
+const updateSubtask = (projectIndex, subtaskIndex, field, value) => {
+  const updated = [...selectedProjects];
+  updated[projectIndex].subtasks[subtaskIndex][field] = value;
+  setSelectedProjects(updated);
+};
     const removeSubtask = (projectIndex, subtaskIndex) => {
-      const updated = [...selectedProjects];
-      updated[projectIndex].subtasks.splice(subtaskIndex, 1);
-      setSelectedProjects(updated);
-      
-    };
+  const updated = [...selectedProjects];
+  updated[projectIndex].subtasks.splice(subtaskIndex, 1);
+  setSelectedProjects(updated);
+};
 
     const removeProject = (index) => {
       setSelectedProjects(selectedProjects.filter((_, i) => i !== index));
-      
     };
 
     return (
       <div className="fixed inset-0 bg-transparent backdrop-blur-[2px] flex items-center justify-center z-50">
         <div className="bg-gradient-to-br from-white via-gray-50 to-blue-50 rounded-xl shadow-2xl max-w-2xl w-full mx-4 max-h-[80vh] overflow-y-auto border border-gray-200">
           <div className="flex justify-between items-center p-6 border-b border-gray-200 bg-gradient-to-r from-gray-600 to-blue-600 rounded-t-xl">
-            <h3 className="text-xl font-semibold text-white">Select Projects & Subtasks</h3>
+            <h3 className="font-semibold text-white">Select Projects & Subtasks</h3>
             <button onClick={onClose} className="text-blue-100 hover:text-white transition-colors p-1 rounded-full hover:bg-blue-500">
               <X size={24} />
             </button>
@@ -556,13 +574,13 @@ const AddAttendance = () => {
               <div key={projectIndex} className="border border-gray-200 rounded-lg p-4 bg-gray-50">
                 <div className="flex items-center gap-3 mb-3">
                   <select
-                    value={project.projectId}
+                    value={project.projectId || ''}
                     onChange={(e) => updateProject(projectIndex, 'projectId', e.target.value)}
                     className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   >
                     <option value="">Select Project</option>
                     {projects.map(p => (
-                      <option key={p.project_id} value={p.project_id}>
+                      <option key={p.project_id} value={String(p.project_id)}>
                         {p.project_name}
                       </option>
                     ))}
@@ -575,32 +593,49 @@ const AddAttendance = () => {
                   </button>
                 </div>
 
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-700">Subtasks:</label>
-                  {project.subtasks.map((subtask, subtaskIndex) => (
-                    <div key={subtaskIndex} className="flex items-center gap-2">
-                      <input
-                        type="text"
-                        value={subtask}
-                        onChange={(e) => updateSubtask(projectIndex, subtaskIndex, e.target.value)}
-                        placeholder="Enter subtask"
-                        className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      />
-                      <button
-                        onClick={() => removeSubtask(projectIndex, subtaskIndex)}
-                        className="text-red-500 hover:text-red-700 p-1"
-                      >
-                        <X size={16} />
-                      </button>
-                    </div>
-                  ))}
-                  <button
-                    onClick={() => addSubtask(projectIndex)}
-                    className="text-blue-600 hover:text-blue-800 text-sm flex items-center gap-1"
-                  >
-                    <Plus size={16} /> Add Subtask
-                  </button>
-                </div>
+               <div className="space-y-2">
+  <label className="text-sm font-medium text-gray-700">Subtasks:</label>
+  {project.subtasks.map((subtask, subtaskIndex) => (
+    <div key={subtaskIndex} className="flex items-center gap-2">
+      {/* Subtask input */}
+      <input
+        type="text"
+        value={subtask.name}
+        onChange={(e) =>
+          updateSubtask(projectIndex, subtaskIndex, { ...subtask, name: e.target.value })
+        }
+        placeholder="Enter subtask"
+        className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+      />
+
+      {/* Hours input */}
+      <input
+        type="number"
+        value={subtask.hours}
+         onChange={(e) => updateSubtask(projectIndex, subtaskIndex, 'hours', e.target.value)}
+        placeholder="Hours"
+        className="w-24 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+      />
+
+      {/* Remove button */}
+      <button
+        onClick={() => removeSubtask(projectIndex, subtaskIndex)}
+        className="text-red-500 hover:text-red-700 p-1"
+      >
+        <X size={16} />
+      </button>
+    </div>
+  ))}
+
+  {/* Add subtask button */}
+  <button
+    onClick={() => addSubtask(projectIndex)}
+    className="text-blue-600 hover:text-blue-800 text-sm flex items-center gap-1"
+  >
+    <Plus size={16} /> Add Subtask
+  </button>
+  </div>
+
               </div>
             ))}
             {selectedProjects.length === 0 && (
@@ -624,7 +659,10 @@ const AddAttendance = () => {
                 Cancel
               </button>
               <button
-                onClick={() => onSave(selectedProjects.filter(p => p.projectId && p.projectName))}
+                onClick={() => {
+                  console.log('Saving selectedProjects:', selectedProjects);
+                  onSave(selectedProjects.filter(p => p.projectId && p.projectName));
+                }}
                 className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
               >
                 Save
@@ -638,11 +676,19 @@ const AddAttendance = () => {
 
   const weekDates = getWeekDates(currentWeek);
 
+  if (!user?.employeeId) {
+    return (
+      <div className="flex justify-center items-center h-screen">
+        <div className="text-red-500 text-xl font-semibold">Employee ID not found. Please login again.</div>
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-6xl mx-auto p-6 bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen">
       <div className="bg-white rounded-2xl shadow-xl overflow-hidden">
         <div className="bg-gradient-to-r from-blue-500 to-indigo-600 text-white p-6">
-          <h1 className="text-2xl font-bold flex items-center gap-3">
+          <h1 className="text-xl font-bold flex items-center gap-3">
             <Calendar className="text-blue-200" />
             Attendance Management
           </h1>
@@ -664,8 +710,8 @@ const AddAttendance = () => {
                 key={id}
                 onClick={() => setActiveTab(id)}
                 className={`py-4 px-2 border-b-2 font-medium text-sm flex items-center gap-2 transition-colors ${activeTab === id
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                   }`}
               >
                 <Icon size={18} />
@@ -726,7 +772,7 @@ const AddAttendance = () => {
                     <button
                       onClick={submitWeekOffs}
                       disabled={loading || weekOffDays.length === 0}
-                      className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-grey-700 transition-colors disabled:opacity-50"
+                      className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors disabled:opacity-50"
                     >
                       Save Week-Offs
                     </button>
@@ -783,12 +829,12 @@ const AddAttendance = () => {
                             ) : row.status ? (
                               <span
                                 className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${row.status === 'Present'
-                                    ? 'bg-green-100 text-green-800 border border-green-200'
-                                    : row.status === 'WFH' || row.status === 'Work From Home'
-                                      ? 'bg-blue-100 text-blue-800 border border-blue-200'
-                                      : row.status === 'Leave'
-                                        ? 'bg-red-100 text-red-800 border border-red-200'
-                                        : 'bg-gray-100 text-gray-800 border border-gray-200'
+                                  ? 'bg-green-100 text-green-800 border border-green-200'
+                                  : row.status === 'WFH' || row.status === 'Work From Home'
+                                    ? 'bg-blue-100 text-blue-800 border border-blue-200'
+                                    : row.status === 'Leave'
+                                      ? 'bg-red-100 text-red-800 border border-red-200'
+                                      : 'bg-gray-100 text-gray-800 border border-gray-200'
                                   }`}
                               >
                                 {row.status}
@@ -818,10 +864,9 @@ const AddAttendance = () => {
                               <span className="text-gray-400 text-sm">N/A</span>
                             ) : (
                               <div className="space-y-2">
-                                       
                                 <button
                                   onClick={() => openProjectPopup(index)}
-                                  className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-gradient-to-r from-blue-700 to-indigo-600 text-white rounded-lg hover:from-blue-600 hover:to-indigo-600 transition-all duration-200 shadow-sm"
+                                  className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-lg hover:from-blue-600 hover:to-indigo-600 transition-all duration-200 shadow-sm"
                                 >
                                   <Edit3 size={16} />
                                   {row.projects.length > 0 ? 'Edit Projects' : 'Projects'}
@@ -945,7 +990,7 @@ const AddAttendance = () => {
                       const dayOfWeek = currentDate.toLocaleDateString('en-US', { weekday: 'long' });
 
                       const attendanceRecord = filteredDailyAttendance.find(record => record.date === dateStr);
-                      const isWeekOff = weekOffDays.includes(dayOfWeek);
+                      const isWeekOff = isWeekOffForDate(currentDate);
 
                       days.push(
                         <div
@@ -966,12 +1011,12 @@ const AddAttendance = () => {
                           ) : attendanceRecord && isCurrentMonth ? (
                             <div className="space-y-1">
                               <div className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${attendanceRecord.status === 'Present'
-                                  ? 'bg-green-100 text-green-800 border border-green-200'
-                                  : attendanceRecord.status === 'WFH'
-                                    ? 'bg-blue-100 text-blue-800 border border-blue-200'
-                                    : attendanceRecord.status === 'Leave'
-                                      ? 'bg-red-100 text-red-800 border border-red-200'
-                                      : 'bg-gray-100 text-gray-800 border border-gray-200'
+                                ? 'bg-green-100 text-green-800 border border-green-200'
+                                : attendanceRecord.status === 'WFH'
+                                  ? 'bg-blue-100 text-blue-800 border border-blue-200'
+                                  : attendanceRecord.status === 'Leave'
+                                    ? 'bg-red-100 text-red-800 border border-red-200'
+                                    : 'bg-gray-100 text-gray-800 border border-gray-200'
                                 }`}>
                                 {attendanceRecord.status}
                               </div>
@@ -1144,14 +1189,14 @@ const AddAttendance = () => {
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${record.status === 'Present'
-                                ? 'bg-green-100 text-green-800'
-                                : record.status === 'Leave'
-                                  ? 'bg-red-100 text-red-800'
-                                  : record.status === 'WFH'
-                                    ? 'bg-blue-100 text-blue-800'
-                                    : record.status === 'Week-off'
-                                      ? 'bg-gray-100 text-gray-800'
-                                      : 'bg-gray-100 text-gray-800'
+                              ? 'bg-green-100 text-green-800'
+                              : record.status === 'Leave'
+                                ? 'bg-red-100 text-red-800'
+                                : record.status === 'WFH'
+                                  ? 'bg-blue-100 text-blue-800'
+                                  : record.status === 'Week-off'
+                                    ? 'bg-gray-100 text-gray-800'
+                                    : 'bg-gray-100 text-gray-800'
                               }`}>
                               {record.status}
                             </span>
@@ -1192,10 +1237,10 @@ const AddAttendance = () => {
       )}
 
       {showProjectModal && selectedRecord && (
-       <div className="fixed inset-0 bg-transparent backdrop-blur-[2px] flex items-center justify-center z-50">
-        <div className="bg-gradient-to-br from-white via-gray-50 to-blue-50 rounded-xl shadow-2xl max-w-2xl w-full mx-4 max-h-[80vh] overflow-y-auto border border-gray-200">
-          <div className="flex justify-between items-center p-6 border-b border-gray-200 bg-gradient-to-r from-gray-600 to-blue-600 rounded-t-xl">
-              <h3 className="text-lg font-semibold text-white-800">
+        <div className="fixed inset-0 bg-transparent backdrop-blur-[2px] flex items-center justify-center z-50">
+          <div className="bg-gradient-to-br from-white via-gray-50 to-blue-50 rounded-xl shadow-2xl max-w-2xl w-full mx-4 max-h-[80vh] overflow-y-auto border border-gray-200">
+            <div className="flex justify-between items-center p-6 border-b border-gray-200 bg-gradient-to-r from-gray-600 to-blue-600 rounded-t-xl">
+              <h3 className="font-semibold text-white">
                 Projects for {new Date(selectedRecord.date).toLocaleDateString('en-US', {
                   weekday: 'long',
                   year: 'numeric',

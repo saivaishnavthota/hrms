@@ -25,16 +25,22 @@ BASE_URL = "http://localhost:8000"
  
 @router.post("/submit-exp", response_model=dict)
 def submit_expense(
-    employee_id: int = Form(...),
-    category: str = Form(...),
-    amount: float = Form(...),
-    currency: str = Form(...),
-    description: str = Form(None),
-    expense_date: str = Form(...),
-    tax_included: bool = Form(False),
-    file: UploadFile = File(None),
+    data: dict,
     session: Session = Depends(get_session),
 ):
+    # Extract data from JSON body
+    employee_id = data.get('employee_id')
+    category = data.get('category')
+    amount = data.get('amount')
+    currency = data.get('currency')
+    description = data.get('description')
+    expense_date = data.get('expense_date')
+    tax_included = data.get('tax_included', False)
+    
+    # Validate required fields
+    if not all([employee_id, category, amount, currency, expense_date]):
+        raise HTTPException(status_code=400, detail="Missing required fields")
+    
     req = ExpenseRequest(
         request_code=generate_request_code(),
         employee_id=employee_id,
@@ -48,40 +54,10 @@ def submit_expense(
     session.add(req)
     session.commit()
     session.refresh(req)
- 
-    attachment_data = None
-    if file:
-        folder_path = os.path.join(UPLOAD_DIR, str(req.request_code))
-        os.makedirs(folder_path, exist_ok=True)
-        file_location = os.path.join(folder_path, file.filename)
-       
-        with open(file_location, "wb") as f:
-            f.write(file.file.read())
-           
-        rel_path = os.path.join("uploads/expenses", str(req.request_code), file.filename).replace(os.sep, "/")
- 
-        attach = ExpenseAttachment(
-            request_id=req.request_id,
-            file_name=file.filename,
-            file_path=rel_path,  # Relative path only
-            file_type=file.content_type,
-            file_size=os.path.getsize(file_location),
-        )
-        session.add(attach)
-        session.commit()
-        session.refresh(attach)
-   
-        # Build public URL for response (single prefix)
-        public_url = f"{BASE_URL}/{rel_path.lstrip('/')}"
-   
-        attachment_data = {
-            "attachment_id": attach.attachment_id,
-            "file_name": attach.file_name,
-            "file_path": public_url,  # Full URL in response for immediate use
-            "file_type": attach.file_type,
-            "file_size": attach.file_size,
-        }
- 
+
+    # File upload functionality removed for JSON format
+    # TODO: Implement file upload separately if needed
+
     return {
         "request_id": req.request_id,
         "request_code": req.request_code,
@@ -92,17 +68,17 @@ def submit_expense(
         "description": req.description,
         "expense_date": req.expense_date,
         "tax_included": req.tax_included,
-        "submit_date": req.created_at, #changed
+        "submit_date": req.created_at,
         "status": req.status,
-        "attachments": [attachment_data] if attachment_data else [],
+        "attachments": [],
     }
  
 #changed
 @router.get("/my-expenses", response_model=List[dict])
 def list_my_expenses(
-    employee_id: int,  # Get from frontend instead of current_user
-    year: Optional[int] = None,
-    month: Optional[int] = None,
+    employee_id: int = Query(...),  # Get from frontend instead of current_user
+    year: Optional[int] = Query(None),
+    month: Optional[int] = Query(None),
     session: Session = Depends(get_session),
 ):
     query = session.query(ExpenseRequest).filter(
@@ -116,7 +92,11 @@ def list_my_expenses(
         )
  
     expenses = query.order_by(ExpenseRequest.created_at.desc()).all()
- 
+    
+    # Debug logging
+    print(f"Found {len(expenses)} expenses for employee_id: {employee_id}")
+    print(f"Query filters: year={year}, month={month}")
+
     result = []
     for exp in expenses:
         history_entries = []

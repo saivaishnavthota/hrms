@@ -206,5 +206,237 @@ export const onboardingAPI = {
   }
 };
 
+// Attendance API endpoints
+export const attendanceAPI = {
+  // GET /attendance/active-projects - Get active projects for attendance
+  getActiveProjects: async (params = {}) => {
+    const response = await api.get('/attendance/active-projects', { params });
+    return response.data;
+  },
+
+  // POST /attendance/ - Submit attendance
+  submitAttendance: async (data) => {
+    const { employee_id, ...attendanceData } = data;
+    const response = await api.post('/attendance/', attendanceData, {
+      params: { employee_id }
+    });
+    return response.data;
+  },
+
+  // GET /attendance/weekly - Get weekly attendance
+  getWeeklyAttendance: async (params = {}) => {
+    const response = await api.get('/attendance/weekly', { params });
+    return response.data;
+  },
+
+  // GET /attendance/daily - Get daily attendance
+  getDailyAttendance: async (params = {}) => {
+    const response = await api.get('/attendance/daily', { params });
+    return response.data;
+  },
+
+  // GET /attendance/mgr-assigned - Get manager assigned attendance
+  getManagerAssignedAttendance: async (params = {}) => {
+    const response = await api.get('/attendance/mgr-assigned', { params });
+    return response.data;
+  },
+
+  // GET /attendance/hr-assigned - Get HR assigned attendance
+  getHRAssignedAttendance: async (params = {}) => {
+    const response = await api.get('/attendance/hr-assigned', { params });
+    return response.data;
+  },
+
+  // GET /attendance/hr-daily - Get HR daily attendance
+  getHRDailyAttendance: async (params = {}) => {
+    const response = await api.get('/attendance/hr-daily', { params });
+    return response.data;
+  }
+};
+
+// Expenses API endpoints
+export const expensesAPI = {
+  // POST /expenses/submit-exp - Submit expense request
+  submitExpense: async (data) => {
+    const response = await api.post('/expenses/submit-exp', data);
+    return response.data;
+  },
+
+  // GET /expenses/my-expenses - Get employee's expenses
+  getMyExpenses: async (params = {}) => {
+    console.log('API Call - getMyExpenses with params:', params);
+    const response = await api.get('/expenses/my-expenses', { params });
+    console.log('API Response:', response.data);
+    return response.data;
+  },
+
+  // GET /expenses/mgr-exp-list - Get manager's expense list
+  getManagerExpenseList: async (params = {}) => {
+    const response = await api.get('/expenses/mgr-exp-list', { params });
+    return response.data;
+  },
+
+  // PUT /expenses/mgr-upd-status/{request_id} - Update expense status by manager
+  updateExpenseStatusByManager: async (requestId, data) => {
+    const formData = new FormData();
+    formData.append('manager_id', data.manager_id);
+    formData.append('status', data.status);
+    if (data.reason) formData.append('reason', data.reason);
+    
+    const response = await api.put(`/expenses/mgr-upd-status/${requestId}`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
+  },
+
+  // GET /expenses/hr-exp-list - Get HR expense list
+  getHRExpenseList: async (params = {}) => {
+    const response = await api.get('/expenses/hr-exp-list', { params });
+    return response.data;
+  },
+
+  // PUT /expenses/hr-upd-status/{request_id} - Update expense status by HR
+  updateExpenseStatusByHR: async (requestId, data) => {
+    const formData = new FormData();
+    formData.append('hr_id', data.hr_id);
+    formData.append('status', data.status);
+    if (data.reason) formData.append('reason', data.reason);
+    
+    const response = await api.put(`/expenses/hr-upd-status/${requestId}`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
+  },
+
+  // GET /expenses/acc-mgr-exp-list - Get account manager expense list
+  getAccountManagerExpenseList: async (params = {}) => {
+    const response = await api.get('/expenses/acc-mgr-exp-list', { params });
+    return response.data;
+  },
+
+  // PUT /expenses/acc-mgr-upd-status/{request_id} - Update expense status by account manager
+  updateExpenseStatusByAccountManager: async (requestId, data) => {
+    const formData = new FormData();
+    formData.append('acc_mgr_id', data.acc_mgr_id);
+    formData.append('status', data.status);
+    if (data.reason) formData.append('reason', data.reason);
+    
+    const response = await api.put(`/expenses/acc-mgr-upd-status/${requestId}`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
+  }
+};
+
+// Projects API endpoints
+export const projectsAPI = {
+  // POST /projects/ - Create new project
+  createProject: async (data) => {
+    const response = await api.post('/projects/', data);
+    return response.data;
+  },
+
+  // GET /projects/get_projects - Get all projects
+  getProjects: async (params = {}) => {
+    const response = await api.get('/projects/get_projects', { params });
+    return response.data;
+  },
+
+  // PUT /projects/{project_id}/status - Update project status
+  updateProjectStatus: async (projectId, data) => {
+    const response = await api.put(`/projects/${projectId}/status`, data);
+    return response.data;
+  },
+
+  // PUT /projects/{project_id} - Update project
+  updateProject: async (projectId, data) => {
+    const response = await api.put(`/projects/${projectId}`, data);
+    return response.data;
+  },
+
+  // GET /projects/all-projects - Get all projects
+  getAllProjects: async (params = {}) => {
+    const response = await api.get('/projects/all-projects', { params });
+    return response.data;
+  },
+
+  // GET /projects/manager-employees - Get manager employees
+  getManagerEmployees: async (params = {}) => {
+    const response = await api.get('/projects/manager-employees', { params });
+    return response.data;
+  },
+
+  // POST /projects/employees/{emp_id}/projects - Assign projects to employee
+  assignProjectsToEmployee: async (empId, data) => {
+    const response = await api.post(`/projects/employees/${empId}/projects`, data);
+    return response.data;
+  }
+};
+
+// Weekoff API endpoints
+export const weekoffAPI = {
+  // POST /weekoffs/ - Create weekoff request
+  createWeekoff: async (data) => {
+    const response = await api.post('/weekoffs/', data);
+    return response.data;
+  },
+
+  // GET /weekoffs/{employee_id} - Get employee weekoffs
+  getEmployeeWeekoffs: async (employeeId) => {
+    const response = await api.get(`/weekoffs/${employeeId}`);
+    return response.data;
+  }
+};
+
+
+// Locations API endpoints
+export const locationsAPI = {
+  // GET /locations/ - Get all locations
+  getLocations: async () => {
+    const response = await api.get('/locations/');
+    return response.data;
+  },
+
+  // POST /locations/ - Add new location
+  addLocation: async (locationData) => {
+    const response = await api.post('/locations/', locationData);
+    return response.data;
+  }
+};
+
+// Calendar/Holidays API endpoints
+export const calendarAPI = {
+  // GET /calendar/ - Get all holidays
+  getHolidays: async (locationId = null) => {
+    const params = locationId ? { location_id: locationId } : {};
+    const response = await api.get('/calendar/', { params });
+    return response.data;
+  },
+
+  // POST /calendar/add - Add new holiday
+  addHoliday: async (holidayData) => {
+    const response = await api.post('/calendar/add', holidayData);
+    return response.data;
+  },
+
+  // DELETE /calendar/{holiday_id} - Delete holiday
+  deleteHoliday: async (holidayId) => {
+    const response = await api.delete(`/calendar/${holidayId}`);
+    return response.data;
+  },
+
+  // GET /calendar/by-location/{location_id} - Get holidays by location
+  getHolidaysByLocation: async (locationId) => {
+    const response = await api.get(`/calendar/by-location/${locationId}`);
+    return response.data;
+  }
+};
+
 // Export the axios instance for custom requests
 export default api;

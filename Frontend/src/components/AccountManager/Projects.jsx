@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Eye, Edit, Trash2 } from 'lucide-react';
-import api from '@/lib/api';
+import api, { projectsAPI } from '@/lib/api';
 import { toast } from 'react-toastify';
 import { markDeleted, filterListByDeleted } from '@/lib/localDelete';
 
@@ -49,7 +49,7 @@ const Projects = ({ viewOnly = false }) => {
         end_date: values.endDate || null,
         skills_required: values.technology || '',
       };
-      const res = await api.post('/projects/', payload);
+      const res = await projectsAPI.createProject(payload);
       console.log("Error:",res);
       toast.success('Project created successfully');
       form.reset();
@@ -65,8 +65,8 @@ const Projects = ({ viewOnly = false }) => {
     setLoading(true);
     setError(null);
     try {
-      const res = await api.get('/projects/get_projects');
-      const data = Array.isArray(res.data) ? res.data : [];
+      const res = await projectsAPI.getProjects();
+      const data = Array.isArray(res) ? res : [];
       const mapped = data.map((p) => ({
         id: p.project_id,
         name: p.project_name,

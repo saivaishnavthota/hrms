@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import api from '@/lib/api';
+import api, { attendanceAPI, weekoffAPI } from '@/lib/api';
 import { Calendar, Clock, Plus, X, Save, ChevronLeft, ChevronRight, Trash2, Edit3, Search, Filter, Eye, Briefcase } from 'lucide-react';
 import { useUser } from '../../contexts/UserContext';
 import { toast } from 'react-toastify';
@@ -124,8 +124,8 @@ const AddAttendance = () => {
         return;
       }
 
-      const response = await api.get(`/weekoffs/${user.employeeId}`);
-      setAllWeekOffs(response.data || []);
+      const response = await weekoffAPI.getEmployeeWeekoffs(user.employeeId);
+      setAllWeekOffs(response || []);
     } catch (error) {
       console.error('Error fetching week-offs:', error);
       setMessage(error.response?.data?.detail || 'Error fetching week-offs');
@@ -162,18 +162,16 @@ const AddAttendance = () => {
       const year = selectedYear || new Date().getFullYear();
       const month = (selectedMonth !== undefined ? selectedMonth : new Date().getMonth()) + 1;
 
-      const response = await api.get('/attendance/daily', {
-        params: {
-          employee_id: user.employeeId,
-          year: year,
-          month: month
-        }
+      const response = await attendanceAPI.getDailyAttendance({
+        employee_id: user.employeeId,
+        year: year,
+        month: month
       });
 
-      console.log('Daily Attendance Response:', response.data); // Debugging
+      console.log('Daily Attendance Response:', response); // Debugging
 
-      if (response.data && response.data.length > 0) {
-        const formattedData = response.data.map(record => ({
+      if (response && response.length > 0) {
+        const formattedData = response.map(record => ({
           date: record.date,
           status: record.status || record.action || 'Not set',
           hours: record.hours || 0,
@@ -218,10 +216,8 @@ const AddAttendance = () => {
         return;
       }
 
-      const response = await api.get('/attendance/active-projects', {
-        params: { employee_id: user.employeeId }
-      });
-      setProjects(response.data || []);
+      const response = await attendanceAPI.getActiveProjects({ employee_id: user.employeeId });
+      setProjects(response || []);
     } catch (error) {
       console.error('Error fetching projects:', error);
       setMessage('Error fetching assigned projects');
@@ -247,16 +243,14 @@ const AddAttendance = () => {
         };
       });
 
-      const response = await api.get('/attendance/weekly', {
-        params: { employee_id: user.employeeId }
-      });
+      const response = await attendanceAPI.getWeeklyAttendance({ employee_id: user.employeeId });
 
-      console.log('Weekly Attendance Response:', response.data); // Debugging
+      console.log('Weekly Attendance Response:', response); // Debugging
 
-      if (response.data) {
+      if (response) {
         const updatedData = { ...baseData };
-        Object.keys(response.data).forEach(dateStr => {
-          const attendance = response.data[dateStr];
+        Object.keys(response).forEach(dateStr => {
+          const attendance = response[dateStr];
           const rowIndex = Object.keys(updatedData).find(key =>
             updatedData[key].date === dateStr
           );
@@ -383,7 +377,7 @@ const AddAttendance = () => {
       };
 
       setLoading(true);
-      const response = await api.post('/weekoffs', payload);
+      const response = await weekoffAPI.createWeekoff(payload);
       toast.success('Week-off saved successfully');
       setTimeout(() => setMessage(''), 3000);
       await fetchWeekOffs();
@@ -481,11 +475,12 @@ const AddAttendance = () => {
 
       console.log('Submitting Attendance Data:', dataToSubmit); // Debugging
 
-      const response = await api.post('/attendance', dataToSubmit, {
-        params: { employee_id: user.employeeId }
+      const response = await attendanceAPI.submitAttendance({
+        ...dataToSubmit,
+        employee_id: user.employeeId
       });
 
-      if (response.data.success) {
+      if (response.success) {
         toast.success('Attendance submitted successfully!');
         setTimeout(() => setMessage(''), 3000);
         await Promise.all([fetchWeeklyAttendance(), fetchDailyAttendance()]);
@@ -602,7 +597,7 @@ const updateSubtask = (projectIndex, subtaskIndex, field, value) => {
         type="text"
         value={subtask.name}
         onChange={(e) =>
-          updateSubtask(projectIndex, subtaskIndex, { ...subtask, name: e.target.value })
+          updateSubtask(projectIndex, subtaskIndex, 'name', e.target.value)
         }
         placeholder="Enter subtask"
         className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"

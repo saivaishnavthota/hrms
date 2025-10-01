@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import api from '@/lib/api';
+import api, { attendanceAPI } from '@/lib/api';
 import { 
   User, 
   Mail, 
@@ -52,10 +52,8 @@ const fetchEmployeeProfile = async () => {
 
     // Fetch projects for this employee
     try {
-      const projRes = await api.get('/attendance/active-projects', {
-        params: { employee_id: employeeId }
-      });
-      setProjects(projRes.data || []);
+      const projRes = await attendanceAPI.getActiveProjects({ employee_id: employeeId });
+      setProjects(projRes || []);
     } catch (projError) {
       console.error('Error fetching projects:', projError);
       toast.error('Error fetching assigned projects');

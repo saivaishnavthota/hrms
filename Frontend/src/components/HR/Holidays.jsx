@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Search, Plus, Edit, Trash2, Eye, X } from 'lucide-react';
 import { markDeleted, filterListByDeleted } from '../../lib/localDelete';
 import { toast } from "react-toastify";
-import api from "@/lib/api";
+import api, { calendarAPI, locationsAPI } from "@/lib/api";
 import {
   Dialog,
   DialogContent,
@@ -64,9 +64,9 @@ const Holidays = () => {
 
   const fetchLocations = async () => {
     try {
-      const { data } = await api.get("/locations/");
-      if (data.status === "success") {
-        setLocations(data.data);
+      const response = await locationsAPI.getLocations();
+      if (response.status === "success") {
+        setLocations(response.data);
       }
     } catch (error) {
       console.error("Error fetching locations:", error);
@@ -79,11 +79,11 @@ const Holidays = () => {
     if (!newLocationName.trim()) return;
 
     try {
-      const { data } = await api.post("/locations", {
+      const response = await locationsAPI.addLocation({
         name: newLocationName.trim(),
       });
-      if (data.status === "success") {
-        setLocations((prev) => [...prev, data.data]);
+      if (response.status === "success") {
+        setLocations((prev) => [...prev, response.data]);
         setNewLocationName("");
         setShowLocationModal(false);
         toast.success("Location added successfully");
@@ -97,7 +97,7 @@ const Holidays = () => {
 
  const fetchHolidays = async () => {
     try {
-      const { data } = await api.get("/calendar/");
+      const data = await calendarAPI.getHolidays();
       if (data.status === "success") {
         const transformed = data.data.map((holiday) => ({
           id: holiday.id,
@@ -123,7 +123,7 @@ const Holidays = () => {
  const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      const { data } = await api.post("/calendar/add", {
+      const data = await calendarAPI.addHoliday({
         location_id: parseInt(formData.location_id),
         holiday_date: formData.date,
         holiday_name: formData.title,

@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { toast } from 'react-toastify';
 import api from '@/lib/api';
-import { CheckCircle, Clock, AlertCircle,FileText  } from 'lucide-react';
 
+import { CheckCircle, Clock, AlertCircle, FileText, Eye, Send, X, Download } from 'lucide-react';
 const DocumentCollection = () => {
   const [employeesData, setEmployeesData] = useState([]);
   const [loadingEmployees, setLoadingEmployees] = useState(false);
@@ -14,6 +14,7 @@ const DocumentCollection = () => {
   const [selectedDocuments, setSelectedDocuments] = useState([]);
   const [showDocumentsModal, setShowDocumentsModal] = useState(false);
   const [showDocumentRequestModal, setShowDocumentRequestModal] = useState(false);
+  const [showRequestLogs, setShowRequestLogs] = useState(false);
   const [isRejectMode, setIsRejectMode] = useState(false);
 
   // ------------------ API Functions ------------------
@@ -45,6 +46,7 @@ const DocumentCollection = () => {
       setLoadingEmployees(false);
     }
   };
+  
 
   const fetchEmployeeDocuments = async (employeeId) => {
     setLoadingDocuments(true);
@@ -75,7 +77,7 @@ const DocumentCollection = () => {
       setLoadingDocuments(false);
     }
   };
-
+  
   const requestDocument = async (employeeId, documentType = 'General Document') => {
     try {
       const { data: result } = await api.post('/documents/request-doc', {
@@ -123,7 +125,8 @@ const DocumentCollection = () => {
       const { data: logs } = await api.get('/documents/request-logs');
 
       const { data: employees } = await api.get('/users/employees');
-      const employeesMap = employees.reduce((map, emp) => {
+      const employeesArray = Array.isArray(employees) ? employees : (employees?.employees || []);
+      const employeesMap = employeesArray.reduce((map, emp) => {
         map[emp.employeeId] = emp;
         return map;
       }, {});
@@ -230,7 +233,33 @@ const DocumentCollection = () => {
       toast.error('Failed to download document');
     }
   };
+  // Add these handler functions in the DocumentCollection component
 
+const handleViewDocuments = async (employee) => {
+  setSelectedEmployee(employee);
+  setShowDocumentsModal(true);
+  await fetchEmployeeDocuments(employee.id);
+};
+
+const handleRequestDocument = (employeeId) => {
+  const employee = employeesData.find(emp => emp.id === employeeId);
+  setSelectedEmployeeForRequest(employee);
+  setShowDocumentRequestModal(true);
+};
+
+const handleCloseModal = () => {
+  setShowDocumentsModal(false);
+  setSelectedEmployee(null);
+  setEmployeeDocuments([]);
+};
+
+const handleSpecificDocumentRequest = async (documentType) => {
+  if (selectedEmployeeForRequest) {
+    await requestDocument(selectedEmployeeForRequest.id, documentType);
+    setShowDocumentRequestModal(false);
+    setSelectedEmployeeForRequest(null);
+  }
+};
   // ------------------ Initialization ------------------
   useEffect(() => {
     fetchEmployeesData();

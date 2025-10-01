@@ -72,7 +72,9 @@ export default function Login() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [resetPasswordLoading, setResetPasswordLoading] = useState(false);
   const [resetPasswordMessage, setResetPasswordMessage] = useState('');
-
+  const handleInputChange = (e) => {
+    setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
  
 
   const validateForm = () => {

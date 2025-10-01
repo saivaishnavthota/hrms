@@ -40,7 +40,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { useNavigate } from 'react-router-dom';
-import api from '@/lib/api';
+import api, { expensesAPI } from '@/lib/api';
 import { avatarBg } from '../../lib/avatarColors';
 
 const AccountManagerExpenseManagement = () => {
@@ -161,15 +161,13 @@ const AccountManagerExpenseManagement = () => {
         year: Number(selectedYear),
         month: Number(selectedMonth),
       });
-      const response = await api.get('/expenses/acc-mgr-exp-list', {
-        params: {
-          acc_mgr_id: userId,
-          year: Number(selectedYear),
-          month: Number(selectedMonth),
-        },
+      const response = await expensesAPI.getAccountManagerExpenseList({
+        acc_mgr_id: userId,
+        year: Number(selectedYear),
+        month: Number(selectedMonth),
       });
       console.log('Raw response:', response);
-      const data = Array.isArray(response.data) ? response.data : response.data?.results || [];
+      const data = Array.isArray(response) ? response : response?.results || [];
       console.log('Parsed data:', data);
       const mapped = data.map(mapExpense);
       console.log('Mapped expenses:', mapped);
@@ -199,15 +197,13 @@ const AccountManagerExpenseManagement = () => {
         year: Number(selectedYear),
         month: Number(selectedMonth),
       });
-      const response = await api.get('/expenses/acc-mgr-exp-list', {
-        params: {
-          acc_mgr_id: userId,
-          year: Number(selectedYear),
-          month: Number(selectedMonth),
-        },
+      const response = await expensesAPI.getAccountManagerExpenseList({
+        acc_mgr_id: userId,
+        year: Number(selectedYear),
+        month: Number(selectedMonth),
       });
       console.log('Raw response:', response);
-      const data = Array.isArray(response.data) ? response.data : response.data?.results || [];
+      const data = Array.isArray(response) ? response : response?.results || [];
       console.log('Parsed data:', data);
       const mapped = data.map(mapExpense);
       console.log('Mapped expenses:', mapped);
@@ -261,12 +257,12 @@ const AccountManagerExpenseManagement = () => {
         reason: form.get('reason'),
       });
 
-      const response = await api.put(`/expenses/acc-mgr-upd-status/${expense.requestId}`, form, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
+      const response = await expensesAPI.updateExpenseStatusByAccountManager(expense.requestId, {
+        acc_mgr_id: form.get('acc_mgr_id'),
+        status: form.get('status'),
+        reason: form.get('reason'),
       });
-      console.log('Approve response:', response.data);
+      console.log('Approve response:', response);
 
       setExpenses((prev) =>
         activeTab === 'pending'
@@ -319,12 +315,12 @@ const AccountManagerExpenseManagement = () => {
         reason: form.get('reason'),
       });
 
-      const response = await api.put(`/expenses/acc-mgr-upd-status/${expense.requestId}`, form, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
+      const response = await expensesAPI.updateExpenseStatusByAccountManager(expense.requestId, {
+        acc_mgr_id: form.get('acc_mgr_id'),
+        status: form.get('status'),
+        reason: form.get('reason'),
       });
-      console.log('Reject response:', response.data);
+      console.log('Reject response:', response);
 
       setExpenses((prev) =>
         activeTab === 'pending'

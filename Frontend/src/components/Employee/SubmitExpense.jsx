@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table';
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from '@/components/ui/select';
-import api from '@/lib/api'; // Axios instance
+import api, { expensesAPI } from '@/lib/api';
 import { toast } from 'react-toastify';
 import { markDeleted, filterListByDeleted } from '../../lib/localDelete';
 
@@ -26,6 +26,10 @@ const SubmitExpense = () => {
   const [expenseHistory, setExpenseHistory] = useState([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyError, setHistoryError] = useState('');
+  
+  // Filter states
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
 
   // popup states
   const [selectedRecord, setSelectedRecord] = useState(null);
@@ -72,9 +76,9 @@ const SubmitExpense = () => {
     switch (s) {
       case 'pending':
       case 'pending_manager_approval': return 'Pending Manager Approval';
-      case 'approved':
       case 'pending_hr_approval': return 'Pending HR Approval';
       case 'pending_account_mgr_approval': return 'Pending Account Manager Approval';
+      case 'approved': return 'Approved';
       case 'hr_rejected': return 'HR Rejected';
       case 'mgr_rejected': return 'Manager Rejected';
       case 'acc_mgr_rejected': return 'Account Manager Rejected';
@@ -91,17 +95,17 @@ const SubmitExpense = () => {
       let employeeId = user?.employeeId || JSON.parse(localStorage.getItem('userData') || '{}')?.employeeId;
       if (!employeeId) throw new Error('Employee ID not found. Please log in.');
 
-      const form = new FormData();
-      form.append('employee_id', Number(employeeId));
-      form.append('category', expenseData.category || 'Other');
-      form.append('amount', parseFloat(expenseData.amount || 0));
-      form.append('currency', expenseData.currency || 'INR');
-      form.append('description', expenseData.description || expenseData.title || '');
-      form.append('expense_date', expenseData.date);
-      form.append('tax_included', expenseData.tax_included);
-      if (receipts[0]?.file) form.append('file', receipts[0].file);
+      const expensePayload = {
+        employee_id: Number(employeeId),
+        category: expenseData.category || 'Other',
+        amount: parseFloat(expenseData.amount || 0),
+        currency: expenseData.currency || 'INR',
+        description: expenseData.description || expenseData.title || '',
+        expense_date: expenseData.date,
+        tax_included: expenseData.tax_included
+      };
 
-      const res = await api.post('/expenses/submit-exp', form);
+      const res = await expensesAPI.submitExpense(expensePayload);
 
       toast.success(`Expense submitted successfully! Reference: ${res.data.request_code || res.data.request_id}`);
 
@@ -121,20 +125,18 @@ const SubmitExpense = () => {
     }
   };
 
-  const loadExpenseHistory = async (employeeId) => {
+  const loadExpenseHistory = async (employeeId, year = selectedYear, month = selectedMonth) => {
     setHistoryLoading(true);
     setHistoryError('');
     try {
       if (!employeeId) return;
-      const now = new Date();
-      const year = now.getFullYear();
-      const month = now.getMonth() + 1;
 
-      const res = await api.get('/expenses/my-expenses', {
-        params: { employee_id: employeeId, year, month }
-      });
+      const res = await expensesAPI.getMyExpenses({ employee_id: employeeId, year, month });
+      
+      console.log('Expense API Response:', res);
+      console.log('Employee ID:', employeeId, 'Year:', year, 'Month:', month);
 
-      const mapped = (res.data || []).map((item) => {
+      const mapped = (res || []).map((item) => {
         const approvals = Array.isArray(item.history)
           ? item.history.filter(h => ['Manager', 'HR'].includes(h.action_role))
             .map(h => ({ name: h.action_by_name || h.action_role, role: h.action_role, reason: h.reason || '-', status: h.action }))
@@ -153,16 +155,24 @@ const SubmitExpense = () => {
 
       setExpenseHistory(mapped);
     } catch (err) {
+      console.error('Error loading expense history:', err);
+      console.error('Error response:', err.response);
       setHistoryError(err.response?.data?.message || err.message || 'Error loading history');
     } finally {
       setHistoryLoading(false);
     }
   };
 
+  // Handle filter changes
+  const handleFilterChange = () => {
+    const employeeId = user?.employeeId || JSON.parse(localStorage.getItem('userData') || '{}')?.employeeId;
+    if (employeeId) loadExpenseHistory(employeeId, selectedYear, selectedMonth);
+  };
+
   useEffect(() => {
     const employeeId = user?.employeeId || JSON.parse(localStorage.getItem('userData') || '{}')?.employeeId;
-    if (employeeId) loadExpenseHistory(employeeId);
-  }, [user]);
+    if (employeeId) loadExpenseHistory(employeeId, selectedYear, selectedMonth);
+  }, [user, selectedYear, selectedMonth]);
 
   return (
     <div className="max-w-4xl mx-auto">
@@ -389,6 +399,53 @@ const SubmitExpense = () => {
           {/* ---- Expense History ---- */}
           {/* ---- Expense History ---- */}
 <TabsContent value="history">
+  {/* Filter Controls */}
+  <div className="mb-4 flex gap-4 items-center">
+    <div className="flex items-center gap-2">
+      <label className="text-sm font-medium text-gray-700">Year:</label>
+      <select
+        value={selectedYear}
+        onChange={(e) => setSelectedYear(parseInt(e.target.value))}
+        className="px-3 py-1 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+      >
+        {Array.from({ length: 5 }, (_, i) => {
+          const year = new Date().getFullYear() - i;
+          return (
+            <option key={year} value={year}>
+              {year}
+            </option>
+          );
+        })}
+      </select>
+    </div>
+    
+    <div className="flex items-center gap-2">
+      <label className="text-sm font-medium text-gray-700">Month:</label>
+      <select
+        value={selectedMonth}
+        onChange={(e) => setSelectedMonth(parseInt(e.target.value))}
+        className="px-3 py-1 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+      >
+        {Array.from({ length: 12 }, (_, i) => {
+          const month = i + 1;
+          const monthName = new Date(2024, i).toLocaleString('default', { month: 'long' });
+          return (
+            <option key={month} value={month}>
+              {monthName}
+            </option>
+          );
+        })}
+      </select>
+    </div>
+    
+    <button
+      onClick={handleFilterChange}
+      className="px-4 py-1 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+    >
+      Apply Filters
+    </button>
+  </div>
+  
   <div className="rounded-lg border">
     <Table>
       <TableHeader>
@@ -402,7 +459,29 @@ const SubmitExpense = () => {
         </TableRow>
       </TableHeader>
       <TableBody>
-        {expenseHistory.map((item, index) => (
+        {historyLoading ? (
+          <TableRow>
+            <TableCell colSpan={6} className="text-center py-8">
+              <div className="flex items-center justify-center">
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+                <span className="ml-2">Loading expense history...</span>
+              </div>
+            </TableCell>
+          </TableRow>
+        ) : historyError ? (
+          <TableRow>
+            <TableCell colSpan={6} className="text-center py-8 text-red-600">
+              Error: {historyError}
+            </TableCell>
+          </TableRow>
+        ) : expenseHistory.length === 0 ? (
+          <TableRow>
+            <TableCell colSpan={6} className="text-center py-8 text-gray-500">
+              No expense requests found
+            </TableCell>
+          </TableRow>
+        ) : (
+          expenseHistory.map((item, index) => (
           <TableRow key={item.id} className="hover:bg-gray-50">
             {/* Serial Number */}
             <TableCell className="text-center font-medium">
@@ -474,7 +553,8 @@ const SubmitExpense = () => {
               </div>
             </TableCell>
           </TableRow>
-        ))}
+          ))
+        )}
       </TableBody>
     </Table>
   </div>

@@ -15,7 +15,7 @@ import Swal from 'sweetalert2';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'react-toastify';
-import api from '@/lib/api'; //
+import api, { expensesAPI } from '@/lib/api';
 import {
   Table,
   TableBody,
@@ -62,11 +62,11 @@ const ManagerExpenseManagement = () => {
   const [myLoading, setMyLoading] = useState(false);
   const [myError, setMyError] = useState(null);
 
-  const token = useMemo(() => localStorage.getItem('authToken'), []);
+  // Filter states
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
 
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = now.getMonth() + 1;
+  const token = useMemo(() => localStorage.getItem('authToken'), []);
 
   const getAvatarColor = (name) => avatarBg(name);
 
@@ -131,14 +131,11 @@ const ManagerExpenseManagement = () => {
         : []),
   });
 
-  const fetchExpenses = async () => {
+  const fetchExpenses = async (year = selectedYear, month = selectedMonth) => {
     if (!user?.employeeId) return;
     setLoading(true);
     try {
-      const { data } = await api.get('/expenses/mgr-exp-list', {
-        params: { manager_id: user.employeeId, year, month },
-        headers: { Authorization: token ? `Bearer ${token}` : '' },
-      });
+      const data = await expensesAPI.getManagerExpenseList({ manager_id: user.employeeId, year, month });
       const mapped = (data || []).map(mapExpense);
       if (activeTab === 'pending') setExpenses(mapped.filter((e) => e.status.toLowerCase() === 'pending'));
       else setExpenses(mapped);
@@ -150,10 +147,15 @@ const ManagerExpenseManagement = () => {
     }
   };
 
+  // Handle filter changes
+  const handleFilterChange = () => {
+    fetchExpenses(selectedYear, selectedMonth);
+  };
+
   useEffect(() => {
-    fetchExpenses();
+    fetchExpenses(selectedYear, selectedMonth);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab, user?.employeeId]);
+  }, [activeTab, user?.employeeId, selectedYear, selectedMonth]);
 
   const mapMyExpense = (item) => ({
     id: item.request_id || item.id,
@@ -176,18 +178,13 @@ const fetchMyExpenses = async () => {
   setMyError(null);
 
   try {
-    const url = `/expenses/my-expenses?employee_id=${encodeURIComponent(
-      user.employeeId
-    )}&year=${year}&month=${month}`;
-
-    const res = await api.get(url, {
-      headers: {
-        Authorization: token ? `Bearer ${token}` : '',
-      },
+    const res = await expensesAPI.getMyExpenses({ 
+      employee_id: user.employeeId, 
+      year, 
+      month 
     });
 
-    // Axios automatically parses JSON response in res.data
-    setMyExpenses((res.data || []).map(mapMyExpense));
+    setMyExpenses((res || []).map(mapMyExpense));
   } catch (err) {
     console.error('Error fetching my-expenses:', err);
     setMyError('Failed to fetch my expense history.');
@@ -228,13 +225,10 @@ const fetchMyExpenses = async () => {
       });
       if (!reason.isConfirmed) return;
 
-      const form = new FormData();
-      form.append('manager_id', String(user.employeeId));
-      form.append('status', 'Approved');
-      form.append('reason', (reason.value || '-').trim() || '-');
-
-      await api.put(`/expenses/mgr-upd-status/${expense.requestId}`, form, {
-        headers: { Authorization: token ? `Bearer ${token}` : '' },
+      await expensesAPI.updateExpenseStatusByManager(expense.requestId, {
+        manager_id: user.employeeId,
+        status: 'Approved',
+        reason: (reason.value || '-').trim() || '-',
       });
 
       toast.success('Expense approved successfully!');
@@ -262,13 +256,10 @@ const fetchMyExpenses = async () => {
       });
       if (!reason.isConfirmed) return;
 
-      const form = new FormData();
-      form.append('manager_id', String(user.employeeId));
-      form.append('status', 'Rejected');
-      form.append('reason', (reason.value || '-').trim() || '-');
-
-      await api.put(`/expenses/mgr-upd-status/${expense.requestId}`, form, {
-        headers: { Authorization: token ? `Bearer ${token}` : '' },
+      await expensesAPI.updateExpenseStatusByManager(expense.requestId, {
+        manager_id: user.employeeId,
+        status: 'Rejected',
+        reason: (reason.value || '-').trim() || '-',
       });
 
       toast.success('Expense rejected successfully!');
@@ -559,6 +550,55 @@ const fetchMyExpenses = async () => {
 
       {activeTab !== 'my' && (
       <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+        {/* Filter Controls */}
+        <div className="p-6 border-b border-gray-200">
+          <div className="flex gap-4 items-center">
+            <div className="flex items-center gap-2">
+              <label className="text-sm font-medium text-gray-700">Year:</label>
+              <select
+                value={selectedYear}
+                onChange={(e) => setSelectedYear(parseInt(e.target.value))}
+                className="px-3 py-1 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                {Array.from({ length: 5 }, (_, i) => {
+                  const year = new Date().getFullYear() - i;
+                  return (
+                    <option key={year} value={year}>
+                      {year}
+                    </option>
+                  );
+                })}
+              </select>
+            </div>
+            
+            <div className="flex items-center gap-2">
+              <label className="text-sm font-medium text-gray-700">Month:</label>
+              <select
+                value={selectedMonth}
+                onChange={(e) => setSelectedMonth(parseInt(e.target.value))}
+                className="px-3 py-1 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                {Array.from({ length: 12 }, (_, i) => {
+                  const month = i + 1;
+                  const monthName = new Date(2024, i).toLocaleString('default', { month: 'long' });
+                  return (
+                    <option key={month} value={month}>
+                      {monthName}
+                    </option>
+                  );
+                })}
+              </select>
+            </div>
+            
+            <button
+              onClick={handleFilterChange}
+              className="px-4 py-1 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              Apply Filters
+            </button>
+          </div>
+        </div>
+        
         {loading ? (
           <div className="px-6 py-10 text-center text-gray-600">Loading expenses...</div>
         ) : error ? (

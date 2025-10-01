@@ -42,7 +42,7 @@ import {
 import { useUser } from '@/contexts/UserContext';
 import NewExpenseForm from '../Manager/NewExpenseForm';
 import { toast } from 'react-toastify';
-import api from '@/lib/api';
+import api, { expensesAPI } from '@/lib/api';
 
 
 const ExpenseManagement = () => {
@@ -61,11 +61,11 @@ const ExpenseManagement = () => {
   const [myLoading, setMyLoading] = useState(false);
   const [myError, setMyError] = useState(null);
 
-  const token = useMemo(() => localStorage.getItem('authToken'), []);
+  // Filter states
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
 
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = now.getMonth() + 1;
+  const token = useMemo(() => localStorage.getItem('authToken'), []);
 
   // Fallback implementation for avatarBg
   const getAvatarColor = (name) => {
@@ -139,18 +139,15 @@ const ExpenseManagement = () => {
         : []),
   });
 
-  const fetchPendingExpenses = async () => {
+  const fetchPendingExpenses = async (year = selectedYear, month = selectedMonth) => {
      if (!user?.employeeId) return toast.error("Missing HR ID in user context");
     if (!token) return toast.error("Missing authentication token");
 
     setLoading(true);
     
      try {
-      const res = await api.get(`/expenses/hr-exp-list`, {
-        params: { hr_id: user.employeeId, year, month },
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const mapped = (res.data || []).map(mapExpense);
+      const res = await expensesAPI.getHRExpenseList({ hr_id: user.employeeId, year, month });
+      const mapped = (res || []).map(mapExpense);
       setExpenses(mapped.filter((e) => (e.status || "").toLowerCase() === "pending"));
     } catch (err) {
       console.error("Error fetching pending expenses:", err);
@@ -162,17 +159,14 @@ const ExpenseManagement = () => {
   };
 
 
- const fetchAllExpenses = async () => {
+ const fetchAllExpenses = async (year = selectedYear, month = selectedMonth) => {
     if (!user?.employeeId) return setError("Missing HR ID in user context");
     if (!token) return toast.error("Missing authentication token");
 
     setLoading(true);
     try {
-      const res = await api.get(`/expenses/hr-exp-list`, {
-        params: { hr_id: user.employeeId, year, month },
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const mapped = (res.data || []).map(mapExpense);
+      const res = await expensesAPI.getHRExpenseList({ hr_id: user.employeeId, year, month });
+      const mapped = (res || []).map(mapExpense);
       setExpenses(
         mapped.filter((e) => {
           const s = (e.status || "").toLowerCase();
@@ -199,17 +193,14 @@ const ExpenseManagement = () => {
     approvals: item.approvals || [],
   });
 
-  const fetchMyExpenses = async () => {
+  const fetchMyExpenses = async (year = selectedYear, month = selectedMonth) => {
     if (!user?.employeeId) return setError("Missing employee ID in user context");
     if (!token) return toast.error("Missing authentication token");
 
     setMyLoading(true);
     try {
-      const res = await api.get(`/expenses/my-expenses`, {
-        params: { employee_id: user.employeeId, year, month },
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const mapped = (res.data || []).map(mapMyExpense);
+      const res = await expensesAPI.getMyExpenses({ employee_id: user.employeeId, year, month });
+      const mapped = (res || []).map(mapMyExpense);
       setMyExpenses(mapped);
     } catch (err) {
       console.error("Error fetching my expenses:", err);
@@ -220,13 +211,20 @@ const ExpenseManagement = () => {
     }
   };
 
+  // Handle filter changes
+  const handleFilterChange = () => {
+    if (activeTab === 'pending') fetchPendingExpenses(selectedYear, selectedMonth);
+    else if (activeTab === 'my') fetchMyExpenses(selectedYear, selectedMonth);
+    else fetchAllExpenses(selectedYear, selectedMonth);
+  };
+
   useEffect(() => {
     console.log('User:', user);
     console.log('Token:', token);
-    if (activeTab === 'pending') fetchPendingExpenses();
-    else if (activeTab === 'my') fetchMyExpenses();
-    else fetchAllExpenses();
-  }, [activeTab, user?.employeeId, token]);
+    if (activeTab === 'pending') fetchPendingExpenses(selectedYear, selectedMonth);
+    else if (activeTab === 'my') fetchMyExpenses(selectedYear, selectedMonth);
+    else fetchAllExpenses(selectedYear, selectedMonth);
+  }, [activeTab, user?.employeeId, token, selectedYear, selectedMonth]);
 
   const handleViewDetails = (expense) => {
     setSelectedExpense(expense);
@@ -254,12 +252,10 @@ const ExpenseManagement = () => {
 
       const reason = (value || "-").trim() || "-";
 
-      await api.put(`/expenses/hr-upd-status/${expense.requestId}`, {
+      await expensesAPI.updateExpenseStatusByHR(expense.requestId, {
         hr_id: user.employeeId,
         status: "Approved",
         reason,
-      }, {
-        headers: { Authorization: `Bearer ${token}` }
       });
 
       toast.success("Expense approved");
@@ -291,12 +287,10 @@ const ExpenseManagement = () => {
 
       const reason = (value || "-").trim() || "-";
 
-      await api.put(`/expenses/hr-upd-status/${expense.requestId}`, {
+      await expensesAPI.updateExpenseStatusByHR(expense.requestId, {
         hr_id: user.employeeId,
         status: "Rejected",
         reason,
-      }, {
-        headers: { Authorization: `Bearer ${token}` }
       });
 
       toast.success("Expense rejected");
@@ -621,6 +615,55 @@ const ExpenseManagement = () => {
     
       {activeTab !== 'my' && (
         <div>
+          {/* Filter Controls */}
+          <div className="p-6 border-b border-gray-200">
+            <div className="flex gap-4 items-center">
+              <div className="flex items-center gap-2">
+                <label className="text-sm font-medium text-gray-700">Year:</label>
+                <select
+                  value={selectedYear}
+                  onChange={(e) => setSelectedYear(parseInt(e.target.value))}
+                  className="px-3 py-1 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  {Array.from({ length: 5 }, (_, i) => {
+                    const year = new Date().getFullYear() - i;
+                    return (
+                      <option key={year} value={year}>
+                        {year}
+                      </option>
+                    );
+                  })}
+                </select>
+              </div>
+              
+              <div className="flex items-center gap-2">
+                <label className="text-sm font-medium text-gray-700">Month:</label>
+                <select
+                  value={selectedMonth}
+                  onChange={(e) => setSelectedMonth(parseInt(e.target.value))}
+                  className="px-3 py-1 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  {Array.from({ length: 12 }, (_, i) => {
+                    const month = i + 1;
+                    const monthName = new Date(2024, i).toLocaleString('default', { month: 'long' });
+                    return (
+                      <option key={month} value={month}>
+                        {monthName}
+                      </option>
+                    );
+                  })}
+                </select>
+              </div>
+              
+              <button
+                onClick={handleFilterChange}
+                className="px-4 py-1 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                Apply Filters
+              </button>
+            </div>
+          </div>
+          
           {loading ? (
             <div className="px-6 py-10 text-center text-gray-600">Loading expenses...</div>
           ) : error ? (

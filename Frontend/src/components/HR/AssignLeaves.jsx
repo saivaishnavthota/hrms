@@ -18,7 +18,10 @@ const AssignLeaves = () => {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState(new Set());
-const [viewEmployee, setViewEmployee] = useState(null);
+  const [viewEmployee, setViewEmployee] = useState(null);
+  const [actionLoading, setActionLoading] = useState(false);
+  const [actionMessage, setActionMessage] = useState(null);
+  const [actionError, setActionError] = useState(null);
 
   const getAvatarColor = (name) => avatarBg(name);
 
@@ -120,7 +123,7 @@ const [viewEmployee, setViewEmployee] = useState(null);
     }
     handleCloseEdit();
   };
-
+  
  const handleDelete = (employee) => {
   if (!window.confirm(`Are you sure you want to remove ${employee.employee} from the list?`)) return;
 
@@ -146,11 +149,140 @@ const [viewEmployee, setViewEmployee] = useState(null);
     else setSelectedIds(new Set(sortedEmployees.map(e => e.id)));
   };
 
+
+  const assignDefaultLeaves = async () => {
+    setActionMessage(null);
+    setActionError(null);
+    if (selectedIds.size === 0) {
+      setActionError('Please select at least one employee.');
+      toast.info('Please select at least one employee');
+      return;
+    }
+    setActionLoading(true);
+    const DEFAULTS = {
+      sick_leaves: 6,
+      casual_leaves: 6,
+      paid_leaves: 15,
+      maternity_leave: 0,
+      paternity_leave: 0,
+    };
+
+    try {
+      const ids = Array.from(selectedIds);
+      let failed = 0;
+      for (const id of ids) {
+        try {
+          await api.post(`/leave/init/${id}`);
+        } catch (err) {
+          const status = err?.response?.status;
+          // If already exists (likely 400), continue to update
+          if (status !== 400 && status !== 409) {
+            failed += 1;
+            console.warn('Init failed for employee', id, err);
+            continue;
+          }
+        }
+        try {
+          await api.put(`/leave/leave-balance/${id}`, DEFAULTS);
+        } catch (err) {
+          failed += 1;
+          console.error('Update balance failed for employee', id, err);
+          continue;
+        }
+
+        // Refetch balance from backend to restore UI from source of truth
+        try {
+          const balRes = await api.get(`/leave/leave_balances/${id}`);
+          const bal = balRes.data;
+          setEmployeeLeaveData(prev => prev.map(emp => (
+            emp.id === id
+              ? {
+                  ...emp,
+                  sickLeave: bal.sick_leaves ?? DEFAULTS.sick_leaves,
+                  casualLeave: bal.casual_leaves ?? DEFAULTS.casual_leaves,
+                  annualLeave: bal.paid_leaves ?? DEFAULTS.paid_leaves,
+                  maternityLeave: bal.maternity_leave ?? DEFAULTS.maternity_leave,
+                  paternityLeave: bal.paternity_leave ?? DEFAULTS.paternity_leave,
+                }
+              : emp
+          )));
+        } catch (err) {
+          console.warn(`Failed to refetch balance for employee ${id}, falling back to defaults`, err);
+          setEmployeeLeaveData(prev => prev.map(emp => (
+            emp.id === id
+              ? {
+                  ...emp,
+                  sickLeave: DEFAULTS.sick_leaves,
+                  casualLeave: DEFAULTS.casual_leaves,
+                  annualLeave: DEFAULTS.paid_leaves,
+                  maternityLeave: DEFAULTS.maternity_leave,
+                  paternityLeave: DEFAULTS.paternity_leave,
+                }
+              : emp
+          )));
+        }
+      }
+      const successCount = ids.length - failed;
+      if (successCount > 0 && failed === 0) {
+        toast.success(`Assigned default leaves to ${successCount} employee(s)`);
+        setActionMessage(`Assigned default leaves to ${successCount} employee(s).`);
+      } else if (successCount > 0 && failed > 0) {
+        toast.warn(`Assigned ${successCount}, ${failed} failed`);
+        setActionMessage(`Assigned ${successCount}, ${failed} failed.`);
+      } else {
+        toast.error('Failed to assign default leaves');
+        setActionError('Failed to assign default leaves. Please try again.');
+      }
+    } catch (err) {
+      console.error('Failed assigning default leaves:', err);
+      setActionError('Failed to assign default leaves. Please try again.');
+      toast.error('Failed to assign default leaves');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+
   return (
     <div className="p-6">
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Assign Leaves</h1>
         <p className="text-gray-600 mt-1">Manage employee leave balances and assignments</p>
+      </div>
+
+      <div className="bg-white rounded-lg shadow">
+        {/* Toolbar */}
+        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={assignDefaultLeaves}
+              disabled={selectedIds.size === 0 || actionLoading || loadingEmployees}
+              className={`inline-flex items-center px-3 py-2 rounded-md text-sm font-medium ${selectedIds.size === 0 || actionLoading ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-blue-600 text-white hover:bg-blue-700'}`}
+            >
+              Assign Default Leaves (6/6/15)
+            </button>
+            {actionLoading && (
+              <span className="text-sm text-gray-600">Applying...</span>
+            )}
+          </div>
+          <div className="text-sm text-gray-600">
+            Selected: {selectedIds.size}
+          </div>
+        </div>
+
+        {/* Employees loading/error state */}
+        {loadingEmployees && (
+          <div className="px-4 py-2 bg-gray-50 text-gray-700 border-b border-gray-200">Loading employees...</div>
+        )}
+        {employeesError && (
+          <div className="px-4 py-2 bg-red-50 text-red-700 border-b border-red-200">{employeesError}</div>
+        )}
+
+        {(actionMessage || actionError) && (
+          <div className={`px-4 py-2 ${actionError ? 'bg-red-50 text-red-700 border border-red-200' : 'bg-green-50 text-green-700 border border-green-200'}`}>
+            {actionError || actionMessage}
+          </div>
+        )}
       </div>
 
       <div className="bg-white rounded-lg shadow overflow-x-auto">

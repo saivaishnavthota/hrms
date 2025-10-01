@@ -40,7 +40,7 @@ import {
   DialogBody,
 } from '@/components/ui/dialog';
 import { useUser } from '@/contexts/UserContext';
-import NewExpenseForm from '../Manager/NewExpenseForm';
+import HRExpenseForm from './HRExpenseForm';
 import { toast } from 'react-toastify';
 import api, { expensesAPI } from '@/lib/api';
 
@@ -364,7 +364,7 @@ const ExpenseManagement = () => {
           onClick={() => setIsNewExpenseOpen(true)}
         >
           <Plus className="h-4 w-4 mr-2" />
-          New Expense
+          Add Expense for Employee
         </Button>
       </div>
  <div className="flex items-center justify-between gap-4">
@@ -862,18 +862,18 @@ const ExpenseManagement = () => {
         </DialogContent>
       </Dialog>
 
-      {/* <Dialog open={isNewExpenseOpen} onOpenChange={setIsNewExpenseOpen}>
-        <DialogContent className="max-w-lg">
+       <Dialog open={isNewExpenseOpen} onOpenChange={setIsNewExpenseOpen}>
+        <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>New Expense</DialogTitle>
-            <DialogDescription>Submit a new expense request</DialogDescription>
+            <DialogTitle>Add Expense for Employee</DialogTitle>
+            <DialogDescription>Add an expense on behalf of an employee</DialogDescription>
           </DialogHeader>
-          <NewExpenseForm
+          <HRExpenseForm
             onSuccess={handleNewExpenseSuccess}
             onCancel={() => setIsNewExpenseOpen(false)}
           />
         </DialogContent>
-      </Dialog> */}
+      </Dialog> 
     </div>
   );
 };

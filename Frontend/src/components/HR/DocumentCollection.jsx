@@ -3,6 +3,7 @@ import { toast } from 'react-toastify';
 import api from '@/lib/api';
 
 import { CheckCircle, Clock, AlertCircle, FileText, Eye, Send, X, Download } from 'lucide-react';
+
 const DocumentCollection = () => {
   const [employeesData, setEmployeesData] = useState([]);
   const [loadingEmployees, setLoadingEmployees] = useState(false);
@@ -15,7 +16,6 @@ const DocumentCollection = () => {
   const [showDocumentsModal, setShowDocumentsModal] = useState(false);
   const [showDocumentRequestModal, setShowDocumentRequestModal] = useState(false);
   const [showRequestLogs, setShowRequestLogs] = useState(false);
-  const [isRejectMode, setIsRejectMode] = useState(false);
 
   // ------------------ API Functions ------------------
   const fetchEmployeesData = async () => {
@@ -47,7 +47,6 @@ const DocumentCollection = () => {
     }
   };
   
-
   const fetchEmployeeDocuments = async (employeeId) => {
     setLoadingDocuments(true);
     try {
@@ -78,8 +77,11 @@ const DocumentCollection = () => {
     }
   };
   
-  const requestDocument = async (employeeId, documentType = 'General Document') => {
+  const requestDocument = async (employeeId, documentTypes) => {
     try {
+      // documentTypes is an array of document names
+      const documentType = documentTypes.join(', ');
+      
       const { data: result } = await api.post('/documents/request-doc', {
         employee_id: employeeId,
         document_type: documentType
@@ -103,6 +105,7 @@ const DocumentCollection = () => {
       // Handle 401 separately
       if (error.response?.status === 401) {
         const employee = employeesData.find(emp => emp.id === employeeId);
+        const documentType = documentTypes.join(', ');
         const newLog = {
           id: Date.now(),
           employeeId,
@@ -233,39 +236,70 @@ const DocumentCollection = () => {
       toast.error('Failed to download document');
     }
   };
-  // Add these handler functions in the DocumentCollection component
 
-const handleViewDocuments = async (employee) => {
-  setSelectedEmployee(employee);
-  setShowDocumentsModal(true);
-  await fetchEmployeeDocuments(employee.id);
-};
+  const handleViewDocuments = async (employee) => {
+    setSelectedEmployee(employee);
+    setShowDocumentsModal(true);
+    await fetchEmployeeDocuments(employee.id);
+  };
 
-const handleRequestDocument = (employeeId) => {
-  const employee = employeesData.find(emp => emp.id === employeeId);
-  setSelectedEmployeeForRequest(employee);
-  setShowDocumentRequestModal(true);
-};
+  const handleRequestDocument = (employeeId) => {
+    const employee = employeesData.find(emp => emp.id === employeeId);
+    setSelectedEmployeeForRequest(employee);
+    setSelectedDocuments([]);
+    setShowDocumentRequestModal(true);
+  };
 
-const handleCloseModal = () => {
-  setShowDocumentsModal(false);
-  setSelectedEmployee(null);
-  setEmployeeDocuments([]);
-};
+  const handleCloseModal = () => {
+    setShowDocumentsModal(false);
+    setSelectedEmployee(null);
+    setEmployeeDocuments([]);
+  };
 
-const handleSpecificDocumentRequest = async (documentType) => {
-  if (selectedEmployeeForRequest) {
-    await requestDocument(selectedEmployeeForRequest.id, documentType);
+  const handleToggleDocumentSelection = (documentName) => {
+    setSelectedDocuments(prev => {
+      const isAlreadySelected = prev.includes(documentName);
+      if (isAlreadySelected) {
+        // Remove from selection
+        return prev.filter(d => d !== documentName);
+      } else {
+        // Add to selection
+        return [...prev, documentName];
+      }
+    });
+  };
+
+  const handleSelectAllDocuments = () => {
+    const allDocNames = getAllDocumentTypes().map(doc => doc.name);
+    setSelectedDocuments(allDocNames);
+  };
+
+  const handleClearAllDocuments = () => {
+    setSelectedDocuments([]);
+  };
+
+  const handleSendDocumentRequest = async () => {
+    if (selectedEmployeeForRequest && selectedDocuments.length > 0) {
+      await requestDocument(selectedEmployeeForRequest.id, selectedDocuments);
+      setShowDocumentRequestModal(false);
+      setSelectedEmployeeForRequest(null);
+      setSelectedDocuments([]);
+    } else if (selectedDocuments.length === 0) {
+      toast.error('Please select at least one document');
+    }
+  };
+
+  const handleCloseRequestModal = () => {
     setShowDocumentRequestModal(false);
     setSelectedEmployeeForRequest(null);
-  }
-};
+    setSelectedDocuments([]);
+  };
+
   // ------------------ Initialization ------------------
   useEffect(() => {
     fetchEmployeesData();
     fetchRequestLogs();
   }, []);
-
 
   return (
     <div className="p-6 bg-gray-50 min-h-screen">
@@ -526,13 +560,10 @@ const handleSpecificDocumentRequest = async (documentType) => {
           <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full mx-4 max-h-[70vh] overflow-y-auto">
             <div className="flex items-center justify-between p-6 border-b border-gray-200">
               <h3 className="text-xl font-semibold text-gray-900">
-                Request Document from {selectedEmployeeForRequest.name}
+                Request Documents from {selectedEmployeeForRequest.name}
               </h3>
               <button 
-                onClick={() => {
-                  setShowDocumentRequestModal(false);
-                  setSelectedEmployeeForRequest(null);
-                }}
+                onClick={handleCloseRequestModal}
                 className="text-gray-400 hover:text-gray-600 transition-colors"
               >
                 <X size={24} />
@@ -540,44 +571,97 @@ const handleSpecificDocumentRequest = async (documentType) => {
             </div>
             
             <div className="p-6">
-              <p className="text-sm text-gray-600 mb-4">
-                Select which document you want to request from {selectedEmployeeForRequest.name}:
-              </p>
+              <div className="flex items-center justify-between mb-4">
+                <p className="text-sm text-gray-600">
+                  Select multiple documents you want to request from {selectedEmployeeForRequest.name}:
+                </p>
+                <div className="flex space-x-2">
+                  <button
+                    onClick={handleSelectAllDocuments}
+                    className="text-xs px-2 py-1 text-blue-600 hover:text-blue-800 underline"
+                  >
+                    Select All
+                  </button>
+                  {selectedDocuments.length > 0 && (
+                    <button
+                      onClick={handleClearAllDocuments}
+                      className="text-xs px-2 py-1 text-red-600 hover:text-red-800 underline"
+                    >
+                      Clear All
+                    </button>
+                  )}
+                </div>
+              </div>
+              
+              {selectedDocuments.length > 0 && (
+                <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                  <p className="text-sm font-medium text-blue-900 mb-2">
+                    Selected Documents ({selectedDocuments.length}):
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {selectedDocuments.map((doc) => (
+                      <span key={doc} className="inline-flex items-center px-2 py-1 bg-blue-100 text-blue-800 rounded-md text-xs">
+                        {doc}
+                        <button
+                          onClick={() => handleToggleDocumentSelection(doc)}
+                          className="ml-1 text-blue-600 hover:text-blue-800"
+                        >
+                          <X size={12} />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {getAllDocumentTypes().map((docType) => (
-                  <button
-                    key={docType.id}
-                    onClick={() => handleSpecificDocumentRequest(docType.name)}
-                    className="flex items-center p-3 text-left border border-gray-200 rounded-lg hover:border-blue-300 hover:bg-blue-50 transition-colors"
-                  >
-                    <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center mr-3">
-                      <span className="text-sm">📄</span>
-                    </div>
-                    <div>
-                      <div className="text-sm font-medium text-gray-900">{docType.name}</div>
-                      <div className="text-xs text-gray-500">{docType.type}</div>
-                    </div>
-                  </button>
-                ))}
+                {getAllDocumentTypes().map((docType) => {
+                  const isSelected = selectedDocuments.includes(docType.name);
+                  return (
+                    <button
+                      key={docType.id}
+                      onClick={() => handleToggleDocumentSelection(docType.name)}
+                      className={`flex items-center p-3 text-left border rounded-lg transition-colors ${
+                        isSelected
+                          ? 'border-blue-500 bg-blue-50'
+                          : 'border-gray-200 hover:border-blue-300 hover:bg-blue-50'
+                      }`}
+                    >
+                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center mr-3 ${
+                        isSelected ? 'bg-blue-200' : 'bg-blue-100'
+                      }`}>
+                        <span className="text-sm">📄</span>
+                      </div>
+                      <div className="flex-1">
+                        <div className="text-sm font-medium text-gray-900">{docType.name}</div>
+                        <div className="text-xs text-gray-500">{docType.type}</div>
+                      </div>
+                      {isSelected && (
+                        <CheckCircle className="w-5 h-5 text-blue-600" />
+                      )}
+                    </button>
+                  );
+                })}
               </div>
             </div>
             
             <div className="flex justify-end items-center p-6 border-t border-gray-200 space-x-3">
               <button 
-                onClick={() => {
-                  setShowDocumentRequestModal(false);
-                  setSelectedEmployeeForRequest(null);
-                }}
+                onClick={handleCloseRequestModal}
                 className="px-4 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 transition-colors"
               >
                 Cancel
               </button>
               <button 
-                onClick={() => handleSpecificDocumentRequest('General Document')}
-                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                onClick={handleSendDocumentRequest}
+                disabled={selectedDocuments.length === 0}
+                className={`px-4 py-2 rounded-md transition-colors ${
+                  selectedDocuments.length > 0
+                    ? 'bg-blue-600 text-white hover:bg-blue-700'
+                    : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                }`}
               >
-                Request General Document
+                Send Request ({selectedDocuments.length} {selectedDocuments.length === 1 ? 'document' : 'documents'})
               </button>
             </div>
           </div>

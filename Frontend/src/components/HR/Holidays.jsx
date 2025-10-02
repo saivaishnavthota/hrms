@@ -95,9 +95,10 @@ const Holidays = () => {
   };
 
 
- const fetchHolidays = async () => {
+  const fetchHolidays = async () => {
     try {
       const data = await calendarAPI.getHolidays();
+      console.log("API Response:", data); // Debug log
       if (data.status === "success") {
         const transformed = data.data.map((holiday) => ({
           id: holiday.id,
@@ -106,6 +107,7 @@ const Holidays = () => {
           date: holiday.holiday_date,
           status: "Active",
         }));
+        console.log("Transformed holidays:", transformed); // Debug log
         setHolidays(transformed);
       }
     } catch (error) {

@@ -7,14 +7,14 @@ services:
       dockerfile: Dockerfile
     container_name: fastapi_app
     ports:
-      - "8000:8000"
+      - "${BACKEND_PORT}:${BACKEND_PORT}"   # 👈 dynamic port
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./Backend/init.sql:/docker-entrypoint-initdb.d/init.sql  # Add this line
-    
+      - ./Backend/init.sql:/docker-entrypoint-initdb.d/init.sql
     depends_on:
       - db
     environment:
+      PORT: ${BACKEND_PORT}  # 👈 pass env to container
       DATABASE_URL: postgresql://admin:nxzen%40123@db:5432/Nxzen
     networks:
       - app-network
@@ -25,7 +25,7 @@ services:
       dockerfile: Dockerfile
     container_name: react_app
     ports:
-      - "3000:80"
+      - "${FRONTEND_PORT}:80"
     depends_on:
       - backend
     networks:
@@ -39,7 +39,7 @@ services:
       POSTGRES_PASSWORD: nxzen@123
       POSTGRES_DB: Nxzen
     ports:
-      - "5432:5432"
+      - "${POSTGRES_PORT}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:

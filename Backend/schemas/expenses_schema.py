@@ -2,18 +2,15 @@ from datetime import date, datetime
 from typing import Optional, List
 from sqlmodel import SQLModel
 
-
 class ExpenseAttachmentCreate(SQLModel):
     file_name: str
-    file_path: str
+    file_url: str  # Changed from file_path
     file_type: Optional[str] = None
     file_size: Optional[float] = None
-
 
 class ExpenseAttachmentRead(ExpenseAttachmentCreate):
     attachment_id: int
     uploaded_at: datetime
-
 
 class ExpenseHistoryRead(SQLModel):
     action_by: int
@@ -21,7 +18,6 @@ class ExpenseHistoryRead(SQLModel):
     action: str
     reason: Optional[str]
     created_at: datetime
-
 
 class ExpenseRequestCreate(SQLModel):
     employee_id: int
@@ -31,7 +27,6 @@ class ExpenseRequestCreate(SQLModel):
     description: Optional[str] = None
     expense_date: date
     tax_included: bool = False
-
 
 class ExpenseRequestRead(SQLModel):
     request_id: int
@@ -48,4 +43,4 @@ class ExpenseRequestRead(SQLModel):
     updated_at: datetime
 
     attachments: List[ExpenseAttachmentRead] = []
-    history: List[ExpenseHistoryRead] = []  
+    history: List[ExpenseHistoryRead] = []

@@ -1,8 +1,9 @@
+
+
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   Eye,
   Search,
-  Filter,
   Plus,
   CheckCircle,
   XCircle,
@@ -37,13 +38,12 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-  DialogBody,
 } from '@/components/ui/dialog';
 import { useUser } from '@/contexts/UserContext';
 import HRExpenseForm from './HRExpenseForm';
+import NewExpenseForm from '../Manager/NewExpenseForm'; 
 import { toast } from 'react-toastify';
-import api, { expensesAPI } from '@/lib/api';
-
+import api from '@/lib/api';
 
 const ExpenseManagement = () => {
   const { user } = useUser();
@@ -55,6 +55,7 @@ const ExpenseManagement = () => {
   const [selectedExpense, setSelectedExpense] = useState(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [isNewExpenseOpen, setIsNewExpenseOpen] = useState(false);
+  const [isOwnExpenseOpen, setIsOwnExpenseOpen] = useState(false); // New state for HR's own expense form
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [myExpenses, setMyExpenses] = useState([]);
@@ -67,9 +68,21 @@ const ExpenseManagement = () => {
 
   const token = useMemo(() => localStorage.getItem('authToken'), []);
 
+  // Helper to get employeeId with localStorage fallback
+  const getEmployeeId = () => {
+    let employeeId = user?.employeeId;
+    if (!employeeId) {
+      const stored = localStorage.getItem('userData');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        employeeId = parsed?.employeeId;
+      }
+    }
+    return employeeId;
+  };
+
   // Fallback implementation for avatarBg
   const getAvatarColor = (name) => {
-    // Simple hash function to generate a color based on name
     const colors = ['bg-blue-500', 'bg-green-500', 'bg-purple-500', 'bg-red-500', 'bg-indigo-500'];
     const index = name ? name.length % colors.length : 0;
     return colors[index];
@@ -93,125 +106,149 @@ const ExpenseManagement = () => {
     }
   };
 
-  const mapStatus = (item) => {
-    const s = (item.hr_status || item.status || '').toLowerCase();
-    switch (s) {
-      case 'pending':
+  const mapStatus = (status) => {
+    switch (status?.toLowerCase()) {
       case 'pending_hr_approval':
-        
         return 'Pending';
       case 'approved':
       case 'pending_account_mgr_approval':
-
         return 'Approved';
-      case 'rejected':
       case 'hr_rejected':
         return 'Rejected';
-
       default:
-        return item.hr_status || item.status || 'Pending';
+        return status || 'Pending';
     }
   };
 
   const mapExpense = (item) => ({
-    id: item.request_id || item.id,
-    requestId: item.request_id || item.id,
+    id: item.id,
+    requestId: item.id,
     employee: {
-      name: item.employeeName || item.employee_name || item.employee || 'Unknown',
-      email: item.employeeEmail || item.employee_email || item.email || '',
-      avatar: getInitials(
-        item.employeeName || item.employee_name || item.employee || 'U'
-      ),
+      name: item.employeeName || 'Unknown',
+      email: item.employeeEmail || '',
+      avatar: getInitials(item.employeeName || 'U'),
     },
     category: item.category || 'N/A',
     amount: Number(item.amount || 0),
+    currency: item.currency || 'INR',
     details: item.description || '',
-    submittedOn: formatDate(
-      item.submitted_at || item.created_at || item.expense_date || item.date
-    ),
-    status: mapStatus(item),
-    attachments:
-      item.attachments ||
-      (item.attachment
-        ? [{ file_name: 'Attachment', file_path: item.attachment }]
-        : item.attachment_url
-        ? [{ file_name: 'Attachment', file_path: item.attachment_url }]
-        : []),
+    submittedOn: formatDate(item.submitted_at),
+    status: mapStatus(item.status),
+    attachments: item.attachments || [],
   });
 
-  const fetchPendingExpenses = async (year = selectedYear, month = selectedMonth) => {
-     if (!user?.employeeId) return toast.error("Missing HR ID in user context");
-    if (!token) return toast.error("Missing authentication token");
-
-    setLoading(true);
-    
-     try {
-      const res = await expensesAPI.getHRExpenseList({ hr_id: user.employeeId, year, month });
-      const mapped = (res || []).map(mapExpense);
-      setExpenses(mapped.filter((e) => (e.status || "").toLowerCase() === "pending"));
-    } catch (err) {
-      console.error("Error fetching pending expenses:", err);
-      toast.error("Failed to fetch pending requests");
-      setExpenses([]);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-
- const fetchAllExpenses = async (year = selectedYear, month = selectedMonth) => {
-    if (!user?.employeeId) return setError("Missing HR ID in user context");
-    if (!token) return toast.error("Missing authentication token");
-
-    setLoading(true);
-    try {
-      const res = await expensesAPI.getHRExpenseList({ hr_id: user.employeeId, year, month });
-      const mapped = (res || []).map(mapExpense);
-      setExpenses(
-        mapped.filter((e) => {
-          const s = (e.status || "").toLowerCase();
-          return s === "approved" || s === "rejected";
-        })
-      );
-    } catch (err) {
-      console.error("Error fetching all expenses:", err);
-      toast.error("Failed to fetch expense list");
-      setExpenses([]);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const mapMyExpense = (item) => ({
-    id: item.request_id || item.id,
+    id: item.request_id,
     category: item.category || 'N/A',
-    date: formatDate(item.expense_date || item.date || item.submitted_at),
+    date: formatDate(item.expense_date || item.submitted_at),
     amount: Number(item.amount || 0),
     currency: item.currency || 'INR',
     description: item.description || '',
-    status: item.status || 'Pending',
-    approvals: item.approvals || [],
+    status: mapStatus(item.status),
+    approvals: item.history?.map((h) => ({
+      name: h.action_by_name,
+      role: h.action_role,
+      reason: h.reason || '-',
+      status: mapStatus(h.action),
+    })) || [],
   });
 
+  const fetchPendingExpenses = async (year = selectedYear, month = selectedMonth) => {
+    const employeeId = getEmployeeId();
+    if (!employeeId) {
+      setError('Missing HR ID in user context or local storage');
+      toast.error('Missing HR ID. Please log in again.');
+      return;
+    }
+    if (!token) {
+      setError('Missing authentication token');
+      toast.error('Missing authentication token');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const response = await api.get('/expenses/hr-exp-list', {
+        params: { hr_id: employeeId, year, month },
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const mapped = (response.data || []).map(mapExpense);
+      setExpenses(mapped.filter((e) => e.status.toLowerCase() === 'pending'));
+      setError(null);
+    } catch (err) {
+      console.error('Error fetching pending expenses:', err);
+      setError('Failed to fetch pending requests');
+      toast.error(err.response?.data?.detail || 'Failed to fetch pending requests');
+      setExpenses([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchAllExpenses = async (year = selectedYear, month = selectedMonth) => {
+    const employeeId = getEmployeeId();
+    if (!employeeId) {
+      setError('Missing HR ID in user context or local storage');
+      toast.error('Missing HR ID. Please log in again.');
+      return;
+    }
+    if (!token) {
+      setError('Missing authentication token');
+      toast.error('Missing authentication token');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const response = await api.get('/expenses/hr-exp-list', {
+        params: { hr_id: employeeId, year, month },
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const mapped = (response.data || []).map(mapExpense);
+      setExpenses(mapped.filter((e) => e.status.toLowerCase() !== 'pending'));
+      setError(null);
+    } catch (err) {
+      console.error('Error fetching all expenses:', err);
+      setError('Failed to fetch expense list');
+      toast.error(err.response?.data?.detail || 'Failed to fetch expense list');
+      setExpenses([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const fetchMyExpenses = async (year = selectedYear, month = selectedMonth) => {
-    if (!user?.employeeId) return setError("Missing employee ID in user context");
-    if (!token) return toast.error("Missing authentication token");
+    const employeeId = getEmployeeId();
+    if (!employeeId) {
+      setError('Missing employee ID in user context or local storage');
+      toast.error('Missing employee ID. Please log in again.');
+      return;
+    }
+    if (!token) {
+      setError('Missing authentication token');
+      toast.error('Missing authentication token');
+      return;
+    }
 
     setMyLoading(true);
     try {
-      const res = await expensesAPI.getMyExpenses({ employee_id: user.employeeId, year, month });
-      const mapped = (res || []).map(mapMyExpense);
+      const response = await api.get('/expenses/my-expenses', {
+        params: { employee_id: employeeId, year, month },
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const mapped = (response.data || []).map(mapMyExpense);
       setMyExpenses(mapped);
+      setMyError(null);
     } catch (err) {
-      console.error("Error fetching my expenses:", err);
-      toast.error("Failed to fetch my expense history");
+      console.error('Error fetching my expenses:', err);
+      setMyError('Failed to fetch my expense history');
+      toast.error(err.response?.data?.detail || 'Failed to fetch my expense history');
       setMyExpenses([]);
     } finally {
       setMyLoading(false);
     }
   };
 
-  // Handle filter changes
   const handleFilterChange = () => {
     if (activeTab === 'pending') fetchPendingExpenses(selectedYear, selectedMonth);
     else if (activeTab === 'my') fetchMyExpenses(selectedYear, selectedMonth);
@@ -224,7 +261,7 @@ const ExpenseManagement = () => {
     if (activeTab === 'pending') fetchPendingExpenses(selectedYear, selectedMonth);
     else if (activeTab === 'my') fetchMyExpenses(selectedYear, selectedMonth);
     else fetchAllExpenses(selectedYear, selectedMonth);
-  }, [activeTab, user?.employeeId, token, selectedYear, selectedMonth]);
+  }, [activeTab, token, selectedYear, selectedMonth]);
 
   const handleViewDetails = (expense) => {
     setSelectedExpense(expense);
@@ -233,80 +270,97 @@ const ExpenseManagement = () => {
 
   const handleNewExpenseSuccess = () => {
     setIsNewExpenseOpen(false);
+    setIsOwnExpenseOpen(false); // Close HR's own expense form
     if (activeTab === 'pending') fetchPendingExpenses();
     else if (activeTab === 'all') fetchAllExpenses();
     else if (activeTab === 'my') fetchMyExpenses();
   };
 
-   const handleApprove = async (expense) => {
+  const handleApprove = async (expense) => {
+    const employeeId = getEmployeeId();
+    if (!employeeId) {
+      toast.error('Missing HR ID. Please log in again.');
+      return;
+    }
     try {
       const { isConfirmed, value } = await Swal.fire({
-        title: "Approve Expense",
-        input: "textarea",
-        inputLabel: "Reason (optional)",
-        inputPlaceholder: "Enter approval reason...",
+        title: 'Approve Expense',
+        input: 'textarea',
+        inputLabel: 'Reason (optional)',
+        inputPlaceholder: 'Enter approval reason...',
         showCancelButton: true,
-        confirmButtonText: "Submit",
+        confirmButtonText: 'Submit',
       });
       if (!isConfirmed) return;
 
-      const reason = (value || "-").trim() || "-";
+      const formData = new FormData();
+      formData.append('hr_id', employeeId);
+      formData.append('status', 'Approved');
+      formData.append('reason', (value || '-').trim() || '-');
 
-      await expensesAPI.updateExpenseStatusByHR(expense.requestId, {
-        hr_id: user.employeeId,
-        status: "Approved",
-        reason,
+      await api.put(`/expenses/hr-upd-status/${expense.requestId}`, formData, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'multipart/form-data',
+        },
       });
 
-      toast.success("Expense approved");
+      toast.success('Expense approved');
       setExpenses((prev) =>
-        activeTab === "pending"
+        activeTab === 'pending'
           ? prev.filter((e) => e.requestId !== expense.requestId)
           : prev.map((e) =>
-              e.requestId === expense.requestId ? { ...e, status: "Approved" } : e
+              e.requestId === expense.requestId ? { ...e, status: 'Approved' } : e
             )
       );
     } catch (err) {
-      console.error("Approve failed:", err);
-      toast.error("Failed to approve expense");
+      console.error('Approve failed:', err);
+      toast.error(err.response?.data?.detail || 'Failed to approve expense');
     }
   };
 
-
- const handleReject = async (expense) => {
+  const handleReject = async (expense) => {
+    const employeeId = getEmployeeId();
+    if (!employeeId) {
+      toast.error('Missing HR ID. Please log in again.');
+      return;
+    }
     try {
       const { isConfirmed, value } = await Swal.fire({
-        title: "Reject Expense",
-        input: "textarea",
-        inputLabel: "Reason (optional)",
-        inputPlaceholder: "Enter rejection reason...",
+        title: 'Reject Expense',
+        input: 'textarea',
+        inputLabel: 'Reason (optional)',
+        inputPlaceholder: 'Enter rejection reason...',
         showCancelButton: true,
-        confirmButtonText: "Submit",
+        confirmButtonText: 'Submit',
       });
       if (!isConfirmed) return;
 
-      const reason = (value || "-").trim() || "-";
+      const formData = new FormData();
+      formData.append('hr_id', employeeId);
+      formData.append('status', 'Rejected');
+      formData.append('reason', (value || '-').trim() || '-');
 
-      await expensesAPI.updateExpenseStatusByHR(expense.requestId, {
-        hr_id: user.employeeId,
-        status: "Rejected",
-        reason,
+      await api.put(`/expenses/hr-upd-status/${expense.requestId}`, formData, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'multipart/form-data',
+        },
       });
 
-      toast.success("Expense rejected");
+      toast.success('Expense rejected');
       setExpenses((prev) =>
-        activeTab === "pending"
+        activeTab === 'pending'
           ? prev.filter((e) => e.requestId !== expense.requestId)
           : prev.map((e) =>
-              e.requestId === expense.requestId ? { ...e, status: "Rejected" } : e
+              e.requestId === expense.requestId ? { ...e, status: 'Rejected' } : e
             )
       );
     } catch (err) {
-      console.error("Reject failed:", err);
-      toast.error("Failed to reject expense");
+      console.error('Reject failed:', err);
+      toast.error(err.response?.data?.detail || 'Failed to reject expense');
     }
   };
-
 
   const filteredExpenses = expenses.filter((expense) => {
     const q = searchTerm.toLowerCase();
@@ -320,9 +374,6 @@ const ExpenseManagement = () => {
       (expense.status || '').toLowerCase() === statusFilter.toLowerCase();
     return matchesSearch && matchesStatus;
   });
-
-  console.log('Filtered Expenses:', filteredExpenses);
-  console.log('My Expenses:', myExpenses);
 
   const getStatusBadge = (status) => {
     switch ((status || '').toLowerCase()) {
@@ -359,15 +410,24 @@ const ExpenseManagement = () => {
           <h1 className="text-2xl font-semibold text-gray-900">Expense Management</h1>
           <p className="text-gray-600 mt-1">Review and approve team expense claims</p>
         </div>
-        <Button
-          className="bg-blue-500 hover:bg-blue-600 text-white"
-          onClick={() => setIsNewExpenseOpen(true)}
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          Add Expense for Employee
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            className="bg-blue-500 hover:bg-blue-600 text-white"
+            onClick={() => setIsNewExpenseOpen(true)}
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Add Expense for Employee
+          </Button>
+          <Button
+            className="bg-blue-500 hover:bg-blue-600 text-white"
+            onClick={() => setIsOwnExpenseOpen(true)}
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Add My Expense
+          </Button>
+        </div>
       </div>
- <div className="flex items-center justify-between gap-4">
+      <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-4 flex-1">
           <div className="relative flex-1 max-w-sm">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
@@ -389,9 +449,7 @@ const ExpenseManagement = () => {
               <SelectItem value="rejected">Rejected</SelectItem>
             </SelectContent>
           </Select>
-         
         </div>
-
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2 text-sm text-gray-600">
             <span>Per Page:</span>
@@ -409,8 +467,6 @@ const ExpenseManagement = () => {
           </div>
         </div>
       </div>
-
-
       <div className="mb-2">
         <div className="border-b border-gray-200">
           <nav className="-mb-px flex space-x-8">
@@ -447,7 +503,6 @@ const ExpenseManagement = () => {
           </nav>
         </div>
       </div>
-
 
       {activeTab === 'my' && (
         <div className="bg-white rounded-lg shadow-sm border border-gray-200">
@@ -488,42 +543,35 @@ const ExpenseManagement = () => {
                           </Button>
                         </DialogTrigger>
                         <DialogContent className="max-w-2xl p-0">
-              
-                          <DialogBody>
-                       {/* <div className="fixed inset-0 bg-black/20 backdrop-blur-[2px] flex items-center justify-center z-50"> */}
-                       {/* <div className="bg-gradient-to-br from-white via-gray-50 to-blue-50 rounded-xl shadow-2xl max-w-2xl w-full mx-4 max-h-[100vh] overflow-y-auto border border-gray-200"> */}
-                       <div className="flex justify-between items-center p-6 border-b border-gray-200 bg-gradient-to-r from-gray-600 to-blue-600 rounded-t-xl">
-                      <h3 className="text-lg font-semibold text-white">
-                      Submitted Expense Details
-                       </h3>
-                      </div>
-               <div className="space-y-4 p-6">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
-
-                            <div className="rounded-lg p-4 bg-white">
-                  <div className="text-gray-500">Category</div>
-                  <div className="font-medium text-gray-800">{item.category}</div>
-                </div>
-
-                <div className="rounded-lg p-4 bg-white">
-                  <div className="text-gray-500">Date</div>
-                  <div className="font-medium text-gray-800">{item.date}</div>
-                  </div>
-            <div className="rounded-lg p-4 bg-white">
-                  <div className="text-gray-500">Amount</div>
-                  <div className="font-medium text-gray-800">{item.amount}{item.currency}</div>
-                  </div>
-                <div className="rounded-lg p-4 bg-white">
-                  <div className="text-gray-500">Description</div>
-                  <div className="font-medium text-gray-800">{item.description}</div>
-                  </div>
-                
-                     
+                          <div className="w-full bg-gradient-to-br from-white via-gray-50 to-blue-50 rounded-xl shadow-2xl max-h-[100vh] overflow-y-auto border border-gray-200">
+                            <div className="flex justify-between items-center p-6 border-b border-gray-200 bg-gradient-to-r from-gray-600 to-blue-600 rounded-t-xl">
+                              <h3 className="text-lg font-semibold text-white">
+                                Submitted Expense Details
+                              </h3>
                             </div>
+                            <div className="space-y-4 p-6">
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+                                <div className="rounded-lg p-4 bg-white">
+                                  <div className="text-gray-500">Category</div>
+                                  <div className="font-medium text-gray-800">{item.category}</div>
+                                </div>
+                                <div className="rounded-lg p-4 bg-white">
+                                  <div className="text-gray-500">Date</div>
+                                  <div className="font-medium text-gray-800">{item.date}</div>
+                                </div>
+                                <div className="rounded-lg p-4 bg-white">
+                                  <div className="text-gray-500">Amount</div>
+                                  <div className="font-medium text-gray-800">
+                                    {item.amount} {item.currency}
+                                  </div>
+                                </div>
+                                <div className="rounded-lg p-4 bg-white">
+                                  <div className="text-gray-500">Description</div>
+                                  <div className="font-medium text-gray-800">{item.description}</div>
+                                </div>
+                              </div>
                             </div>
-                            {/* </div> */}
-                          {/* </div> */}
-                          </DialogBody>
+                          </div>
                         </DialogContent>
                       </Dialog>
                     </TableCell>
@@ -540,70 +588,63 @@ const ExpenseManagement = () => {
                         {item.status}
                       </span>
                     </TableCell>
-                
                     <TableCell className="px-6 py-4">
-                     <Dialog>
-  <DialogTrigger asChild>
-    <Button
-      variant="ghost"
-      size="sm"
-      className="text-blue-800 hover:text-foreground blue-800 "
-    >
-      <Eye className="h-4 w-4" />
-    </Button>
-  </DialogTrigger>
-
-  {/* Apply same themed dialog */}
-  <DialogContent className="max-w-2xl p-0">
-    <div className="w-full bg-gradient-to-br from-white via-gray-50 to-blue-50 rounded-xl shadow-2xl max-h-[100vh] overflow-y-auto border border-gray-200">
-      <div className="flex justify-between items-center p-6 border-b border-gray-200 bg-gradient-to-r from-gray-600 to-blue-600 rounded-t-xl">
-        <h3 className="text-lg font-semibold text-white">
-          Manager & HR Details
-        </h3>
-      </div>
-
-      <div className="space-y-4 p-6">
-        {(item.approvals || []).map((appr, idx) => (
-          <div
-            key={idx}
-            className="rounded-lg border border-gray-200 bg-white shadow-sm p-4 space-y-2"
-          >
-            <div className="flex justify-between">
-              <p className="font-medium text-gray-700">Name</p>
-              <p className="text-gray-900">{appr.name}</p>
-            </div>
-
-            <div className="flex justify-between">
-              <p className="font-medium text-gray-700">Role</p>
-              <p className="text-gray-900">{appr.role}</p>
-            </div>
-
-            <div className="flex justify-between">
-              <p className="font-medium text-gray-700">Reason</p>
-              <p className="text-gray-900">{appr.reason || '-'}</p>
-            </div>
-
-            <div className="flex justify-between">
-              <p className="font-medium text-gray-700">Status</p>
-              <span
-                className={`${
-                  appr.status === "Approved"
-                    ? "text-green-700 bg-green-50 border border-green-200"
-                    : appr.status === "Rejected"
-                    ? "text-red-700 bg-red-50 border border-red-200"
-                    : "text-yellow-700 bg-yellow-50 border border-yellow-200"
-                } px-3 py-1 rounded-md text-xs font-medium`}
-              >
-                {appr.status}
-              </span>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  </DialogContent>
-</Dialog>
-</TableCell>
+                      <Dialog>
+                        <DialogTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-blue-800 hover:text-blue-800"
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent className="max-w-2xl p-0">
+                          <div className="w-full bg-gradient-to-br from-white via-gray-50 to-blue-50 rounded-xl shadow-2xl max-h-[100vh] overflow-y-auto border border-gray-200">
+                            <div className="flex justify-between items-center p-6 border-b border-gray-200 bg-gradient-to-r from-gray-600 to-blue-600 rounded-t-xl">
+                              <h3 className="text-lg font-semibold text-white">
+                                Manager & HR Details
+                              </h3>
+                            </div>
+                            <div className="space-y-4 p-6">
+                              {(item.approvals || []).map((appr, idx) => (
+                                <div
+                                  key={idx}
+                                  className="rounded-lg border border-gray-200 bg-white shadow-sm p-4 space-y-2"
+                                >
+                                  <div className="flex justify-between">
+                                    <p className="font-medium text-gray-700">Name</p>
+                                    <p className="text-gray-900">{appr.name}</p>
+                                  </div>
+                                  <div className="flex justify-between">
+                                    <p className="font-medium text-gray-700">Role</p>
+                                    <p className="text-gray-900">{appr.role}</p>
+                                  </div>
+                                  <div className="flex justify-between">
+                                    <p className="font-medium text-gray-700">Reason</p>
+                                    <p className="text-gray-900">{appr.reason || '-'}</p>
+                                  </div>
+                                  <div className="flex justify-between">
+                                    <p className="font-medium text-gray-700">Status</p>
+                                    <span
+                                      className={`${
+                                        appr.status === 'Approved'
+                                          ? 'text-green-700 bg-green-50 border border-green-200'
+                                          : appr.status === 'Rejected'
+                                          ? 'text-red-700 bg-red-50 border border-red-200'
+                                          : 'text-yellow-700 bg-yellow-50 border border-yellow-200'
+                                      } px-3 py-1 rounded-md text-xs font-medium`}
+                                    >
+                                      {appr.status}
+                                    </span>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </DialogContent>
+                      </Dialog>
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -612,10 +653,8 @@ const ExpenseManagement = () => {
         </div>
       )}
 
-    
       {activeTab !== 'my' && (
-        <div>
-          {/* Filter Controls */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200">
           <div className="p-6 border-b border-gray-200">
             <div className="flex gap-4 items-center">
               <div className="flex items-center gap-2">
@@ -635,7 +674,6 @@ const ExpenseManagement = () => {
                   })}
                 </select>
               </div>
-              
               <div className="flex items-center gap-2">
                 <label className="text-sm font-medium text-gray-700">Month:</label>
                 <select
@@ -654,7 +692,6 @@ const ExpenseManagement = () => {
                   })}
                 </select>
               </div>
-              
               <button
                 onClick={handleFilterChange}
                 className="px-4 py-1 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -663,7 +700,6 @@ const ExpenseManagement = () => {
               </button>
             </div>
           </div>
-          
           {loading ? (
             <div className="px-6 py-10 text-center text-gray-600">Loading expenses...</div>
           ) : error ? (
@@ -707,7 +743,9 @@ const ExpenseManagement = () => {
                     </TableCell>
                     <TableCell className="px-6 py-4 text-gray-700">{expense.category}</TableCell>
                     <TableCell className="px-6 py-4 font-medium text-gray-900">
-                      {new Intl.NumberFormat(undefined, { style: 'currency', currency: expense.currency || 'INR' }).format(expense.amount)}
+                      {new Intl.NumberFormat(undefined, { style: 'currency', currency: expense.currency || 'INR' }).format(
+                        expense.amount
+                      )}
                     </TableCell>
                     <TableCell className="px-6 py-4 text-gray-700">
                       <Button
@@ -721,9 +759,7 @@ const ExpenseManagement = () => {
                       </Button>
                     </TableCell>
                     <TableCell className="px-6 py-4 text-gray-700">{expense.submittedOn}</TableCell>
-                    <TableCell className="px-6 py-4">
-                      {getStatusBadge(expense.status)}
-                    </TableCell>
+                    <TableCell className="px-6 py-4">{getStatusBadge(expense.status)}</TableCell>
                     <TableCell className="px-6 py-4">
                       <div className="flex items-center gap-2">
                         <Button
@@ -798,7 +834,6 @@ const ExpenseManagement = () => {
                   <p className="text-sm text-gray-900">{selectedExpense.category}</p>
                 </div>
               </div>
-
               <div>
                 <label className="text-sm font-medium text-gray-500">Employee</label>
                 <div className="flex items-center gap-2 mt-1">
@@ -815,30 +850,30 @@ const ExpenseManagement = () => {
                   </div>
                 </div>
               </div>
-
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="text-sm font-medium text-gray-500">Amount</label>
-                  <p className="text-lg font-bold text-gray-900">{new Intl.NumberFormat(undefined, { style: 'currency', currency: selectedExpense.currency || 'INR' }).format(selectedExpense.amount)}</p>
+                  <p className="text-lg font-bold text-gray-900">
+                    {new Intl.NumberFormat(undefined, { style: 'currency', currency: selectedExpense.currency || 'INR' }).format(
+                      selectedExpense.amount
+                    )}
+                  </p>
                 </div>
                 <div>
                   <label className="text-sm font-medium text-gray-500">Status</label>
                   <div className="mt-1">{getStatusBadge(selectedExpense.status)}</div>
                 </div>
               </div>
-
               <div>
                 <label className="text-sm font-medium text-gray-500">Submitted On</label>
                 <p className="text-sm text-gray-900">{selectedExpense.submittedOn}</p>
               </div>
-
               <div>
                 <label className="text-sm font-medium text-gray-500">Details</label>
                 <p className="text-sm text-gray-900 bg-gray-50 p-3 rounded-md border">
                   {selectedExpense.details}
                 </p>
               </div>
-
               {selectedExpense.attachments?.length ? (
                 <div>
                   <label className="text-sm font-medium text-gray-500">Attachments</label>
@@ -846,7 +881,7 @@ const ExpenseManagement = () => {
                     {selectedExpense.attachments.map((att, idx) => (
                       <a
                         key={idx}
-                        href={att.file_path}
+                        href={att.file_url}
                         target="_blank"
                         rel="noreferrer"
                         className="text-blue-600 text-sm underline"
@@ -862,7 +897,7 @@ const ExpenseManagement = () => {
         </DialogContent>
       </Dialog>
 
-       <Dialog open={isNewExpenseOpen} onOpenChange={setIsNewExpenseOpen}>
+      <Dialog open={isNewExpenseOpen} onOpenChange={setIsNewExpenseOpen}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>Add Expense for Employee</DialogTitle>
@@ -873,7 +908,20 @@ const ExpenseManagement = () => {
             onCancel={() => setIsNewExpenseOpen(false)}
           />
         </DialogContent>
-      </Dialog> 
+      </Dialog>
+
+      <Dialog open={isOwnExpenseOpen} onOpenChange={setIsOwnExpenseOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Add My Expense</DialogTitle>
+            <DialogDescription>Add an expense for yourself</DialogDescription>
+          </DialogHeader>
+          <NewExpenseForm
+            onSuccess={handleNewExpenseSuccess}
+            onCancel={() => setIsOwnExpenseOpen(false)}
+          />
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

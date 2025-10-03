@@ -1,3 +1,5 @@
+
+
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   Eye,
@@ -40,12 +42,21 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { useNavigate } from 'react-router-dom';
-import api, { expensesAPI } from '@/lib/api';
+import api from '@/lib/api';
 import { avatarBg } from '../../lib/avatarColors';
+
+// Formatter for INR currency
+const formatINR = (amount) => {
+  return new Intl.NumberFormat('en-IN', {
+    style: 'currency',
+    currency: 'INR',
+    minimumFractionDigits: 2,
+  }).format(amount);
+};
 
 const AccountManagerExpenseManagement = () => {
   const navigate = useNavigate();
-  const [, setUserId] = useState(localStorage.getItem('userId')); // Fetch userId from localStorage
+  const [userId, setUserId] = useState(localStorage.getItem('userId')); // Fetch userId from localStorage
   const [activeTab, setActiveTab] = useState('pending');
   const [expenses, setExpenses] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -161,13 +172,15 @@ const AccountManagerExpenseManagement = () => {
         year: Number(selectedYear),
         month: Number(selectedMonth),
       });
-      const response = await expensesAPI.getAccountManagerExpenseList({
-        acc_mgr_id: userId,
-        year: Number(selectedYear),
-        month: Number(selectedMonth),
+      const response = await api.get('/expenses/acc-mgr-exp-list', {
+        params: {
+          acc_mgr_id: userId,
+          year: Number(selectedYear),
+          month: Number(selectedMonth),
+        },
       });
       console.log('Raw response:', response);
-      const data = Array.isArray(response) ? response : response?.results || [];
+      const data = Array.isArray(response.data) ? response.data : response.data?.results || [];
       console.log('Parsed data:', data);
       const mapped = data.map(mapExpense);
       console.log('Mapped expenses:', mapped);
@@ -185,7 +198,7 @@ const AccountManagerExpenseManagement = () => {
   const fetchAllExpenses = async () => {
     const userId = localStorage.getItem('userId');
     if (!userId) {
-    toast.error('Missing account manager ID. Please log in.');
+      toast.error('Missing account manager ID. Please log in.');
       navigate('/login', { replace: true });
       return;
     }
@@ -197,24 +210,26 @@ const AccountManagerExpenseManagement = () => {
         year: Number(selectedYear),
         month: Number(selectedMonth),
       });
-      const response = await expensesAPI.getAccountManagerExpenseList({
-        acc_mgr_id: userId,
-        year: Number(selectedYear),
-        month: Number(selectedMonth),
+      const response = await api.get('/expenses/acc-mgr-exp-list', {
+        params: {
+          acc_mgr_id: userId,
+          year: Number(selectedYear),
+          month: Number(selectedMonth),
+        },
       });
       console.log('Raw response:', response);
-      const data = Array.isArray(response) ? response : response?.results || [];
+      const data = Array.isArray(response.data) ? response.data : response.data?.results || [];
       console.log('Parsed data:', data);
       const mapped = data.map(mapExpense);
       console.log('Mapped expenses:', mapped);
 
-    setExpenses(mapped.filter((e) => 
-      e.status.toLowerCase() === 'approved' || e.status.toLowerCase() === 'rejected'
-    ));
+      setExpenses(mapped.filter((e) => 
+        e.status.toLowerCase() === 'approved' || e.status.toLowerCase() === 'rejected'
+      ));
 
     } catch (err) {
       console.error('Error in fetchAllExpenses:', err, err.response?.data);
-       toast.error(`Failed to fetch expense list: ${err.message}`);
+      toast.error(`Failed to fetch expense list: ${err.message}`);
       setExpenses([]);
     } finally {
       setLoading(false);
@@ -250,19 +265,18 @@ const AccountManagerExpenseManagement = () => {
       form.append('status', 'Approved');
       form.append('reason', reason);
       
-      // Log FormData contents
       console.log('FormData for approve:', {
         acc_mgr_id: form.get('acc_mgr_id'),
         status: form.get('status'),
         reason: form.get('reason'),
       });
 
-      const response = await expensesAPI.updateExpenseStatusByAccountManager(expense.requestId, {
-        acc_mgr_id: form.get('acc_mgr_id'),
-        status: form.get('status'),
-        reason: form.get('reason'),
+      const response = await api.put(`/expenses/acc-mgr-upd-status/${expense.requestId}`, form, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
       });
-      console.log('Approve response:', response);
+      console.log('Approve response:', response.data);
 
       setExpenses((prev) =>
         activeTab === 'pending'
@@ -274,7 +288,6 @@ const AccountManagerExpenseManagement = () => {
       toast.success('Expense approved successfully!');
     } catch (err) {
       console.error('Approve failed:', err, err.response?.data);
-     
       toast.error(`Failed to approve expense: ${err.message}`);
     }
   };
@@ -308,19 +321,18 @@ const AccountManagerExpenseManagement = () => {
       form.append('status', 'Rejected');
       form.append('reason', reason);
       
-      // Log FormData contents
       console.log('FormData for reject:', {
         acc_mgr_id: form.get('acc_mgr_id'),
         status: form.get('status'),
         reason: form.get('reason'),
       });
 
-      const response = await expensesAPI.updateExpenseStatusByAccountManager(expense.requestId, {
-        acc_mgr_id: form.get('acc_mgr_id'),
-        status: form.get('status'),
-        reason: form.get('reason'),
+      const response = await api.put(`/expenses/acc-mgr-upd-status/${expense.requestId}`, form, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
       });
-      console.log('Reject response:', response);
+      console.log('Reject response:', response.data);
 
       setExpenses((prev) =>
         activeTab === 'pending'
@@ -329,11 +341,10 @@ const AccountManagerExpenseManagement = () => {
               e.requestId === expense.requestId ? { ...e, status: 'Rejected' } : e
             )
       );
-       toast.success('Expense rejected successfully!');
+      toast.success('Expense rejected successfully!');
     } catch (err) {
       console.error('Reject failed:', err, err.response?.data);
-     
-     toast.error(`Failed to reject expense: ${err.message}`);
+      toast.error(`Failed to reject expense: ${err.message}`);
     }
   };
 
@@ -354,7 +365,6 @@ const AccountManagerExpenseManagement = () => {
     return filtered;
   }, [expenses, searchTerm, statusFilter]);
 
-  // Client-side pagination
   const totalPages = Math.ceil(filteredExpenses.length / Number(perPage));
   const paginatedExpenses = filteredExpenses.slice(
     (page - 1) * Number(perPage),
@@ -563,7 +573,7 @@ const AccountManagerExpenseManagement = () => {
                     </div>
                   </TableCell>
                   <TableCell className="px-6 py-4 text-gray-700">{expense.category}</TableCell>
-                  <TableCell className="px-6 py-4 font-medium text-gray-900">${expense.amount.toFixed(2)}</TableCell>
+                  <TableCell className="px-6 py-4 font-medium text-gray-900">{formatINR(expense.amount)}</TableCell>
                   <TableCell className="px-6 py-4 text-gray-700">
                     <Button
                       variant="outline"
@@ -678,7 +688,7 @@ const AccountManagerExpenseManagement = () => {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="text-sm font-medium text-gray-500">Amount</label>
-                  <p className="text-lg font-bold text-gray-900">${selectedExpense.amount.toFixed(2)}</p>
+                  <p className="text-lg font-bold text-gray-900">{formatINR(selectedExpense.amount)}</p>
                 </div>
                 <div>
                   <label className="text-sm font-medium text-gray-500">Status</label>

@@ -1,11 +1,10 @@
-import React, { use, useMemo, useState } from 'react';
-
+import React, { useMemo, useState } from 'react';
 import { useUser } from '@/contexts/UserContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from '@/components/ui/select';
 import { toast } from 'react-toastify';
-import api from '@/lib/api'; //
+import api from '@/lib/api';
 
 const NewExpenseForm = ({ employeeIdOverride, onSuccess, onCancel }) => {
   const { user } = useUser();
@@ -21,13 +20,21 @@ const NewExpenseForm = ({ employeeIdOverride, onSuccess, onCancel }) => {
   });
   const [receiptFile, setReceiptFile] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [message,setMessage]=useState();
+  const [message, setMessage] = useState();
 
   const token = useMemo(() => localStorage.getItem('authToken'), []);
 
   const expenseCategories = [
-    'Travel', 'Food', 'Entertainment', 'Office Supplies', 'Software & Subscriptions',
-    'Training & Education', 'Communication', 'Marketing', 'Equipment', 'Other',
+    'Travel',
+    'Food',
+    'Entertainment',
+    'Office Supplies',
+    'Software & Subscriptions',
+    'Training & Education',
+    'Communication',
+    'Marketing',
+    'Equipment',
+    'Other',
   ];
 
   const handleFileChange = (e) => {
@@ -63,9 +70,9 @@ const NewExpenseForm = ({ employeeIdOverride, onSuccess, onCancel }) => {
       form.append('description', expenseData.description || expenseData.title || '');
       form.append('expense_date', expenseData.date);
       form.append('tax_included', expenseData.tax_included);
-      if (receiptFile) form.append('file', receiptFile);
+      if (receiptFile) form.append('files', receiptFile); // Changed 'file' to 'files'
 
-      const res = await api.post(`/expenses/submit-exp`, form, {
+      const res = await api.post('/expenses/submit-exp', form, {
         headers: {
           Authorization: token ? `Bearer ${token}` : '',
           'Content-Type': 'multipart/form-data',
@@ -87,15 +94,15 @@ const NewExpenseForm = ({ employeeIdOverride, onSuccess, onCancel }) => {
         tax_included: false,
       });
       setReceiptFile(null);
+      setMessage('');
 
     } catch (error) {
       console.error('Expense submission failed:', error);
-      toast.error(error.response?.data?.message || error.message || 'Failed to submit expense.');
+      toast.error(error.response?.data?.detail || error.message || 'Failed to submit expense.');
     } finally {
       setIsSubmitting(false);
     }
   };
-
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">

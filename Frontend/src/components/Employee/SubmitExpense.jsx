@@ -1,18 +1,18 @@
+
+
 import React, { useEffect, useState } from 'react';
 import { useUser } from '../../contexts/UserContext';
-import { Receipt, DollarSign, Calendar, Upload, X, CheckCircle, AlertCircle, Trash2,Eye } from 'lucide-react';
+import { Receipt, DollarSign, Calendar, Upload, X, CheckCircle, AlertCircle, Trash2, Eye } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table';
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from '@/components/ui/select';
 import api, { expensesAPI } from '@/lib/api';
 import { toast } from 'react-toastify';
-import { markDeleted, filterListByDeleted } from '../../lib/localDelete';
 
 const SubmitExpense = () => {
   const { user } = useUser();
   const [expenseData, setExpenseData] = useState({
-    title: '',
     category: '',
     amount: '',
     currency: 'INR',
@@ -22,7 +22,6 @@ const SubmitExpense = () => {
   });
   const [receipts, setReceipts] = useState([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [message, setMessage] = useState('');
   const [expenseHistory, setExpenseHistory] = useState([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyError, setHistoryError] = useState('');
@@ -31,7 +30,7 @@ const SubmitExpense = () => {
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
 
-  // popup states
+  // Popup states
   const [selectedRecord, setSelectedRecord] = useState(null);
   const [showProjectModal, setShowProjectModal] = useState(false);
 
@@ -72,7 +71,7 @@ const SubmitExpense = () => {
   };
 
   const mapStatus = (item) => {
-    const s = (item.manager_status || item.status || '').toLowerCase();
+    const s = (item.status || '').toLowerCase();
     switch (s) {
       case 'pending':
       case 'pending_manager_approval': return 'Pending Manager Approval';
@@ -82,30 +81,41 @@ const SubmitExpense = () => {
       case 'hr_rejected': return 'HR Rejected';
       case 'mgr_rejected': return 'Manager Rejected';
       case 'acc_mgr_rejected': return 'Account Manager Rejected';
-      default: return item.manager_status || item.status || 'Pending';
+      default: return item.status || 'Pending';
     }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsSubmitting(true);
-    setMessage('');
 
     try {
       let employeeId = user?.employeeId || JSON.parse(localStorage.getItem('userData') || '{}')?.employeeId;
       if (!employeeId) throw new Error('Employee ID not found. Please log in.');
 
-      const expensePayload = {
-        employee_id: Number(employeeId),
-        category: expenseData.category || 'Other',
-        amount: parseFloat(expenseData.amount || 0),
-        currency: expenseData.currency || 'INR',
-        description: expenseData.description || expenseData.title || '',
-        expense_date: expenseData.date,
-        tax_included: expenseData.tax_included
-      };
+      // Create FormData for multipart request
+      const formData = new FormData();
+      formData.append('employee_id', Number(employeeId));
+      formData.append('category', expenseData.category || 'Other');
+      formData.append('amount', parseFloat(expenseData.amount || 0));
+      formData.append('currency', expenseData.currency || 'INR');
+      formData.append('description', expenseData.description || '');
+      formData.append('expense_date', expenseData.date);
+      formData.append('tax_included', expenseData.tax_included);
 
-      const res = await expensesAPI.submitExpense(expensePayload);
+      // Append files
+      receipts.forEach(receipt => {
+        if (receipt.file) {
+          formData.append('files', receipt.file);
+        }
+      });
+
+      // Use the correct endpoint
+      const res = await api.post('/expenses/submit-exp', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
 
       toast.success(`Expense submitted successfully! Reference: ${res.data.request_code || res.data.request_id}`);
 
@@ -119,9 +129,23 @@ const SubmitExpense = () => {
       await loadExpenseHistory(employeeId);
 
     } catch (error) {
-      toast.error(error.response?.data?.message || error.message || 'Failed to submit expense');
+      console.error('Submit error:', error);
+      toast.error(error.response?.data?.detail || error.message || 'Failed to submit expense');
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleDeleteExpense = async (requestId) => {
+    try {
+      let employeeId = user?.employeeId || JSON.parse(localStorage.getItem('userData') || '{}')?.employeeId;
+      if (!employeeId) throw new Error('Employee ID not found. Please log in.');
+
+      await api.delete(`/expenses/${requestId}?user_id=${employeeId}`);
+      toast.success('Expense deleted successfully');
+      setExpenseHistory(prev => prev.filter(r => r.id !== requestId));
+    } catch (error) {
+      toast.error(error.response?.data?.detail || error.message || 'Failed to delete expense');
     }
   };
 
@@ -131,14 +155,15 @@ const SubmitExpense = () => {
     try {
       if (!employeeId) return;
 
-      const res = await expensesAPI.getMyExpenses({ employee_id: employeeId, year, month });
+      const res = await api.get('/expenses/my-expenses', {
+        params: { employee_id: employeeId, year, month }
+      });
       
       console.log('Expense API Response:', res);
-      console.log('Employee ID:', employeeId, 'Year:', year, 'Month:', month);
 
-      const mapped = (res || []).map((item) => {
+      const mapped = (res.data || []).map((item) => {
         const approvals = Array.isArray(item.history)
-          ? item.history.filter(h => ['Manager', 'HR'].includes(h.action_role))
+          ? item.history.filter(h => ['Manager', 'HR', 'Account Manager'].includes(h.action_role))
             .map(h => ({ name: h.action_by_name || h.action_role, role: h.action_role, reason: h.reason || '-', status: h.action }))
           : [];
         return {
@@ -156,8 +181,7 @@ const SubmitExpense = () => {
       setExpenseHistory(mapped);
     } catch (err) {
       console.error('Error loading expense history:', err);
-      console.error('Error response:', err.response);
-      setHistoryError(err.response?.data?.message || err.message || 'Error loading history');
+      setHistoryError(err.response?.data?.detail || err.message || 'Error loading history');
     } finally {
       setHistoryLoading(false);
     }
@@ -221,7 +245,7 @@ const SubmitExpense = () => {
 
               {/* Approvals Section */}
               <div className="rounded-lg p-4 bg-white">
-                <h4 className="text-gray-700 font-semibold mb-3">Manager & HR Approvals</h4>
+                <h4 className="text-gray-700 font-semibold mb-3">Approvals</h4>
                 {selectedRecord.approvals && selectedRecord.approvals.length > 0 ? (
                   <div className="space-y-2">
                     {selectedRecord.approvals.map((appr, idx) => (
@@ -345,7 +369,7 @@ const SubmitExpense = () => {
 
               {/* Receipt Upload */}
               <div>
-                <label className="block text-sm font-medium mb-2">Upload Receipts *</label>
+                <label className="block text-sm font-medium mb-2">Upload Receipts</label>
                 <input
                   type="file"
                   multiple
@@ -353,7 +377,6 @@ const SubmitExpense = () => {
                   onChange={handleReceiptUpload}
                   className="hidden"
                   id="receipt-upload"
-                  required
                 />
                 <Button
                   type="button"
@@ -397,169 +420,150 @@ const SubmitExpense = () => {
           </TabsContent>
 
           {/* ---- Expense History ---- */}
-          {/* ---- Expense History ---- */}
-<TabsContent value="history">
-  {/* Filter Controls */}
-  <div className="mb-4 flex gap-4 items-center">
-    <div className="flex items-center gap-2">
-      <label className="text-sm font-medium text-gray-700">Year:</label>
-      <select
-        value={selectedYear}
-        onChange={(e) => setSelectedYear(parseInt(e.target.value))}
-        className="px-3 py-1 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-      >
-        {Array.from({ length: 5 }, (_, i) => {
-          const year = new Date().getFullYear() - i;
-          return (
-            <option key={year} value={year}>
-              {year}
-            </option>
-          );
-        })}
-      </select>
-    </div>
-    
-    <div className="flex items-center gap-2">
-      <label className="text-sm font-medium text-gray-700">Month:</label>
-      <select
-        value={selectedMonth}
-        onChange={(e) => setSelectedMonth(parseInt(e.target.value))}
-        className="px-3 py-1 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-      >
-        {Array.from({ length: 12 }, (_, i) => {
-          const month = i + 1;
-          const monthName = new Date(2024, i).toLocaleString('default', { month: 'long' });
-          return (
-            <option key={month} value={month}>
-              {monthName}
-            </option>
-          );
-        })}
-      </select>
-    </div>
-    
-    <button
-      onClick={handleFilterChange}
-      className="px-4 py-1 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-    >
-      Apply Filters
-    </button>
-  </div>
-  
-  <div className="rounded-lg border">
-    <Table>
-      <TableHeader>
-        <TableRow className="bg-gray-50">
-          <TableHead className="w-12 text-center">S.No</TableHead>
-          <TableHead>Expense Category</TableHead>
-          <TableHead>Amount</TableHead>
-          <TableHead>Date</TableHead>
-          <TableHead>Status</TableHead>
-          <TableHead className="text-center">Actions</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {historyLoading ? (
-          <TableRow>
-            <TableCell colSpan={6} className="text-center py-8">
-              <div className="flex items-center justify-center">
-                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
-                <span className="ml-2">Loading expense history...</span>
-              </div>
-            </TableCell>
-          </TableRow>
-        ) : historyError ? (
-          <TableRow>
-            <TableCell colSpan={6} className="text-center py-8 text-red-600">
-              Error: {historyError}
-            </TableCell>
-          </TableRow>
-        ) : expenseHistory.length === 0 ? (
-          <TableRow>
-            <TableCell colSpan={6} className="text-center py-8 text-gray-500">
-              No expense requests found
-            </TableCell>
-          </TableRow>
-        ) : (
-          expenseHistory.map((item, index) => (
-          <TableRow key={item.id} className="hover:bg-gray-50">
-            {/* Serial Number */}
-            <TableCell className="text-center font-medium">
-              {index + 1}
-            </TableCell>
-
-            {/* Category */}
-            <TableCell>
-              <span className="text-gray-900 font-medium">{item.category}</span>
-            </TableCell>
-
-            {/* Amount */}
-            <TableCell>
-              <span className="text-gray-900">
-                {item.amount} {item.currency}
-              </span>
-            </TableCell>
-
-            {/* Date */}
-            <TableCell>
-              <span className="text-gray-700">{item.date}</span>
-            </TableCell>
-
-            {/* Status with Badge */}
-            <TableCell>
-              <span
-                className={`px-2 py-1 rounded-md text-xs font-medium
-                  ${item.status === 'Approved'
-                    ? 'text-green-700 bg-green-100'
-                    : item.status === 'Rejected'
-                    ? 'text-red-700 bg-red-100'
-                    : 'text-yellow-700 bg-yellow-100'
-                }`}
-              >
-                {item.status}
-              </span>
-            </TableCell>
-
-            {/* Actions */}
-            <TableCell>
-              <div className="flex items-center justify-center gap-1">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-                  onClick={() => {
-                    setSelectedRecord(item);
-                    setShowProjectModal(true);
-                  }}
+          <TabsContent value="history">
+            {/* Filter Controls */}
+            <div className="mb-4 flex gap-4 items-center">
+              <div className="flex items-center gap-2">
+                <label className="text-sm font-medium text-gray-700">Year:</label>
+                <select
+                  value={selectedYear}
+                  onChange={(e) => setSelectedYear(parseInt(e.target.value))}
+                  className="px-3 py-1 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
-                  <Eye className="h-4 w-4" />
-                </Button>
-
-                 <button 
-                        className="text-red-600 hover:text-red-900 p-1 rounded hover:bg-red-50"
-                        title="Delete"
-                        onClick={() => {
-                          try {
-                            markDeleted('leaveRequests', item.id);
-                          } catch (e) {
-                            console.error('Error marking leave request deleted locally:', e);
-                          }
-                          setExpenseHistory(prev => prev.filter(r => r.id !== item.id));
-                        }}
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-
+                  {Array.from({ length: 5 }, (_, i) => {
+                    const year = new Date().getFullYear() - i;
+                    return (
+                      <option key={year} value={year}>
+                        {year}
+                      </option>
+                    );
+                  })}
+                </select>
               </div>
-            </TableCell>
-          </TableRow>
-          ))
-        )}
-      </TableBody>
-    </Table>
-  </div>
-</TabsContent>
-
+              
+              <div className="flex items-center gap-2">
+                <label className="text-sm font-medium text-gray-700">Month:</label>
+                <select
+                  value={selectedMonth}
+                  onChange={(e) => setSelectedMonth(parseInt(e.target.value))}
+                  className="px-3 py-1 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  {Array.from({ length: 12 }, (_, i) => {
+                    const month = i + 1;
+                    const monthName = new Date(2024, i).toLocaleString('default', { month: 'long' });
+                    return (
+                      <option key={month} value={month}>
+                        {monthName}
+                      </option>
+                    );
+                  })}
+                </select>
+              </div>
+              
+              <button
+                onClick={handleFilterChange}
+                className="px-4 py-1 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                Apply Filters
+              </button>
+            </div>
+            
+            <div className="rounded-lg border">
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-gray-50">
+                    <TableHead className="w-12 text-center">S.No</TableHead>
+                    <TableHead>Expense Category</TableHead>
+                    <TableHead>Amount</TableHead>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-center">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {historyLoading ? (
+                    <TableRow>
+                      <TableCell colSpan={6} className="text-center py-8">
+                        <div className="flex items-center justify-center">
+                          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+                          <span className="ml-2">Loading expense history...</span>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ) : historyError ? (
+                    <TableRow>
+                      <TableCell colSpan={6} className="text-center py-8 text-red-600">
+                        Error: {historyError}
+                      </TableCell>
+                    </TableRow>
+                  ) : expenseHistory.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={6} className="text-center py-8 text-gray-500">
+                        No expense requests found
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    expenseHistory.map((item, index) => (
+                      <TableRow key={item.id} className="hover:bg-gray-50">
+                        <TableCell className="text-center font-medium">
+                          {index + 1}
+                        </TableCell>
+                        <TableCell>
+                          <span className="text-gray-900 font-medium">{item.category}</span>
+                        </TableCell>
+                        <TableCell>
+                          <span className="text-gray-900">
+                            {item.amount} {item.currency}
+                          </span>
+                        </TableCell>
+                        <TableCell>
+                          <span className="text-gray-700">{item.date}</span>
+                        </TableCell>
+                        <TableCell>
+                          <span
+                            className={`px-2 py-1 rounded-md text-xs font-medium
+                              ${item.status === 'Approved'
+                                ? 'text-green-700 bg-green-100'
+                                : item.status.includes('Rejected')
+                                ? 'text-red-700 bg-red-100'
+                                : 'text-yellow-700 bg-yellow-100'
+                            }`}
+                          >
+                            {item.status}
+                          </span>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center justify-center gap-1">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                              onClick={() => {
+                                setSelectedRecord(item);
+                                setShowProjectModal(true);
+                              }}
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-red-600 hover:text-red-900 hover:bg-red-50"
+                              title="Delete"
+                              onClick={() => handleDeleteExpense(item.id)}
+                              disabled={item.status !== 'Pending Manager Approval'}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </TabsContent>
         </Tabs>
       </div>
     </div>

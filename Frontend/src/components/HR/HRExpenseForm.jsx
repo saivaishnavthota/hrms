@@ -32,12 +32,16 @@ const HRExpenseForm = ({ onSuccess, onCancel }) => {
     const fetchEmployees = async () => {
       setLoadingEmployees(true);
       try {
-        const response = await api.get('/users/onboarded-employees');
+        const token = localStorage.getItem('authToken');
+        if (!token) throw new Error('Missing authentication token');
+        const response = await api.get('/users/onboarded-employees', {
+          headers: { Authorization: `Bearer ${token}` },
+        });
         const employeeList = Array.isArray(response.data) ? response.data : response.data?.data || [];
         setEmployees(employeeList);
       } catch (error) {
         console.error('Error fetching employees:', error);
-        toast.error('Failed to load employees');
+        toast.error(error.response?.data?.detail || 'Failed to load employees');
       } finally {
         setLoadingEmployees(false);
       }
@@ -56,7 +60,8 @@ const HRExpenseForm = ({ onSuccess, onCancel }) => {
     setIsSubmitting(true);
 
     try {
-      if (!expenseData.employee_id) {
+      const employeeId = expenseData.employee_id;
+      if (!employeeId) {
         throw new Error('Please select an employee.');
       }
       if (!expenseData.category) {
@@ -68,25 +73,29 @@ const HRExpenseForm = ({ onSuccess, onCancel }) => {
         throw new Error('Please enter a valid amount.');
       }
 
+      const token = localStorage.getItem('authToken');
+      if (!token) throw new Error('Missing authentication token');
+
       const form = new FormData();
-      form.append('employee_id', Number(expenseData.employee_id));
+      form.append('employee_id', Number(employeeId));
       form.append('category', expenseData.category);
       form.append('amount', amountNum);
       form.append('currency', expenseData.currency);
       form.append('description', expenseData.description || '');
       form.append('expense_date', expenseData.date);
-      form.append('tax_included', expenseData.tax_included);
+      form.append('tax_included', expenseData.tax_included ? 'true' : 'false');
       if (receiptFile) {
-        form.append('file', receiptFile);
+        form.append('files', receiptFile); // Changed from 'file' to 'files' to match backend
       }
 
       const response = await api.post('/expenses/submit-exp', form, {
         headers: {
+          Authorization: `Bearer ${token}`,
           'Content-Type': 'multipart/form-data',
         },
       });
 
-      const selectedEmployee = employees.find(emp => emp.id === Number(expenseData.employee_id));
+      const selectedEmployee = employees.find(emp => emp.id === Number(employeeId));
       toast.success(`Expense added successfully for ${selectedEmployee?.name || 'employee'}! Reference: ${response.data.request_code || response.data.request_id}`);
 
       if (typeof onSuccess === 'function') {
@@ -104,10 +113,9 @@ const HRExpenseForm = ({ onSuccess, onCancel }) => {
         tax_included: false,
       });
       setReceiptFile(null);
-
     } catch (error) {
       console.error('Expense submission failed:', error);
-      toast.error(error.response?.data?.message || error.message || 'Failed to add expense.');
+      toast.error(error.response?.data?.detail || error.message || 'Failed to add expense.');
     } finally {
       setIsSubmitting(false);
     }
@@ -131,7 +139,6 @@ const HRExpenseForm = ({ onSuccess, onCancel }) => {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
-      {/* Employee Selection */}
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">
           Employee <span className="text-red-500">*</span>
@@ -153,8 +160,6 @@ const HRExpenseForm = ({ onSuccess, onCancel }) => {
           </SelectContent>
         </Select>
       </div>
-
-      {/* Row 1: Category & Amount */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -188,8 +193,6 @@ const HRExpenseForm = ({ onSuccess, onCancel }) => {
           />
         </div>
       </div>
-
-      {/* Row 2: Currency & Date */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Currency</label>
@@ -218,8 +221,6 @@ const HRExpenseForm = ({ onSuccess, onCancel }) => {
           />
         </div>
       </div>
-
-      {/* Row 3: Description */}
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
         <textarea
@@ -230,8 +231,6 @@ const HRExpenseForm = ({ onSuccess, onCancel }) => {
           onChange={(e) => setExpenseData((p) => ({ ...p, description: e.target.value }))}
         />
       </div>
-
-      {/* Row 4: Attachment */}
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">Receipt (optional)</label>
         <Input 
@@ -243,8 +242,6 @@ const HRExpenseForm = ({ onSuccess, onCancel }) => {
           <p className="text-xs text-gray-500 mt-1">Selected: {receiptFile.name}</p>
         ) : null}
       </div>
-
-      {/* Tax Included Checkbox */}
       <div className="flex items-center">
         <input
           type="checkbox"
@@ -257,8 +254,6 @@ const HRExpenseForm = ({ onSuccess, onCancel }) => {
           Tax included in amount
         </label>
       </div>
-
-      {/* Actions */}
       <div className="flex items-center gap-3">
         <Button 
           type="submit" 

@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import api, { attendanceAPI, weekoffAPI } from '@/lib/api';
+import api from '@/lib/api';
 import { Calendar, Clock, Plus, X, Save, ChevronLeft, ChevronRight, Trash2, Edit3, Search, Filter, Eye, Briefcase } from 'lucide-react';
 import { useUser } from '../../contexts/UserContext';
 import { toast } from 'react-toastify';
+import { useNavigate } from 'react-router-dom';
 
 // Local date helpers to avoid UTC offsets
 const formatDateLocal = (date) => {
@@ -21,6 +22,7 @@ const parseDateLocal = (dateStr) => {
 
 const AddAttendance = () => {
   const { user } = useUser();
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('add');
   const [currentWeek, setCurrentWeek] = useState(new Date());
   const [projects, setProjects] = useState([]);
@@ -78,7 +80,7 @@ const AddAttendance = () => {
         date: dateStr,
         day: date.toLocaleDateString('en-US', { weekday: 'long' }),
         status: '',
-        hours: 0,
+        hours: 0.0, // Initialize as float
         projects: [],
         submitted: false
       };
@@ -93,8 +95,11 @@ const AddAttendance = () => {
       fetchProjects();
       fetchDailyAttendance();
       fetchWeekOffs();
+    } else if (user) {
+      toast.error('Employee ID not found. Logging out...');
+      navigate('/login');
     }
-  }, [user]);
+  }, [user, navigate]);
 
   useEffect(() => {
     if (allWeekOffs.length > 0) {
@@ -124,12 +129,18 @@ const AddAttendance = () => {
         return;
       }
 
-      const response = await weekoffAPI.getEmployeeWeekoffs(user.employeeId);
-      setAllWeekOffs(response || []);
+      const response = await api.get(`/weekoffs/${user.employeeId}`);
+      setAllWeekOffs(response.data || []);
     } catch (error) {
       console.error('Error fetching week-offs:', error);
-      setMessage(error.response?.data?.detail || 'Error fetching week-offs');
+      const errorMessage = error.response?.data?.detail || 'Error fetching week-offs';
+      setMessage(errorMessage);
+      toast.error(errorMessage);
       setTimeout(() => setMessage(''), 5000);
+      if (error.response?.status === 401 || error.response?.status === 403) {
+        toast.error('Session expired. Logging out...');
+        navigate('/login');
+      }
     }
   };
 
@@ -162,26 +173,31 @@ const AddAttendance = () => {
       const year = selectedYear || new Date().getFullYear();
       const month = (selectedMonth !== undefined ? selectedMonth : new Date().getMonth()) + 1;
 
-      const response = await attendanceAPI.getDailyAttendance({
-        employee_id: user.employeeId,
-        year: year,
-        month: month
+      const response = await api.get('/attendance/daily', {
+        params: {
+          employee_id: user.employeeId,
+          year: year,
+          month: month
+        }
       });
 
-      console.log('Daily Attendance Response:', response); // Debugging
+      console.log('Daily Attendance Response:', response.data);
 
-      if (response && response.length > 0) {
-        const formattedData = response.map(record => ({
+      if (response.data && response.data.length > 0) {
+        const formattedData = response.data.map(record => ({
           date: record.date,
           status: record.status || record.action || 'Not set',
-          hours: record.hours || 0,
+          hours: parseFloat(record.hours || 0), // Ensure float
           type: record.type || 'Full-Time',
           projects: (record.projects || []).map(p => ({
-            projectId: String(p.value), // Now value is project_id
+            projectId: String(p.value),
             projectName: p.label,
             subtasks: (record.subTasks || [])
               .filter(st => st.project === p.label)
-              .flatMap(st => st.subTasks || [])
+              .flatMap(st => (st.subTasks || []).map(sub => ({
+                name: sub.sub_task,
+                hours: parseFloat(sub.hours || 0) // Ensure float
+              })))
           }))
         }));
         setDailyAttendance(formattedData);
@@ -194,7 +210,12 @@ const AddAttendance = () => {
       console.error('Error fetching daily attendance:', error);
       const errorMessage = error.response?.data?.detail || 'Error fetching daily attendance data';
       setMessage(errorMessage);
+      toast.error(errorMessage);
       setTimeout(() => setMessage(''), 5000);
+      if (error.response?.status === 401 || error.response?.status === 403) {
+        toast.error('Session expired. Logging out...');
+        navigate('/login');
+      }
     } finally {
       setLoading(false);
     }
@@ -216,11 +237,19 @@ const AddAttendance = () => {
         return;
       }
 
-      const response = await attendanceAPI.getActiveProjects({ employee_id: user.employeeId });
-      setProjects(response || []);
+      const response = await api.get('/attendance/active-projects', {
+        params: { employee_id: user.employeeId }
+      });
+      setProjects(response.data || []);
     } catch (error) {
       console.error('Error fetching projects:', error);
-      setMessage('Error fetching assigned projects');
+      const errorMessage = error.response?.data?.detail || 'Error fetching assigned projects';
+      setMessage(errorMessage);
+      toast.error(errorMessage);
+      if (error.response?.status === 401 || error.response?.status === 403) {
+        toast.error('Session expired. Logging out...');
+        navigate('/login');
+      }
     }
   };
 
@@ -237,37 +266,46 @@ const AddAttendance = () => {
           date: dateStr,
           day: date.toLocaleDateString('en-US', { weekday: 'long' }),
           status: '',
-          hours: 0,
+          hours: 0.0, // Initialize as float
           projects: [],
           submitted: false
         };
       });
 
-      const response = await attendanceAPI.getWeeklyAttendance({ employee_id: user.employeeId });
+      const response = await api.get('/attendance/weekly', {
+        params: { employee_id: user.employeeId }
+      });
 
-      console.log('Weekly Attendance Response:', response); // Debugging
+      console.log('Weekly Attendance Response:', response.data);
 
-      if (response) {
+      if (response.data) {
         const updatedData = { ...baseData };
-        Object.keys(response).forEach(dateStr => {
-          const attendance = response[dateStr];
+        Object.keys(response.data).forEach(dateStr => {
+          const attendance = response.data[dateStr];
           const rowIndex = Object.keys(updatedData).find(key =>
             updatedData[key].date === dateStr
           );
 
           if (rowIndex !== undefined) {
             const projects = (attendance.projects || []).map(p => ({
-              projectId: String(p.value), // Now value is project_id
+              projectId: String(p.value),
               projectName: p.label,
               subtasks: (attendance.subTasks || [])
                 .filter(st => st.project === p.label)
-                .flatMap(st => st.subTasks || [])
+                .flatMap(st => (st.subTasks || []).map(sub => ({
+                  name: sub.sub_task,
+                  hours: parseFloat(sub.hours || 0) // Ensure float
+                })))
             }));
+
+            // Calculate total hours from subtasks
+            const totalHours = projects.reduce((sum, project) =>
+              sum + (project.subtasks || []).reduce((subSum, subtask) => subSum + parseFloat(subtask.hours || 0), 0), 0);
 
             updatedData[rowIndex] = {
               ...updatedData[rowIndex],
               status: attendance.action || attendance.status,
-              hours: attendance.hours || 0,
+              hours: parseFloat(totalHours.toFixed(2)), // Ensure float with 2 decimal places
               projects: projects,
               submitted: !!attendance.action
             };
@@ -281,7 +319,12 @@ const AddAttendance = () => {
       console.error('Error fetching weekly attendance:', error);
       const errorMessage = error.response?.data?.detail || 'Error fetching attendance data';
       setMessage(errorMessage);
+      toast.error(errorMessage);
       setTimeout(() => setMessage(''), 5000);
+      if (error.response?.status === 401 || error.response?.status === 403) {
+        toast.error('Session expired. Logging out...');
+        navigate('/login');
+      }
     } finally {
       setLoading(false);
     }
@@ -293,17 +336,7 @@ const AddAttendance = () => {
       [index]: {
         ...prev[index],
         status,
-        hours: status === 'Leave' ? 0 : prev[index].hours
-      }
-    }));
-  };
-
-  const handleHoursChange = (index, hours) => {
-    setAttendanceData(prev => ({
-      ...prev,
-      [index]: {
-        ...prev[index],
-        hours: parseFloat(hours) || 0
+        hours: status === 'Leave' ? 0.0 : prev[index].hours // Ensure float
       }
     }));
   };
@@ -315,11 +348,16 @@ const AddAttendance = () => {
 
   const handleProjectSelect = (selectedProjects) => {
     if (selectedRowIndex !== null) {
+      // Calculate total hours from subtasks
+      const totalHours = selectedProjects.reduce((sum, project) =>
+        sum + (project.subtasks || []).reduce((subSum, subtask) => subSum + parseFloat(subtask.hours || 0), 0), 0);
+
       setAttendanceData(prev => ({
         ...prev,
         [selectedRowIndex]: {
           ...prev[selectedRowIndex],
-          projects: selectedProjects
+          projects: selectedProjects,
+          hours: parseFloat(totalHours.toFixed(2)) // Ensure float with 2 decimal places
         }
       }));
     }
@@ -328,13 +366,20 @@ const AddAttendance = () => {
   };
 
   const removeProject = (rowIndex, projectIndex) => {
-    setAttendanceData(prev => ({
-      ...prev,
-      [rowIndex]: {
-        ...prev[rowIndex],
-        projects: prev[rowIndex].projects.filter((_, i) => i !== projectIndex)
-      }
-    }));
+    setAttendanceData(prev => {
+      const updatedProjects = prev[rowIndex].projects.filter((_, i) => i !== projectIndex);
+      const totalHours = updatedProjects.reduce((sum, project) =>
+        sum + (project.subtasks || []).reduce((subSum, subtask) => subSum + parseFloat(subtask.hours || 0), 0), 0);
+
+      return {
+        ...prev,
+        [rowIndex]: {
+          ...prev[rowIndex],
+          projects: updatedProjects,
+          hours: parseFloat(totalHours.toFixed(2)) // Ensure float with 2 decimal places
+        }
+      };
+    });
   };
 
   const navigateWeek = (direction) => {
@@ -377,7 +422,7 @@ const AddAttendance = () => {
       };
 
       setLoading(true);
-      const response = await weekoffAPI.createWeekoff(payload);
+      const response = await api.post('/weekoffs', payload);
       toast.success('Week-off saved successfully');
       setTimeout(() => setMessage(''), 3000);
       await fetchWeekOffs();
@@ -386,6 +431,10 @@ const AddAttendance = () => {
       const errorMessage = error.response?.data?.detail || 'Error saving week-offs';
       toast.error(errorMessage);
       setTimeout(() => setMessage(''), 5000);
+      if (error.response?.status === 401 || error.response?.status === 403) {
+        toast.error('Session expired. Logging out...');
+        navigate('/login');
+      }
     } finally {
       setLoading(false);
     }
@@ -402,7 +451,7 @@ const AddAttendance = () => {
       const weekOffViolations = Object.values(attendanceData).filter(row => {
         const dayOfWeek = row.day;
         return weekOffDays.includes(dayOfWeek) && (
-          row.status || (row.hours && row.hours > 0) || row.projects.length > 0
+          row.status || row.hours > 0 || row.projects.length > 0
         );
       });
 
@@ -415,7 +464,7 @@ const AddAttendance = () => {
 
       const hasValidData = Object.values(attendanceData).some(row =>
         !weekOffDays.includes(row.day) && (
-          row.status || (row.hours && row.hours > 0) || row.projects.length > 0
+          row.status || row.hours > 0 || row.projects.length > 0
         )
       );
       if (!hasValidData) {
@@ -428,7 +477,7 @@ const AddAttendance = () => {
         !weekOffDays.includes(row.day) && (row.hours < 0 || row.hours > 24)
       );
       if (invalidHours) {
-        toast.warn('Hours must be between 0 and 24 for non-week-off days');
+        toast.warn('Total hours must be between 0 and 24 for non-week-off days');
         setTimeout(() => setMessage(''), 5000);
         return;
       }
@@ -438,28 +487,27 @@ const AddAttendance = () => {
 
       Object.values(attendanceData).forEach(row => {
         if (!weekOffDays.includes(row.day) && (
-          row.status || (row.hours && row.hours > 0) || row.projects.length > 0
+          row.status || row.hours > 0 || row.projects.length > 0
         )) {
           const project_ids = row.projects
             .map(p => (p.projectId ? parseInt(p.projectId, 10) : null))
             .filter(id => Number.isInteger(id));
 
           const sub_tasks = row.projects
-          .map(p =>
-           (p.subtasks || []).map(subtask => ({
-             project_id: parseInt(p.projectId, 10),
-             sub_task: subtask.name,
-             hours: subtask.hours
-             }))
-             )
-             .flat()
-             .filter(st => st.project_id && st.sub_task);
-
+            .map(p =>
+              (p.subtasks || []).map(subtask => ({
+                project_id: parseInt(p.projectId, 10),
+                sub_task: subtask.name,
+                hours: parseFloat(subtask.hours || 0) // Ensure float
+              }))
+            )
+            .flat()
+            .filter(st => st.project_id && st.sub_task);
 
           dataToSubmit[row.date] = {
             date: row.date,
             action: row.status || '',
-            hours: row.hours || 0,
+            hours: parseFloat(row.hours.toFixed(2)), // Ensure float
             project_ids: project_ids,
             sub_tasks: sub_tasks
           };
@@ -473,14 +521,13 @@ const AddAttendance = () => {
         return;
       }
 
-      console.log('Submitting Attendance Data:', dataToSubmit); // Debugging
+      console.log('Submitting Attendance Data:', dataToSubmit);
 
-      const response = await attendanceAPI.submitAttendance({
-        ...dataToSubmit,
-        employee_id: user.employeeId
+      const response = await api.post('/attendance', dataToSubmit, {
+        params: { employee_id: user.employeeId }
       });
 
-      if (response.success) {
+      if (response.data.success) {
         toast.success('Attendance submitted successfully!');
         setTimeout(() => setMessage(''), 3000);
         await Promise.all([fetchWeeklyAttendance(), fetchDailyAttendance()]);
@@ -490,6 +537,10 @@ const AddAttendance = () => {
       const errorMessage = error.response?.data?.detail || 'Error submitting attendance';
       toast.error(errorMessage);
       setTimeout(() => setMessage(''), 5000);
+      if (error.response?.status === 401 || error.response?.status === 403) {
+        toast.error('Session expired. Logging out...');
+        navigate('/login');
+      }
     } finally {
       setLoading(false);
     }
@@ -499,7 +550,7 @@ const AddAttendance = () => {
     if (activeTab === 'daily' && user?.employeeId) {
       fetchDailyAttendance();
     }
-  }, [activeTab, user]);
+  }, [activeTab, user, selectedMonth, selectedYear]);
 
   const ProjectPopup = ({ onClose, onSave, existingProjects = [] }) => {
     const [selectedProjects, setSelectedProjects] = useState(existingProjects);
@@ -508,14 +559,12 @@ const AddAttendance = () => {
       console.log('Existing Projects in ProjectPopup:', existingProjects);
     }, [existingProjects]);
 
-
-const addProject = () => {
+    const addProject = () => {
   setSelectedProjects([
-    ...selectedProjects,
-    { projectId: '', projectName: '', subtasks: [{ name: '', hours: 0 }] }
+    ...selectedProjects, // Spread existing projects
+    { projectId: '', projectName: '', subtasks: [{ name: '', hours: 0.0 }] } // New project object
   ]);
 };
-
 
     const updateProject = (index, field, value) => {
       const updated = [...selectedProjects];
@@ -525,7 +574,7 @@ const addProject = () => {
           ...updated[index],
           projectId: value,
           projectName: project ? project.project_name : '',
-          subtasks: updated[index].subtasks.length > 0 ? updated[index].subtasks : ['']
+          subtasks: updated[index].subtasks.length > 0 ? updated[index].subtasks : [{ name: '', hours: 0.0 }]
         };
       } else {
         updated[index][field] = value;
@@ -533,22 +582,23 @@ const addProject = () => {
       setSelectedProjects(updated);
     };
 
-const addSubtask = (projectIndex) => {
-  const updated = [...selectedProjects];
-  updated[projectIndex].subtasks.push({ name: '', hours: 0 });
-  setSelectedProjects(updated);
-};
+    const addSubtask = (projectIndex) => {
+      const updated = [...selectedProjects];
+      updated[projectIndex].subtasks.push({ name: '', hours: 0.0 }); // Initialize as float
+      setSelectedProjects(updated);
+    };
 
-const updateSubtask = (projectIndex, subtaskIndex, field, value) => {
-  const updated = [...selectedProjects];
-  updated[projectIndex].subtasks[subtaskIndex][field] = value;
-  setSelectedProjects(updated);
-};
+    const updateSubtask = (projectIndex, subtaskIndex, field, value) => {
+      const updated = [...selectedProjects];
+      updated[projectIndex].subtasks[subtaskIndex][field] = field === 'hours' ? parseFloat(value) || 0.0 : value;
+      setSelectedProjects(updated);
+    };
+
     const removeSubtask = (projectIndex, subtaskIndex) => {
-  const updated = [...selectedProjects];
-  updated[projectIndex].subtasks.splice(subtaskIndex, 1);
-  setSelectedProjects(updated);
-};
+      const updated = [...selectedProjects];
+      updated[projectIndex].subtasks.splice(subtaskIndex, 1);
+      setSelectedProjects(updated);
+    };
 
     const removeProject = (index) => {
       setSelectedProjects(selectedProjects.filter((_, i) => i !== index));
@@ -588,49 +638,42 @@ const updateSubtask = (projectIndex, subtaskIndex, field, value) => {
                   </button>
                 </div>
 
-               <div className="space-y-2">
-  <label className="text-sm font-medium text-gray-700">Subtasks:</label>
-  {project.subtasks.map((subtask, subtaskIndex) => (
-    <div key={subtaskIndex} className="flex items-center gap-2">
-      {/* Subtask input */}
-      <input
-        type="text"
-        value={subtask.name}
-        onChange={(e) =>
-          updateSubtask(projectIndex, subtaskIndex, 'name', e.target.value)
-        }
-        placeholder="Enter subtask"
-        className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-      />
-
-      {/* Hours input */}
-      <input
-        type="number"
-        value={subtask.hours}
-         onChange={(e) => updateSubtask(projectIndex, subtaskIndex, 'hours', e.target.value)}
-        placeholder="Hours"
-        className="w-24 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-      />
-
-      {/* Remove button */}
-      <button
-        onClick={() => removeSubtask(projectIndex, subtaskIndex)}
-        className="text-red-500 hover:text-red-700 p-1"
-      >
-        <X size={16} />
-      </button>
-    </div>
-  ))}
-
-  {/* Add subtask button */}
-  <button
-    onClick={() => addSubtask(projectIndex)}
-    className="text-blue-600 hover:text-blue-800 text-sm flex items-center gap-1"
-  >
-    <Plus size={16} /> Add Subtask
-  </button>
-  </div>
-
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-gray-700">Subtasks:</label>
+                  {project.subtasks.map((subtask, subtaskIndex) => (
+                    <div key={subtaskIndex} className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        value={subtask.name}
+                        onChange={(e) => updateSubtask(projectIndex, subtaskIndex, 'name', e.target.value)}
+                        placeholder="Enter subtask"
+                        className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      />
+                      <input
+                        type="number"
+                        value={subtask.hours}
+                        onChange={(e) => updateSubtask(projectIndex, subtaskIndex, 'hours', e.target.value)}
+                        placeholder="Hours"
+                        min="0"
+                        max="24"
+                        step="0.5"
+                        className="w-24 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      />
+                      <button
+                        onClick={() => removeSubtask(projectIndex, subtaskIndex)}
+                        className="text-red-500 hover:text-red-700 p-1"
+                      >
+                        <X size={16} />
+                      </button>
+                    </div>
+                  ))}
+                  <button
+                    onClick={() => addSubtask(projectIndex)}
+                    className="text-blue-600 hover:text-blue-800 text-sm flex items-center gap-1"
+                  >
+                    <Plus size={16} /> Add Subtask
+                  </button>
+                </div>
               </div>
             ))}
             {selectedProjects.length === 0 && (
@@ -842,16 +885,7 @@ const updateSubtask = (projectIndex, subtaskIndex, field, value) => {
                             {weekOffDays.includes(row.day) ? (
                               <span className="text-gray-400 text-sm">N/A</span>
                             ) : (
-                              <input
-                                type="number"
-                                min="0"
-                                max="24"
-                                step="0.5"
-                                value={row.hours}
-                                onChange={(e) => handleHoursChange(index, e.target.value)}
-                                disabled={row.status === 'Leave'}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
-                              />
+                              <span className="text-gray-900">{row.hours.toFixed(2)} hrs</span>
                             )}
                           </td>
                           <td className="px-4 py-4">
@@ -1018,7 +1052,7 @@ const updateSubtask = (projectIndex, subtaskIndex, field, value) => {
                               {attendanceRecord.hours > 0 && (
                                 <div className="text-xs text-gray-600 flex items-center gap-1">
                                   <Clock className="h-3 w-3" />
-                                  {attendanceRecord.hours}h
+                                  {attendanceRecord.hours.toFixed(2)}h {/* Fixed to show float */}
                                 </div>
                               )}
                               {attendanceRecord.projects && attendanceRecord.projects.length > 0 && (
@@ -1198,7 +1232,7 @@ const updateSubtask = (projectIndex, subtaskIndex, field, value) => {
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="text-sm text-gray-900">
-                              {record.hours || '0'} hrs
+                              {record.hours.toFixed(2)} hrs {/* Fixed to show float */}
                             </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
@@ -1260,7 +1294,7 @@ const updateSubtask = (projectIndex, subtaskIndex, field, value) => {
                 </div>
                 <div className=" rounded-lg p-5">
                   <div className="text-gray-500">Hours</div>
-                  <div className="font-medium text-gray-800">{selectedRecord.hours || 0}</div>
+                  <div className="font-medium text-gray-800">{selectedRecord.hours.toFixed(2)}</div>
                 </div>
                 <div className=" rounded-lg p-5">
                   <div className="text-gray-500">Status</div>
@@ -1285,7 +1319,7 @@ const updateSubtask = (projectIndex, subtaskIndex, field, value) => {
                           {project.subtasks.map((subtask, subIndex) => (
                             <div key={subIndex} className="flex items-center text-sm text-gray-600">
                               <div className="w-2 h-2 bg-blue-400 rounded-full mr-2"></div>
-                              {subtask}
+                              {subtask.name} - {subtask.hours.toFixed(2)} hours {/* Fixed to show float */}
                             </div>
                           ))}
                         </div>

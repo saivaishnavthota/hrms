@@ -13,11 +13,10 @@ const EmployeeAttendance = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [typeFilter, setTypeFilter] = useState('all');
   const [roleFilter, setRoleFilter] = useState('all');
-  const [year, setYear] = useState(2025);
-  const [month, setMonth] = useState(9);
+  const [year, setYear] = useState(new Date().getFullYear()); // Default to current year (2025)
+  const [month, setMonth] = useState(new Date().getMonth() + 1); // Default to current month (10 for October)
   const [userId, setUserId] = useState(null);
   const [error, setError] = useState(null);
-
 
   // Fetch userId from localStorage on component mount
   useEffect(() => {
@@ -39,6 +38,7 @@ const EmployeeAttendance = () => {
         const response = await api.get('/attendance/hr-daily', {
           params: { hr_id: userId, year, month }
         });
+        console.log('HR Daily Response:', response.data); // Debug log
         setAttendanceRecords(transformData(response.data));
       } catch (error) {
         console.error('Error fetching attendance:', error);
@@ -51,27 +51,30 @@ const EmployeeAttendance = () => {
       return data.map((record, index) => {
         // Map backend type to frontend type if needed
         const typeMap = {
-          'Employee': 'Full-Time', // Assuming backend "Employee" maps to "Full-Time"
+          'Employee': 'Full-Time',
           'Intern': 'Intern',
           'Contract': 'Contract'
         };
-        const type = typeMap[record.type] || record.type || 'Full-Time'; // Default to 'Full-Time' if type is missing
+        const type = typeMap[record.type] || record.type || 'Full-Time';
+
+        // Calculate total hours from subtasks
+        const totalHours = (record.subTasks || []).reduce((sum, st) => sum + parseFloat(st.hours || 0), 0);
 
         return {
           id: index + 1,
           employee: { name: record.name || 'Unknown', email: record.email || 'N/A' },
           type: type,
-          role: record.role || 'Employee', // Keep role as backend provides for roleFilter
+          role: record.role || 'Employee',
           day: record.day || new Date(record.date).toLocaleDateString('en-US', { weekday: 'long' }),
           date: record.date || 'N/A',
           status: record.status || 'Unknown',
-          hours: record.hours || 0,
+          hours: parseFloat(totalHours.toFixed(2)), // Use subtask total
           projects: record.projects && record.projects.length > 0
             ? [...new Map(record.projects.map(p => [p.label, {
                 name: p.label,
                 subtasks: record.subTasks
                   .filter(st => st.project === p.label)
-                  .map(st => st.subTask)
+                  .map(st => ({ name: st.subTask, hours: parseFloat(st.hours || 0) })) // Include hours
               }])).values()]
             : []
         };
@@ -143,7 +146,7 @@ const EmployeeAttendance = () => {
     );
   };
 
-   const getAvatarColor = (name) => avatarBg(name);
+  const getAvatarColor = (name) => avatarBg(name);
 
   return (
     <div className="min-h-screen bg-gray-50 p-6">
@@ -158,23 +161,22 @@ const EmployeeAttendance = () => {
               type="number"
               placeholder="Year"
               value={year}
-              onChange={(e) => setYear(e.target.value)}
+              onChange={(e) => setYear(parseInt(e.target.value))}
               className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm w-24"
             />
             <select
               value={month}
-              onChange={(e) => setMonth(e.target.value)}
+              onChange={(e) => setMonth(parseInt(e.target.value))}
               className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
             >
               {[...Array(12)].map((_, i) => (
-                <option key={i + 1} value={i + 1}>{i + 1}</option>
+                <option key={i + 1} value={i + 1}>{new Date(0, i).toLocaleString('en-US', { month: 'long' })}</option>
               ))}
             </select>
           </div>
         </div>
         {/* Summary counts below filters */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-          {/* Monthly Summary */}
           <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
             <div className="px-4 py-3 border-b border-gray-200 flex items-center gap-2">
               <CalendarDays className="h-4 w-4 text-gray-700" />
@@ -201,8 +203,6 @@ const EmployeeAttendance = () => {
               </div>
             </div>
           </div>
-
-          {/* Daily Summary (latest date with data) */}
           <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
             <div className="px-4 py-3 border-b border-gray-200 flex items-center gap-2">
               <CalendarDays className="h-4 w-4 text-gray-700" />
@@ -294,17 +294,17 @@ const EmployeeAttendance = () => {
                 {filteredRecords.map((record) => (
                   <tr key={record.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap">
-    
-                          <div className="flex items-center gap-3">
-       <div className={`flex-shrink-0 h-10 w-10 rounded-full ${getAvatarColor(record.employee.name)} flex items-center justify-center`}>
-                        <span className="text-sm font-medium text-white">
-                          {record.employee.name.split(' ').map(n => n[0]).join('')}
-                        </span>
-                      </div>
-                          <div className="text-sm font-medium text-gray-900">{record.employee.name}<br/>
+                      <div className="flex items-center gap-3">
+                        <div className={`flex-shrink-0 h-10 w-10 rounded-full ${getAvatarColor(record.employee.name)} flex items-center justify-center`}>
+                          <span className="text-sm font-medium text-white">
+                            {record.employee.name.split(' ').map(n => n[0]).join('')}
+                          </span>
+                        </div>
+                        <div className="text-sm font-medium text-gray-900">
+                          {record.employee.name}<br />
                           <span className="text-sm text-gray-500">{record.employee.email}</span>
-                    </div>
-               </div>
+                        </div>
+                      </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm text-gray-900">{record.type}</div>
@@ -411,7 +411,7 @@ const EmployeeAttendance = () => {
                                 className="flex items-center p-2 bg-white/50 rounded-md border border-blue-100"
                               >
                                 <div className="w-2 h-2 bg-gradient-to-r from-emerald-400 to-teal-500 rounded-full mr-3"></div>
-                                <span className="text-sm text-gray-800">{subtask}</span>
+                                <span className="text-sm text-gray-800">{subtask.name} ({subtask.hours}h)</span>
                               </div>
                             ))}
                           </div>
@@ -524,7 +524,7 @@ const EmployeeAttendance = () => {
                             {project.subtasks.map((subtask, subIndex) => (
                               <div key={subIndex} className="flex items-center space-x-2">
                                 <div className="w-1.5 h-1.5 bg-gradient-to-r from-blue-400 to-purple-400 rounded-full"></div>
-                                <span className="text-sm text-gray-700">{subtask}</span>
+                                <span className="text-sm text-gray-700">{subtask.name} ({subtask.hours}h)</span>
                               </div>
                             ))}
                           </div>

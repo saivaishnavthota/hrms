@@ -1,14 +1,17 @@
 import React from 'react';
 import { X, Calendar, User, FileText, Clock } from 'lucide-react';
 
-const ViewLeaveApplication = ({ isOpen, onClose, leaveData }) => {
+const ViewLeaveApplication = ({ isOpen, onClose, leaveData, loggedInEmployeeId, role}) => {
   if (!isOpen || !leaveData) return null;
+ const isSelfApplied = leaveData.employee_id === loggedInEmployeeId;
+const shouldHideDetails = (role === "Manager" || role === "HR" || role === "Employee") && isSelfApplied;
+
 
   const getStatusBadge = (status) => {
     const statusClasses = {
-      pending: "bg-yellow-100 text-yellow-800 border-yellow-200",
-      approved: "bg-green-100 text-green-800 border-green-200",
-      rejected: "bg-red-100 text-red-800 border-red-200",
+      Pending: "bg-yellow-100 text-yellow-800 border-yellow-200",
+      Approved: "bg-green-100 text-green-800 border-green-200",
+      Rejected: "bg-red-100 text-red-800 border-red-200",
     };
 
     return (
@@ -48,6 +51,7 @@ const ViewLeaveApplication = ({ isOpen, onClose, leaveData }) => {
         {/* Content */}
         <div className="p-6 space-y-6">
           {/* Employee Information */}
+          {!shouldHideDetails && (
           <div className="bg-white/70 backdrop-blur-sm border border-gray-200 rounded-xl p-4 shadow-md">
             <div className="flex items-center gap-3 mb-3">
               <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-blue-100 text-blue-600 ring-1 ring-blue-200">
@@ -63,7 +67,7 @@ const ViewLeaveApplication = ({ isOpen, onClose, leaveData }) => {
               
             </div>
           </div>
-
+      )}
           {/* Leave Details */}
           <div className="bg-white/70 backdrop-blur-sm border border-gray-200 rounded-xl p-4 shadow-md">
             <div className="flex items-center gap-3 mb-3">
@@ -91,11 +95,12 @@ const ViewLeaveApplication = ({ isOpen, onClose, leaveData }) => {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Number of Days</label>
-                <p className="text-gray-900">{leaveData.days || leaveData.total_days || 'N/A'}</p>
+                <p className="text-gray-900">{leaveData.days || leaveData.no_of_days||'N/A'}</p>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Applied On</label>
-                <p className="text-gray-900">{formatDate(leaveData.appliedOn || leaveData.applied_date || leaveData.created_at)}</p>
+              <p className="text-gray-900">{formatDate(leaveData.appliedOn || leaveData.applied_date || leaveData.created_at)}</p>
+
               </div>
             </div>
           </div>
@@ -115,37 +120,6 @@ const ViewLeaveApplication = ({ isOpen, onClose, leaveData }) => {
             </div>
           )}
 
-          {/* Additional Information */}
-          {(leaveData.emergencyContact || leaveData.handoverNotes || leaveData.comments) && (
-            <div className="bg-white/70 backdrop-blur-sm border border-gray-200 rounded-xl p-4 shadow-md">
-              <div className="flex items-center gap-3 mb-3">
-                <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-yellow-100 text-yellow-600 ring-1 ring-yellow-200">
-                  <Clock className="w-4 h-4" />
-                </span>
-                <h3 className="text-lg font-medium text-gray-900">Additional Information</h3>
-              </div>
-              <div className="space-y-3">
-                {leaveData.emergencyContact && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Emergency Contact</label>
-                    <p className="text-gray-900">{leaveData.emergencyContact}</p>
-                  </div>
-                )}
-                {leaveData.handoverNotes && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Handover Notes</label>
-                    <p className="text-gray-900 whitespace-pre-wrap">{leaveData.handoverNotes}</p>
-                  </div>
-                )}
-                {leaveData.comments && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Comments</label>
-                    <p className="text-gray-900 whitespace-pre-wrap">{leaveData.comments}</p>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
 
           {/* Approval Information */}
           {(leaveData.approved_by || leaveData.rejected_by || leaveData.manager_comments) && (

@@ -59,7 +59,7 @@ def apply_leave(leave: dict, session: Session = Depends(get_session)):
                     :reason, 
                     :start_date, 
                     :end_date,
-                    :no_of_days
+                    :no_of_days,
                 )
             """),
             {
@@ -68,7 +68,8 @@ def apply_leave(leave: dict, session: Session = Depends(get_session)):
                 "reason": leave["reason"],
                 "start_date": start_date,
                 "end_date": end_date,
-                "no_of_days": total_days  # ✅ dynamic corrected leave days
+                "no_of_days": total_days, 
+              
             },
         )
         row = result.fetchone()
@@ -85,6 +86,9 @@ def apply_leave(leave: dict, session: Session = Depends(get_session)):
             "totalDays": total_days,  # ✅ dynamic corrected leave days
             "reason": row.reason,
             "status": row.status,
+            "created_at": row.created_at
+          
+            
         }
 
     except Exception as e:

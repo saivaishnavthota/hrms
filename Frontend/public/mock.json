@@ -1,0 +1,30 @@
+[
+  {
+    "heading": "Introduction",
+    "content": "Welcome to our company! Our mission is to provide excellent service and a supportive environment for all employees."
+  },
+  {
+    "heading": "Leave Policy",
+    "content": "Employees are entitled to 20 days of paid leave per year. Leave requests must be submitted through the HR portal."
+  },
+  {
+    "heading": "Work From Home",
+    "content": "Work from home is allowed up to 2 days per week, subject to manager approval and team coordination."
+  },
+  {
+    "heading": "Code of Conduct",
+    "content": "All employees are expected to maintain professional behavior, respect colleagues, and adhere to company guidelines."
+  },
+  {
+    "heading": "Health & Safety",
+    "content": "The company ensures a safe working environment. Employees should report any safety concerns to HR immediately."
+  },
+  {
+    "heading": "IT & Security Policy",
+    "content": "Employees must use company devices responsibly, follow password policies, and report any security incidents immediately."
+  },
+  {
+    "heading": "Benefits & Perks",
+    "content": "Employees have access to health insurance, wellness programs, and other perks. Details are available in the HR portal."
+  }
+]

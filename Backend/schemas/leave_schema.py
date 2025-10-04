@@ -23,9 +23,7 @@ class LeaveResponse(SQLModel):
     status: str
     manager_status: str
     hr_status: str
-    
-    
-    
+    created_at: Optional[datetime]
 
 class LeaveApprovalCreate(SQLModel):
     leave_id: int

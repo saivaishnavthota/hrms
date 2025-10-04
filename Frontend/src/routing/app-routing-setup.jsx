@@ -42,6 +42,8 @@ import Projects from '@/components/AccountManager/Projects';
 import ManagerDashboard from '@/components/Manager/Dashboard';
 import ManagerExpenseManagement from '@/components/Manager/ExpenseManagement';
 import ManagerEmployeeAttendance from '@/components/Manager/EmployeesAttendance';
+import AddCompanyPolicy from '../components/HR/AddCompanyPolicy';
+import CompanyPolicies from '../components/Employee/CompanyPolicies';
 
 export const AppRoutingSetup = () => {
   return (
@@ -70,7 +72,8 @@ export const AppRoutingSetup = () => {
         <Route path="add-attendance" element={<HRAddAttendance />} />
         <Route path="employees-attendance" element={<EmployeeAttendance />} />
         <Route path="holidays" element={<Holidays />} />
-         <Route path="reset-password" element={< ChangePassword/>} />
+        <Route path="reset-password" element={< ChangePassword/>} />
+        <Route path="add-policy" element={< AddCompanyPolicy/>} />
         
       </Route>
       
@@ -82,6 +85,7 @@ export const AppRoutingSetup = () => {
         <Route path="submit-expense" element={<SubmitExpense />} />
         <Route path="upload-documents" element={<UploadDocuments />} />
         <Route path="set-password" element={<SetPassword />} />
+          <Route path="view-policy" element={<CompanyPolicies />} />
       </Route>
       
       {/* Layout-1 route */}

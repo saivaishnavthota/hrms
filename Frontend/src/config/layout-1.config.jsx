@@ -1,3 +1,4 @@
+import { RiContractLeftFill } from '@remixicon/react';
 import {
   AlertCircle,
   Award,
@@ -54,6 +55,8 @@ import {
   KeyRound,
   UserPlus as AssignIcon,
   FileText as RequestIcon,
+  FileCog
+
 } from 'lucide-react';
 
 export const MENU_SIDEBAR = [
@@ -128,6 +131,11 @@ export const MENU_SIDEBAR = [
     title: 'Holidays',
     icon: CalendarCheck,
     path: '/hr/holidays',
+  },
+  {
+    title: 'Company Policies',
+    icon: FileCog,
+    path: '/hr/add-policy',
   },
 ];
 

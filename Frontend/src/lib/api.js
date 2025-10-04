@@ -146,6 +146,7 @@ export const leaveAPI = {
       end_date: data.end_date,
       // Optional flag for half-day leave; backend accepts extra keys
       half_day: !!data.half_day,
+      applied_on: data.applied_on ? new Date(data.applied_on).toISOString() : null,
     };
     const response = await api.post('/leave/apply_leave', payload);
     return response.data;
@@ -162,6 +163,13 @@ export const leaveAPI = {
     const response = await api.get(`/leave/leave_balances/${employeeId}`);
     return response.data;
   },
+
+   getUserProfile: async (employeeId) => {
+    const res = await fetch(`/users/${employeeId}`);
+    if (!res.ok) throw new Error("Failed to fetch user profile");
+    return res.json();
+  },
+  
 };
 
 // Onboarding API endpoints

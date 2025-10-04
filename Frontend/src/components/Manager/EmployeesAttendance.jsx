@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { User, Trash2, Eye, X, Search, CheckCircle, Home, CalendarDays } from 'lucide-react';
 import { avatarBg } from '../../lib/avatarColors';
 import api from "@/lib/api";
-
+import { toast } from 'react-toastify';
 
 const ManagerEmployeeAttendance = () => {
   const [attendanceRecords, setAttendanceRecords] = useState([]);
@@ -13,8 +13,9 @@ const ManagerEmployeeAttendance = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [typeFilter, setTypeFilter] = useState('all');
   const [roleFilter, setRoleFilter] = useState('all');
-  const [year, setYear] = useState(2025);
-  const [month, setMonth] = useState(9);
+    const [year, setYear] = useState(new Date().getFullYear()); // current year
+    const [month, setMonth] = useState(new Date().getMonth() + 1); // current month (1-12)
+
   const [userId, setUserId] = useState(null);
   const [error, setError] = useState(null);
 
@@ -59,6 +60,18 @@ const ManagerEmployeeAttendance = () => {
           'Contract': 'Contract'
         };
         const type = typeMap[record.type] || record.type || 'Full-Time'; // Default to 'Full-Time' if type is missing
+         const projects = record.projects && record.projects.length > 0
+          ? [...new Map(record.projects.map(p => [p.label, {
+              name: p.label,
+              total_hours: p.total_hours,
+              subtasks: record.subTasks
+                .filter(st => st.project === p.label)
+                .flatMap(st => st.subTasks.map(sub=> ({
+                  name:sub.sub_task,
+                  hours:sub.hours
+                })))
+            }])).values()]
+          : [];
 
         return {
           id: index + 1,
@@ -69,14 +82,7 @@ const ManagerEmployeeAttendance = () => {
           date: record.date || 'N/A',
           status: record.status || 'Unknown',
           hours: record.hours || 0,
-          projects: record.projects && record.projects.length > 0
-            ? [...new Map(record.projects.map(p => [p.label, {
-                name: p.label,
-                subtasks: record.subTasks
-                  .filter(st => st.project === p.label)
-                  .map(st => st.subTask)
-              }])).values()]
-            : []
+          projects
         };
       });
     };
@@ -410,17 +416,21 @@ const ManagerEmployeeAttendance = () => {
                           <p className="text-sm font-medium text-gray-700 mb-2">Subtasks:</p>
                           <div className="grid grid-cols-1 gap-2">
                             {project.subtasks.map((subtask, subtaskIndex) => (
-                              <div
-                                key={subtaskIndex}
-                                className="flex items-center p-2 bg-white/50 rounded-md border border-blue-100"
-                              >
-                                <div className="w-2 h-2 bg-gradient-to-r from-emerald-400 to-teal-500 rounded-full mr-3"></div>
-                                <span className="text-sm text-gray-800">{subtask}</span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      ) : (
+        <div
+          key={subtaskIndex}
+          className="flex items-center justify-between p-2 bg-white/50 rounded-md border border-blue-100"
+        >
+          <div className="flex items-center">
+            <div className="w-2 h-2 bg-gradient-to-r from-emerald-400 to-teal-500 rounded-full mr-3"></div>
+            <span className="text-sm text-gray-800">{subtask.name}</span>
+          </div>
+          <span className="text-xs font-semibold text-gray-600">{subtask.hours}h</span>
+        </div>
+      ))}
+    </div>
+  </div>
+) : (
+
                         <p className="text-sm text-gray-500 italic">No subtasks for this project</p>
                       )}
                     </div>
@@ -526,12 +536,15 @@ const ManagerEmployeeAttendance = () => {
                           <h5 className="font-medium text-gray-800 mb-2">{project.name}</h5>
                           <div className="space-y-1">
                             {project.subtasks.map((subtask, subIndex) => (
-                              <div key={subIndex} className="flex items-center space-x-2">
-                                <div className="w-1.5 h-1.5 bg-gradient-to-r from-blue-400 to-purple-400 rounded-full"></div>
-                                <span className="text-sm text-gray-700">{subtask}</span>
-                              </div>
-                            ))}
-                          </div>
+    <div key={subIndex} className="flex items-center justify-between space-x-2">
+      <div className="flex items-center space-x-2">
+        <div className="w-1.5 h-1.5 bg-gradient-to-r from-blue-400 to-purple-400 rounded-full"></div>
+        <span className="text-sm text-gray-700">{subtask.name}</span>
+      </div>
+      <span className="text-xs font-semibold text-gray-600">{subtask.hours}h</span>
+    </div>
+  ))}
+</div>
                         </div>
                       ))}
                     </div>

@@ -1,4 +1,4 @@
-version: "3.9"
+
 
 services:
   backend:
@@ -13,9 +13,9 @@ services:
       - ./Backend/init.sql:/docker-entrypoint-initdb.d/init.sql  # Add this line
     
     depends_on:
-      - db
+      - hrms
     environment:
-      DATABASE_URL: postgresql://admin:nxzen%40123@db:5432/Nxzen
+      DATABASE_URL: postgresql://admin:rishitha@localhost:5432/hrms
     networks:
       - app-network
 
@@ -31,12 +31,12 @@ services:
     networks:
       - app-network
 
-  db:
+  hrms:
     image: postgres:15
     container_name: postgres_db
     environment:
       POSTGRES_USER: admin
-      POSTGRES_PASSWORD: nxzen@123
+      POSTGRES_PASSWORD: rishitha
       POSTGRES_DB: Nxzen
     ports:
       - "5432:5432"

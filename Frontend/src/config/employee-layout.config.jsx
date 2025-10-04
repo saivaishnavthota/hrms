@@ -1,4 +1,4 @@
-import { LayoutGrid, ClipboardList, Plane, Upload, DollarSign, KeyRound } from 'lucide-react';
+import { LayoutGrid, ClipboardList, Plane, Upload, DollarSign, KeyRound, FileCog } from 'lucide-react';
 
 export const MENU_SIDEBAR_EMPLOYEE = [
   {
@@ -30,5 +30,10 @@ export const MENU_SIDEBAR_EMPLOYEE = [
     title: 'Set Password',
     icon: KeyRound,
     path: '/employee/set-password',
+  },
+    {
+    title: 'Company Policies',
+    icon: FileCog,
+    path: '/employee/view-policy',
   },
 ];

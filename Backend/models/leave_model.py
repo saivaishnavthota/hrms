@@ -11,7 +11,7 @@ class LeaveManagement(SQLModel, table=True):
     start_date: date
     end_date: date
     no_of_days:int=Field(default=0)
-    
+
     status: str = Field(default="Pending", max_length=20)
     created_at: Optional[datetime] = Field(default_factory=datetime.now)
     updated_at: Optional[datetime] = Field(default_factory=datetime.now)

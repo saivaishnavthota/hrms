@@ -1,102 +1,211 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import List, Optional
-from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException, Request
+from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException, Request, Query
 from sqlmodel import Session, select, extract
+from sqlalchemy.sql import text
 from database import get_session
 from models.expenses_model import ExpenseRequest, ExpenseAttachment, ExpenseHistory
 from utils.code import generate_request_code
-import os
 from auth import get_current_user, role_required
 from models.user_model import User
 from models.employee_master_model import EmployeeMaster
 from models.employee_assignment_model import EmployeeManager, EmployeeHR
-from fastapi import Query
 from sqlalchemy import func
- 
+from azure.storage.blob import BlobServiceClient, ContentSettings, generate_blob_sas, BlobSasPermissions
+import os
+from dotenv import load_dotenv
+
 router = APIRouter(prefix="/expenses", tags=["Expenses"])
- 
-UPLOAD_DIR = "uploads/expenses"
-os.makedirs(UPLOAD_DIR, exist_ok=True)
- 
- 
-# Public URL prefix (for frontend to fetch files)
-BASE_URL = "http://localhost:8000"
- 
- 
+
+load_dotenv()
+AZURE_CONNECTION_STRING = os.getenv("AZURE_CONNECTION_STRING", "DefaultEndpointsProtocol=https;AccountName=hrmsnxzen;AccountKey=Jug56pLmeZIJplobcV+f20v7IXnh6PWuih0hxRYpvRXpGh6tnJrzALqtqL/hRR3lpZK0ZTKIs2Pv+AStDvBH4w==;EndpointSuffix=core.windows.net")
+AZURE_CONTAINER_NAME = os.getenv("AZURE_CONTAINER_NAME", "con-hrms")
+blob_service_client = BlobServiceClient.from_connection_string(AZURE_CONNECTION_STRING)
+container_client = blob_service_client.get_container_client(AZURE_CONTAINER_NAME)
+
+def build_blob_url(employee_id: int, file_name: str) -> str:
+    """Generate the Azure Blob URL for a file."""
+    return f"https://{blob_service_client.account_name}.blob.core.windows.net/{AZURE_CONTAINER_NAME}/expenses/{employee_id}/{file_name}"
+
 @router.post("/submit-exp", response_model=dict)
-def submit_expense(
-    data: dict,
+async def submit_expense(
+    request: Request,
+    employee_id: int = Form(...),
+    category: str = Form(...),
+    amount: float = Form(...),
+    currency: str = Form(...),
+    description: Optional[str] = Form(None),
+    expense_date: str = Form(...),
+    tax_included: bool = Form(False),
+    files: List[UploadFile] = File(None),
     session: Session = Depends(get_session),
 ):
-    # Extract data from JSON body
-    employee_id = data.get('employee_id')
-    category = data.get('category')
-    amount = data.get('amount')
-    currency = data.get('currency')
-    description = data.get('description')
-    expense_date = data.get('expense_date')
-    tax_included = data.get('tax_included', False)
+    """Submit an expense request with optional attachments stored in Azure Blob Storage."""
+    print(f"Received submit-exp request: employee_id={employee_id}, category={category}, amount={amount}, currency={currency}, expense_date={expense_date}, tax_included={tax_included}, files={[f.filename for f in files if f.filename]}")
     
-    # Validate required fields
-    if not all([employee_id, category, amount, currency, expense_date]):
-        raise HTTPException(status_code=400, detail="Missing required fields")
-    
-    req = ExpenseRequest(
-        request_code=generate_request_code(),
-        employee_id=employee_id,
-        category=category,
-        amount=amount,
-        currency=currency,
-        description=description,
-        expense_date=datetime.strptime(expense_date, "%Y-%m-%d"),
-        tax_included=tax_included,
-    )
-    session.add(req)
-    session.commit()
-    session.refresh(req)
+    try:
+        # Validate file size (5 MB = 5 * 1024 * 1024 bytes)
+        for file in files:
+            if file.size > 5 * 1024 * 1024:
+                raise HTTPException(status_code=400, detail=f"File {file.filename} exceeds 5 MB limit")
 
-    # File upload functionality removed for JSON format
-    # TODO: Implement file upload separately if needed
+        # Create expense request
+        req = ExpenseRequest(
+            request_code=generate_request_code(),
+            employee_id=employee_id,
+            category=category,
+            amount=amount,
+            currency=currency,
+            description=description,
+            expense_date=datetime.strptime(expense_date, "%Y-%m-%d"),
+            tax_included=tax_included,
+        )
+        session.add(req)
+        session.flush()
 
-    return {
-        "request_id": req.request_id,
-        "request_code": req.request_code,
-        "employee_id": req.employee_id,
-        "category": req.category,
-        "amount": req.amount,
-        "currency": req.currency,
-        "description": req.description,
-        "expense_date": req.expense_date,
-        "tax_included": req.tax_included,
-        "submit_date": req.created_at,
-        "status": req.status,
-        "attachments": [],
-    }
- 
-#changed
+        attachments = []
+        if files:
+            for file in files:
+                if file.filename:
+                    file_data = await file.read()
+                    if not file_data:
+                        continue
+
+                    # Upload to Azure Blob Storage
+                    blob_name = f"expenses/{employee_id}/{file.filename}"
+                    blob_client = container_client.get_blob_client(blob_name)
+                    content_settings = ContentSettings(content_type=file.content_type)
+                    blob_client.upload_blob(file_data, overwrite=True, content_settings=content_settings)
+                    file_url = build_blob_url(employee_id, file.filename)
+
+                    # Call add_expense_attachment function
+                    result = session.execute(
+                        text("SELECT * FROM add_expense_attachment(:request_id, :file_name, :file_url, :file_type, :file_size)"),
+                        {
+                            "request_id": req.request_id,
+                            "file_name": file.filename,
+                            "file_url": file_url,
+                            "file_type": file.content_type,
+                            "file_size": len(file_data) / 1024,
+                        }
+                    ).fetchone()
+
+                    if result:
+                        attachments.append({
+                            "attachment_id": result.attachment_id,
+                            "file_name": result.file_name,
+                            "file_type": result.file_type,
+                            "file_size": result.file_size,
+                            "uploaded_at": result.uploaded_at,
+                        })
+
+        session.commit()
+        print(f"Expense submitted: request_id={req.request_id}, request_code={req.request_code}")
+        return {
+            "request_id": req.request_id,
+            "request_code": req.request_code,
+            "employee_id": req.employee_id,
+            "category": req.category,
+            "amount": req.amount,
+            "currency": req.currency,
+            "description": req.description,
+            "expense_date": req.expense_date,
+            "tax_included": req.tax_included,
+            "submit_date": req.created_at,
+            "status": req.status,
+            "attachments": attachments,
+        }
+
+    except Exception as e:
+        session.rollback()
+        print(f"Error submitting expense: {str(e)}\nSQL: {e.__cause__}")
+        raise HTTPException(status_code=500, detail=f"Failed to submit expense: {str(e)}")
+
+@router.post("/add-attachment", response_model=dict)
+async def add_attachment(
+    request_id: int = Form(...),
+    file: UploadFile = File(...),
+    user_id: int = Form(...),
+    session: Session = Depends(get_session),
+):
+    """Add an attachment to an existing expense request."""
+    print(f"Adding attachment for request_id={request_id}, user_id={user_id}")
+    expense = session.get(ExpenseRequest, request_id)
+    if not expense:
+        raise HTTPException(status_code=404, detail="Expense request not found")
+    if expense.employee_id != user_id:
+        raise HTTPException(status_code=403, detail="Unauthorized to add attachment")
+
+    if file.size > 5 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail=f"File {file.filename} exceeds 5 MB limit")
+
+    file_data = await file.read()
+    if not file_data:
+        raise HTTPException(status_code=400, detail="Empty file")
+
+    try:
+        blob_name = f"expenses/{user_id}/{file.filename}"
+        blob_client = container_client.get_blob_client(blob_name)
+        content_settings = ContentSettings(content_type=file.content_type)
+        blob_client.upload_blob(file_data, overwrite=True, content_settings=content_settings)
+        file_url = build_blob_url(user_id, file.filename)
+
+        result = session.execute(
+            text("SELECT * FROM add_expense_attachment(:request_id, :file_name, :file_url, :file_type, :file_size)"),
+            {
+                "request_id": request_id,
+                "file_name": file.filename,
+                "file_url": file_url,
+                "file_type": file.content_type,
+                "file_size": len(file_data) / 1024,
+            }
+        ).fetchone()
+
+        if not result:
+            raise HTTPException(status_code=500, detail="Failed to add attachment")
+
+        session.commit()
+        return {
+            "attachment_id": result.attachment_id,
+            "file_name": result.file_name,
+            "file_type": result.file_type,
+            "file_size": result.file_size,
+            "uploaded_at": result.uploaded_at,
+        }
+    except Exception as e:
+        session.rollback()
+        print(f"Error adding attachment: {str(e)}\nSQL: {e.__cause__}")
+        raise HTTPException(status_code=500, detail=f"Failed to add attachment: {str(e)}")
+
 @router.get("/my-expenses", response_model=List[dict])
 def list_my_expenses(
-    employee_id: int = Query(...),  # Get from frontend instead of current_user
+    employee_id: int = Query(...),
     year: Optional[int] = Query(None),
     month: Optional[int] = Query(None),
     session: Session = Depends(get_session),
 ):
+    """List expenses for a specific employee, returning attachment metadata only."""
+    try:
+        employee_id = int(employee_id)  # Convert to int if string
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid employee_id format")
+    
+    print(f"Querying expenses for employee_id: {employee_id}, year: {year}, month: {month}")
     query = session.query(ExpenseRequest).filter(
         ExpenseRequest.employee_id == employee_id
     )
  
-    if year and month:
+    if year is not None and month is not None:
         query = query.filter(
             extract("year", ExpenseRequest.created_at) == year,
             extract("month", ExpenseRequest.created_at) == month
         )
  
     expenses = query.order_by(ExpenseRequest.created_at.desc()).all()
-    
-    # Debug logging
-    print(f"Found {len(expenses)} expenses for employee_id: {employee_id}")
-    print(f"Query filters: year={year}, month={month}")
-
+    print(f"Fetched {len(expenses)} expenses for employee_id: {employee_id}")
+    for exp in expenses:
+        print(f"Expense: request_id={exp.request_id}, created_at={exp.created_at}, expense_date={exp.expense_date}, category={exp.category}")
+ 
     result = []
     for exp in expenses:
         history_entries = []
@@ -114,6 +223,17 @@ def list_my_expenses(
                 }
             )
  
+        attachments = [
+            {
+                "attachment_id": att.attachment_id,
+                "file_name": att.file_name,
+                "file_type": att.file_type,
+                "file_size": att.file_size,
+                "uploaded_at": att.uploaded_at,
+            }
+            for att in exp.attachments
+        ]
+
         result.append(
             {
                 "request_id": exp.request_id,
@@ -126,24 +246,13 @@ def list_my_expenses(
                 "expense_date": exp.expense_date,
                 "tax_included": exp.tax_included,
                 "status": exp.status,
-                "attachments": [
-                    {
-                        "attachment_id": att.attachment_id,
-                        "file_name": att.file_name,
-                        "file_path": att.file_path,
-                        "file_type": att.file_type,
-                        "file_size": att.file_size,
-                    }
-                    for att in exp.attachments
-                ],
+                "attachments": attachments,
                 "history": history_entries,
             }
         )
  
     return result
- 
- 
- 
+
 @router.get("/mgr-exp-list", response_model=List[dict])
 def list_all_expenses(
     request: Request,
@@ -152,15 +261,20 @@ def list_all_expenses(
     year: int = Query(..., description="Year of expenses"),
     month: int = Query(..., description="Month of expenses"),
 ):
-    # Get employees reporting to the manager
+    """List expenses for employees under a manager, returning attachment metadata only."""
+    print(f"Fetching expenses for manager_id={manager_id}, year={year}, month={month}")
+    
+    start_time = datetime.now()
     employee_ids = session.exec(
         select(EmployeeManager.employee_id).where(EmployeeManager.manager_id == manager_id)
     ).all()
- 
+    print(f"Fetched employee_ids in {datetime.now() - start_time}")
+
     employee_links = [e[0] if isinstance(e, tuple) else e for e in employee_ids]
     if not employee_links:
+        print("No employees found for manager")
         return []
- 
+
     expenses = session.exec(
         select(ExpenseRequest).where(
             ExpenseRequest.employee_id.in_(employee_links),
@@ -174,29 +288,34 @@ def list_all_expenses(
             func.extract("month", ExpenseRequest.created_at) == month
         ).order_by(ExpenseRequest.created_at.desc())
     ).all()
- 
+    print(f"Fetched {len(expenses)} expenses in {datetime.now() - start_time}")
+
     result = []
- 
     for exp in expenses:
         employee = session.get(User, exp.employee_id)
- 
-        attachment_url = None
-        if exp.attachments:
-            att = exp.attachments[0]
-            rel_path = att.file_path.replace("\\", "/").split("uploads/")[-1]
-            attachment_url = f"{request.base_url}uploads/{rel_path}"
- 
+
+        attachments = [
+            {
+                "attachment_id": att.attachment_id,
+                "file_name": att.file_name,
+                "file_type": att.file_type,
+                "file_size": att.file_size,
+                "uploaded_at": att.uploaded_at,
+            }
+            for att in exp.attachments
+        ]
+
         history_entries = session.exec(
             select(ExpenseHistory)
             .where(ExpenseHistory.request_id == exp.request_id)
             .order_by(ExpenseHistory.created_at.asc())
         ).all()
- 
+
         manager_reason = None
         for h in history_entries:
             if h.action_role == "Manager" and h.reason:
                 manager_reason = h.reason
- 
+
         result.append(
             {
                 "id": exp.request_id,
@@ -210,12 +329,14 @@ def list_all_expenses(
                 "date": exp.expense_date.strftime("%Y-%m-%d"),
                 "taxIncluded": exp.tax_included,
                 "submitted_at": exp.created_at.strftime("%Y-%m-%d"),
-                "attachment": attachment_url,
+                "attachments": attachments,
                 "reason": manager_reason or "-",
             }
         )
+    
+    print(f"Completed /mgr-exp-list in {datetime.now() - start_time}")
     return result
- 
+
 @router.put("/mgr-upd-status/{request_id}")
 def update_expense_status(
     request_id: int,
@@ -224,13 +345,26 @@ def update_expense_status(
     reason: str = Form(None),
     session: Session = Depends(get_session)
 ):
+    """Update the status of an expense request by a manager."""
+    print(f"Updating expense status: request_id={request_id}, manager_id={manager_id}, status={status}, reason={reason}")
+    
     if status not in ["Pending", "Approved", "Rejected"]:
         raise HTTPException(status_code=400, detail="Invalid status")
- 
+
     expense = session.get(ExpenseRequest, request_id)
     if not expense:
         raise HTTPException(status_code=404, detail="Expense not found")
- 
+
+    # Verify manager authorization
+    is_manager = session.exec(
+        select(EmployeeManager).where(
+            EmployeeManager.employee_id == expense.employee_id,
+            EmployeeManager.manager_id == manager_id
+        )
+    ).first() is not None
+    if not is_manager:
+        raise HTTPException(status_code=403, detail="Unauthorized: Not the assigned manager")
+
     # Map frontend → DB statuses
     if status == "Pending":
         expense.status = "pending_manager_approval"
@@ -238,29 +372,29 @@ def update_expense_status(
         expense.status = "pending_hr_approval"
     elif status == "Rejected":
         expense.status = "mgr_rejected"
- 
+
     expense.updated_at = datetime.utcnow()
     session.add(expense)
     session.commit()
     session.refresh(expense)
- 
+
     history_entry = ExpenseHistory(
         request_id=request_id,
-        action_by=manager_id,  # use manager_id from form
+        action_by=manager_id,
         action_role="Manager",
         action=status,
         reason=reason
     )
     session.add(history_entry)
     session.commit()
- 
+
+    print(f"Expense status updated: request_id={request_id}, new_status={expense.status}")
     return {
         "message": "Manager Status updated",
         "request_id": expense.request_id,
         "new_status": expense.status
     }
- 
-  
+
 @router.get("/hr-exp-list", response_model=List[dict])
 def list_all_expenses(
     request: Request,
@@ -269,54 +403,63 @@ def list_all_expenses(
     year: int = Query(..., description="Year of expenses"),
     month: int = Query(..., description="Month of expenses"),
 ):
-    # Get employees reporting to the manager
+    """List expenses for employees under an HR, returning attachment metadata only."""
+    print(f"Fetching expenses for hr_id={hr_id}, year={year}, month={month}")
+    
+    start_time = datetime.now()
     employee_ids = session.exec(
         select(EmployeeHR.employee_id).where(EmployeeHR.hr_id == hr_id)
     ).all()
- 
+    print(f"Fetched employee_ids in {datetime.now() - start_time}")
+
     employee_links = [e[0] if isinstance(e, tuple) else e for e in employee_ids]
     if not employee_links:
+        print("No employees found for HR")
         return []
- 
+
     expenses = session.exec(
         select(ExpenseRequest).where(
             ExpenseRequest.employee_id.in_(employee_links),
-
-           ExpenseRequest.status.in_([
-    "pending_account_mgr_approval",
-    "pending_hr_approval",
-    "hr_rejected",
-    "approved",
-    "carried_forward"
-]),
-
+            ExpenseRequest.status.in_([
+                "pending_account_mgr_approval",
+                "pending_hr_approval",
+                "hr_rejected",
+                "approved",
+                "carried_forward"
+            ]),
             func.extract("year", ExpenseRequest.created_at) == year,
-            func.extract("month", ExpenseRequest.created_at) == month
+            func.extract("month", ExpenseRequest.created_at) == month,
+            # ExpenseRequest.deleted_at.is_(None)  # Handle soft deletes
         ).order_by(ExpenseRequest.created_at.desc())
     ).all()
- 
+    print(f"Fetched {len(expenses)} expenses in {datetime.now() - start_time}")
+
     result = []
- 
     for exp in expenses:
         employee = session.get(User, exp.employee_id)
- 
-        attachment_url = None
-        if exp.attachments:
-            att = exp.attachments[0]
-            rel_path = att.file_path.replace("\\", "/").split("uploads/")[-1]
-            attachment_url = f"{request.base_url}uploads/{rel_path}"
- 
+
+        attachments = [
+            {
+                "attachment_id": att.attachment_id,
+                "file_name": att.file_name,
+                "file_type": att.file_type,
+                "file_size": att.file_size,
+                "uploaded_at": att.uploaded_at,
+            }
+            for att in exp.attachments
+        ]
+
         history_entries = session.exec(
             select(ExpenseHistory)
             .where(ExpenseHistory.request_id == exp.request_id)
             .order_by(ExpenseHistory.created_at.asc())
         ).all()
- 
+
         hr_reason = None
         for h in history_entries:
             if h.action_role == "HR" and h.reason:
                 hr_reason = h.reason
- 
+
         result.append(
             {
                 "id": exp.request_id,
@@ -330,29 +473,42 @@ def list_all_expenses(
                 "date": exp.expense_date.strftime("%Y-%m-%d"),
                 "taxIncluded": exp.tax_included,
                 "submitted_at": exp.created_at.strftime("%Y-%m-%d"),
-                "attachment": attachment_url,
+                "attachments": attachments,
                 "reason": hr_reason or "-",
-                
             }
         )
+
+    print(f"Completed /hr-exp-list in {datetime.now() - start_time}")
     return result
- 
- 
+
 @router.put("/hr-upd-status/{request_id}")
 def update_hr_status(
     request_id: int,
-    hr_id: int = Form(...),  # pass HR ID from frontend
+    hr_id: int = Form(...),
     status: str = Form(...),
     reason: str = Form(None),
     session: Session = Depends(get_session),
 ):
+    """Update the status of an expense request by HR."""
+    print(f"Updating expense status: request_id={request_id}, hr_id={hr_id}, status={status}, reason={reason}")
+    
     if status not in ["Pending", "Approved", "Rejected"]:
         raise HTTPException(status_code=400, detail="Invalid status")
- 
+
     expense = session.get(ExpenseRequest, request_id)
     if not expense:
         raise HTTPException(status_code=404, detail="Expense not found")
- 
+
+    # Verify HR authorization
+    is_hr = session.exec(
+        select(EmployeeHR).where(
+            EmployeeHR.employee_id == expense.employee_id,
+            EmployeeHR.hr_id == hr_id
+        )
+    ).first() is not None
+    if not is_hr:
+        raise HTTPException(status_code=403, detail="Unauthorized: Not the assigned HR")
+
     # Map frontend → DB statuses
     if status == "Pending":
         expense.status = "pending_hr_approval"
@@ -360,83 +516,90 @@ def update_hr_status(
         expense.status = "pending_account_mgr_approval"
     elif status == "Rejected":
         expense.status = "hr_rejected"
- 
+
     expense.updated_at = datetime.utcnow()
     session.add(expense)
     session.commit()
     session.refresh(expense)
- 
-    # Use HR ID from frontend as the action_by
+
     history_entry = ExpenseHistory(
         request_id=request_id,
-        action_by=hr_id,  # <-- frontend HR ID
+        action_by=hr_id,
         action_role="HR",
         action=status,
         reason=reason
     )
     session.add(history_entry)
     session.commit()
- 
+
+    print(f"Expense status updated: request_id={request_id}, new_status={expense.status}")
     return {
         "message": "HR status updated",
         "request_id": expense.request_id,
         "new_status": expense.status
     }
- 
- 
+
 @router.get("/acc-mgr-exp-list", response_model=List[dict])
 def list_acc_mgr_expenses(
     request: Request,
-    acc_mgr_id: int = Query(..., description="Account Manager ID"),  # from frontend
     session: Session = Depends(get_session),
+    acc_mgr_id: int = Query(..., description="Account Manager ID"),
     year: int = Query(..., description="Year of expenses"),
     month: int = Query(..., description="Month of expenses"),
 ):
-    #account manager object
+    """List expenses for employees in the same location as the account manager, returning attachment metadata only."""
+    print(f"Fetching expenses for acc_mgr_id={acc_mgr_id}, year={year}, month={month}")
+    
+    start_time = datetime.now()
     acc_mgr = session.get(User, acc_mgr_id)
     if not acc_mgr or not acc_mgr.location_id:
+        print("No account manager found or missing location_id")
         return []
- 
-    #Filter expenses for employees in the same location
-    expenses = session.exec(
-    select(ExpenseRequest)
-    .join(User, User.id == ExpenseRequest.employee_id)
-    .where(
-        User.location_id == acc_mgr.location_id,  # <-- FIXED
-        ExpenseRequest.status.in_([
-            "pending_account_mgr_approval", 
-            "approved", 
-            "acc_mgr_rejected"  # Make sure this matches your DB
-        ]),
-        extract("year", ExpenseRequest.created_at) == year,
-        extract("month", ExpenseRequest.created_at) == month
-    )
-    .order_by(ExpenseRequest.created_at.desc())
-).all()
 
- 
+    expenses = session.exec(
+        select(ExpenseRequest)
+        .join(User, User.id == ExpenseRequest.employee_id)
+        .where(
+            User.location_id == acc_mgr.location_id,
+            ExpenseRequest.status.in_([
+                "pending_account_mgr_approval",
+                "approved",
+                "acc_mgr_rejected"
+            ]),
+            func.extract("year", ExpenseRequest.created_at) == year,
+            func.extract("month", ExpenseRequest.created_at) == month,
+            ExpenseRequest.deleted_at.is_(None)  # Handle soft deletes
+        )
+        .order_by(ExpenseRequest.created_at.desc())
+    ).all()
+    print(f"Fetched {len(expenses)} expenses in {datetime.now() - start_time}")
+
     result = []
     for exp in expenses:
         employee = session.get(User, exp.employee_id)
- 
-        attachment_url = None
-        if exp.attachments:
-            att = exp.attachments[0]
-            rel_path = att.file_path.replace("\\", "/").split("uploads/")[-1]
-            attachment_url = f"{request.base_url}uploads/{rel_path}"
- 
-        # Get expense history
+
+        attachments = [
+            {
+                "attachment_id": att.attachment_id,
+                "file_name": att.file_name,
+                "file_type": att.file_type,
+                "file_size": att.file_size,
+                "uploaded_at": att.uploaded_at,
+            }
+            for att in exp.attachments
+        ]
+
         history_entries = session.exec(
             select(ExpenseHistory)
             .where(ExpenseHistory.request_id == exp.request_id)
             .order_by(ExpenseHistory.created_at.asc())
         ).all()
- 
+
         acc_mgr_reason = None
         for h in history_entries:
             if h.action_role == "Account Manager" and h.reason:
                 acc_mgr_reason = h.reason
- 
+
         result.append(
             {
                 "id": exp.request_id,
@@ -448,33 +611,40 @@ def list_acc_mgr_expenses(
                 "status": exp.status,
                 "description": exp.description,
                 "date": exp.expense_date.strftime("%Y-%m-%d"),
-                "submitted_at": exp.created_at.strftime("%Y-%m-%d %H:%M:%S"),
                 "taxIncluded": exp.tax_included,
-                "attachment": attachment_url,
+                "submitted_at": exp.created_at.strftime("%Y-%m-%d"),
+                "attachments": attachments,
                 "reason": acc_mgr_reason or "-",
             }
         )
- 
+
+    print(f"Completed /acc-mgr-exp-list in {datetime.now() - start_time}")
     return result
- 
- 
-#changed
+
 @router.put("/acc-mgr-upd-status/{request_id}")
 def update_acc_mgr_status(
     request_id: int,
-    acc_mgr_id: int = Form(...),   # <-- pass Account Manager ID from frontend
+    acc_mgr_id: int = Form(...),
     status: str = Form(...),
     reason: str = Form(None),
     session: Session = Depends(get_session),
 ):
- 
+    """Update the status of an expense request by an account manager."""
+    print(f"Updating expense status: request_id={request_id}, acc_mgr_id={acc_mgr_id}, status={status}, reason={reason}")
+    
     if status not in ["Pending", "Approved", "Rejected"]:
         raise HTTPException(status_code=400, detail="Invalid status")
- 
+
     expense = session.get(ExpenseRequest, request_id)
     if not expense:
         raise HTTPException(status_code=404, detail="Expense not found")
- 
+
+    # Verify account manager authorization (same location as employee)
+    employee = session.get(User, expense.employee_id)
+    acc_mgr = session.get(User, acc_mgr_id)
+    if not employee or not acc_mgr or employee.location_id != acc_mgr.location_id:
+        raise HTTPException(status_code=403, detail="Unauthorized: Account manager not in same location as employee")
+
     # Map frontend → DB statuses
     if status == "Pending":
         expense.status = "pending_account_mgr_approval"
@@ -483,13 +653,12 @@ def update_acc_mgr_status(
     elif status == "Rejected":
         expense.status = "acc_mgr_rejected"
         expense.account_mgr_rejection_reason = reason
- 
+
     expense.updated_at = datetime.utcnow()
     session.add(expense)
     session.commit()
     session.refresh(expense)
- 
-    # Use frontend-provided Account Manager ID for history
+
     history_entry = ExpenseHistory(
         request_id=request_id,
         action_by=acc_mgr_id,
@@ -499,11 +668,156 @@ def update_acc_mgr_status(
     )
     session.add(history_entry)
     session.commit()
- 
+
+    print(f"Expense status updated: request_id={request_id}, new_status={expense.status}")
     return {
         "message": "Account Manager status updated",
         "request_id": expense.request_id,
         "new_status": expense.status
     }
- 
- 
+
+# @router.get("/attachment/{attachment_id}/access", response_model=dict)
+# async def get_attachment_access(
+#     attachment_id: int,
+#     user_id: int = Query(..., description="User ID"),
+#     session: Session = Depends(get_session),
+# ):
+#     """Generate a temporary SAS URL for an attachment, accessible to the employee who created the expense, their manager, HR, or Account Manager."""
+#     # Fetch user from database
+#     user = session.get(User, user_id)
+#     if not user:
+#         raise HTTPException(status_code=404, detail="User not found")
+
+#     attachment = session.get(ExpenseAttachment, attachment_id)
+#     if not attachment:
+#         raise HTTPException(status_code=404, detail="Attachment not found")
+
+#     # Get the associated expense request
+#     expense = session.get(ExpenseRequest, attachment.request_id)
+#     if not expense:
+#         raise HTTPException(status_code=404, detail="Expense request not found")
+
+#     # Check authorization
+#     is_employee = user.id == expense.employee_id
+#     is_manager = session.exec(
+#         select(EmployeeManager).where(
+#             EmployeeManager.employee_id == expense.employee_id,
+#             EmployeeManager.manager_id == user.id
+#         )
+#     ).first() is not None
+#     is_authorized_role = user.role in ["HR", "Account Manager"]
+
+#     if not (is_employee or is_manager or is_authorized_role):
+#         raise HTTPException(status_code=403, detail="Unauthorized to access attachment")
+
+#     # Extract blob name from file_url
+#     blob_name = attachment.file_url.split(f"/{AZURE_CONTAINER_NAME}/")[-1]
+
+#     # Generate SAS token (valid for 1 hour)
+#     sas_token = generate_blob_sas(
+#         account_name=blob_service_client.account_name,
+#         container_name=AZURE_CONTAINER_NAME,
+#         blob_name=blob_name,
+#         account_key=blob_service_client.credential.account_key,
+#         permission=BlobSasPermissions(read=True),
+#         expiry=datetime.utcnow() + timedelta(hours=1)
+#     )
+
+#     # Construct SAS URL
+#     sas_url = f"https://{blob_service_client.account_name}.blob.core.windows.net/{AZURE_CONTAINER_NAME}/{blob_name}?{sas_token}"
+
+#     return {
+#         "attachment_id": attachment.attachment_id,
+#         "file_name": attachment.file_name,
+#         "file_url": sas_url,
+#         "file_type": attachment.file_type,
+#         "file_size": attachment.file_size,
+#         "uploaded_at": attachment.uploaded_at,
+#     }
+
+@router.delete("/{request_id}", response_model=dict)
+async def delete_expense(
+    request_id: int,
+    user_id: int = Query(..., description="User ID"),
+    session: Session = Depends(get_session),
+):
+    """Delete an expense request and its attachments, accessible to the employee who created it, HR, or Account Manager (for pending_manager_approval)."""
+    try:
+        # Fetch user from database
+        user = session.get(User, user_id)
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        # Fetch expense request
+        expense = session.get(ExpenseRequest, request_id)
+        if not expense:
+            raise HTTPException(status_code=404, detail="Expense request not found")
+
+        # Check authorization
+        is_employee = user.id == expense.employee_id
+        is_hr = user.role == "HR"
+        is_account_manager = user.role == "Account Manager"
+        can_delete = (
+            (is_employee and expense.status in ["pending_manager_approval"]) or
+            is_hr or
+            (is_account_manager and expense.status == "pending_manager_approval")
+        )
+        if not can_delete:
+            raise HTTPException(status_code=403, detail="Unauthorized to delete expense")
+
+        print(f"Deleting expense request_id={request_id}, user_id={user_id}, role={user.role}")
+
+        # 1. Delete expense_history records first (to satisfy foreign key constraint)
+        history_records = session.exec(
+            select(ExpenseHistory).where(ExpenseHistory.request_id == request_id)
+        ).all()
+        for history in history_records:
+            session.delete(history)
+        print(f"Deleted {len(history_records)} history records for request_id={request_id}")
+
+        # 2. Fetch and delete attachments from database and Azure Blob Storage
+        attachments = session.exec(
+            select(ExpenseAttachment).where(ExpenseAttachment.request_id == request_id)
+        ).all()
+
+        for attachment in attachments:
+            # Delete from Azure Blob Storage
+            try:
+                blob_name = attachment.file_url.split(f"/{AZURE_CONTAINER_NAME}/")[-1]
+                blob_client = container_client.get_blob_client(blob_name)
+                blob_client.delete_blob()
+                print(f"Deleted blob: {blob_name}")
+            except Exception as e:
+                print(f"Failed to delete blob {blob_name}: {str(e)}")
+                # Continue even if blob deletion fails
+
+            # Delete from database
+            session.delete(attachment)
+
+        print(f"Deleted {len(attachments)} attachments for request_id={request_id}")
+
+        # 3. Record deletion in history (before deleting the expense)
+        history_entry = ExpenseHistory(
+            request_id=request_id,
+            action_by=user.id,
+            action_role=user.role,
+            action="Deleted",
+            reason=f"Expense deleted by {user.role}",
+            created_at=datetime.utcnow()
+        )
+        session.add(history_entry)
+
+        # 4. Delete expense request
+        session.delete(expense)
+        session.commit()
+
+        print(f"Expense deleted successfully: request_id={request_id}, user_id={user_id}, role={user.role}")
+        return {
+            "message": "Expense deleted successfully",
+            "request_id": request_id
+        }
+
+    except Exception as e:
+        session.rollback()
+        print(f"Error deleting expense request_id={request_id}: {str(e)}\nSQL: {e.__cause__}")
+        raise HTTPException(status_code=500, detail=f"Failed to delete expense: {str(e)}")

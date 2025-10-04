@@ -13,27 +13,20 @@ const EmployeeAttendance = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [typeFilter, setTypeFilter] = useState('all');
   const [roleFilter, setRoleFilter] = useState('all');
-  const [year, setYear] = useState(2025);
-  const [month, setMonth] = useState(9);
-  const [userId, setUserId] = useState(null);
-  const [error, setError] = useState(null);
+    const [userId, setUserId] = useState(null); const [error, setError] = useState(null);
+    const [year, setYear] = useState(new Date().getFullYear()); // current year
+    const [month, setMonth] = useState(new Date().getMonth() + 1); // current month (1-12)
 
 
-  // Fetch userId from localStorage on component mount
   useEffect(() => {
     const storedUserId = localStorage.getItem('userId');
-    if (storedUserId) {
-      setUserId(parseInt(storedUserId, 10));
-    } else {
-      setError('No user ID found in localStorage. Please log in.');
-    }
+    if (storedUserId) setUserId(parseInt(storedUserId, 10));
+    else setError('No user ID found in localStorage. Please log in.');
   }, []);
 
-  // Fetch attendance records
   useEffect(() => {
     const fetchAttendance = async () => {
       if (!userId) return;
-
       try {
         setError(null);
         const response = await api.get('/attendance/hr-daily', {
@@ -49,31 +42,32 @@ const EmployeeAttendance = () => {
 
     const transformData = (data) => {
       return data.map((record, index) => {
-        // Map backend type to frontend type if needed
-        const typeMap = {
-          'Employee': 'Full-Time', // Assuming backend "Employee" maps to "Full-Time"
-          'Intern': 'Intern',
-          'Contract': 'Contract'
-        };
-        const type = typeMap[record.type] || record.type || 'Full-Time'; // Default to 'Full-Time' if type is missing
+        const typeMap = { 'Employee': 'Full-Time', 'Intern': 'Intern', 'Contract': 'Contract' };
+        const type = typeMap[record.type] || record.type || 'Full-Time';
+
+        const projects = record.projects && record.projects.length > 0
+          ? [...new Map(record.projects.map(p => [p.label, {
+              name: p.label,
+              totalHours: p.total_hours,
+              subtasks: record.subTasks
+                .filter(st => st.project === p.label)
+                .map(st => ({
+                  subtaskName: st.subTask,
+                  subtaskHours: st.hours
+                }))
+            }])).values()]
+          : [];
 
         return {
           id: index + 1,
           employee: { name: record.name || 'Unknown', email: record.email || 'N/A' },
           type: type,
-          role: record.role || 'Employee', // Keep role as backend provides for roleFilter
+          role: record.role || 'Employee',
           day: record.day || new Date(record.date).toLocaleDateString('en-US', { weekday: 'long' }),
           date: record.date || 'N/A',
           status: record.status || 'Unknown',
           hours: record.hours || 0,
-          projects: record.projects && record.projects.length > 0
-            ? [...new Map(record.projects.map(p => [p.label, {
-                name: p.label,
-                subtasks: record.subTasks
-                  .filter(st => st.project === p.label)
-                  .map(st => st.subTask)
-              }])).values()]
-            : []
+          projects
         };
       });
     };
@@ -81,7 +75,6 @@ const EmployeeAttendance = () => {
     fetchAttendance();
   }, [userId, year, month]);
 
-  // Handle removing a record (Placeholder)
   const handleRemoveRecord = (id) => {
     setAttendanceRecords(attendanceRecords.filter(record => record.id !== id));
   };
@@ -114,7 +107,6 @@ const EmployeeAttendance = () => {
     return matchesSearch && matchesType && matchesRole;
   });
 
-  // Helpers to compute counts
   const getCounts = (records) => {
     let present = 0, wfh = 0, leave = 0;
     for (const r of records) {
@@ -143,7 +135,8 @@ const EmployeeAttendance = () => {
     );
   };
 
-   const getAvatarColor = (name) => avatarBg(name);
+  const getAvatarColor = (name) => avatarBg(name);
+
 
   return (
     <div className="min-h-screen bg-gray-50 p-6">
@@ -401,24 +394,28 @@ const EmployeeAttendance = () => {
                         <div className="w-3 h-3 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full mr-2"></div>
                         {project.name}
                       </h4>
-                      {project.subtasks && project.subtasks.length > 0 ? (
-                        <div className="space-y-2">
-                          <p className="text-sm font-medium text-gray-700 mb-2">Subtasks:</p>
-                          <div className="grid grid-cols-1 gap-2">
-                            {project.subtasks.map((subtask, subtaskIndex) => (
-                              <div
-                                key={subtaskIndex}
-                                className="flex items-center p-2 bg-white/50 rounded-md border border-blue-100"
-                              >
-                                <div className="w-2 h-2 bg-gradient-to-r from-emerald-400 to-teal-500 rounded-full mr-3"></div>
-                                <span className="text-sm text-gray-800">{subtask}</span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      ) : (
-                        <p className="text-sm text-gray-500 italic">No subtasks for this project</p>
-                      )}
+                     {project.subtasks && project.subtasks.length > 0 ? (
+  <div className="space-y-2">
+    <p className="text-sm font-medium text-gray-700 mb-2">Subtasks:</p>
+    <div className="grid grid-cols-1 gap-2">
+      {project.subtasks.map((subtask, subtaskIndex) => (
+        <div
+          key={subtaskIndex}
+          className="flex items-center justify-between p-2 bg-white/50 rounded-md border border-blue-100"
+        >
+          <div className="flex items-center">
+            <div className="w-2 h-2 bg-gradient-to-r from-emerald-400 to-teal-500 rounded-full mr-3"></div>
+            <span className="text-sm text-gray-800">{subtask.subtaskName}</span>
+          </div>
+          <span className="text-xs font-semibold text-gray-600">{subtask.subtaskHours}h</span>
+        </div>
+      ))}
+    </div>
+  </div>
+) : (
+  <p className="text-sm text-gray-500 italic">No subtasks for this project</p>
+)}
+
                     </div>
                   ))}
                 </div>
@@ -520,14 +517,18 @@ const EmployeeAttendance = () => {
                       {viewRecord.projects.map((project, index) => (
                         <div key={index} className="bg-white/50 border border-gray-100 rounded-lg p-3">
                           <h5 className="font-medium text-gray-800 mb-2">{project.name}</h5>
-                          <div className="space-y-1">
-                            {project.subtasks.map((subtask, subIndex) => (
-                              <div key={subIndex} className="flex items-center space-x-2">
-                                <div className="w-1.5 h-1.5 bg-gradient-to-r from-blue-400 to-purple-400 rounded-full"></div>
-                                <span className="text-sm text-gray-700">{subtask}</span>
-                              </div>
-                            ))}
-                          </div>
+                         <div className="space-y-1">
+  {project.subtasks.map((subtask, subIndex) => (
+    <div key={subIndex} className="flex items-center justify-between space-x-2">
+      <div className="flex items-center space-x-2">
+        <div className="w-1.5 h-1.5 bg-gradient-to-r from-blue-400 to-purple-400 rounded-full"></div>
+        <span className="text-sm text-gray-700">{subtask.subtaskName}</span>
+      </div>
+      <span className="text-xs font-semibold text-gray-600">{subtask.subtaskHours}h</span>
+    </div>
+  ))}
+</div>
+
                         </div>
                       ))}
                     </div>

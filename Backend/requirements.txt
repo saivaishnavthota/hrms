@@ -15,3 +15,6 @@ bcrypt==3.2.2
 fastapi_mail
 python-jose[cryptography]==3.3.0
 azure-storage-blob
+pdfplumber             
+python-docx
+fastapi[all]  

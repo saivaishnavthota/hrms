@@ -603,6 +603,7 @@ async def approve_employee(onboarding_id: int, session: Session = Depends(get_se
     Approve an employee:
     - Moves data from onboarding tables to main tables
     - Calls the stored procedure approve_employee(onboarding_id, OUT new_emp_id)
+    - Regenerates SAS tokens for all transferred documents
     """
     try:
         with session.connection().connection.cursor() as cur:
@@ -610,7 +611,7 @@ async def approve_employee(onboarding_id: int, session: Session = Depends(get_se
             cur.execute("CALL approve_employee(%s, %s)", (onboarding_id, None))
 
             # Fetch OUT parameter if needed (depends how your procedure is written)
-            # Some drivers don’t return OUT params directly, so you can SELECT instead.
+            # Some drivers don't return OUT params directly, so you can SELECT instead.
             # Example if your procedure inserts into employees and returns new id:
             cur.execute("SELECT currval(pg_get_serial_sequence('employees','id'))")
             new_emp_id = cur.fetchone()[0]
@@ -625,6 +626,7 @@ async def approve_employee(onboarding_id: int, session: Session = Depends(get_se
     except Exception as e:
         session.rollback()
         logger.error(f"Error approving employee {onboarding_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
         
 @router.post("/hr/assign")
 async def assign_employee(data: AssignEmployeeRequest, session: Session = Depends(get_session)):

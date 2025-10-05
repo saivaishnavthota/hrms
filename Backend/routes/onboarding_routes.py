@@ -38,8 +38,8 @@ container_client = blob_service_client.get_container_client(AZURE_CONTAINER_NAME
 def build_blob_url(employee_id: int, file_name: str):
     return f"https://{blob_service_client.account_name}.blob.core.windows.net/{AZURE_CONTAINER_NAME}/{employee_id}/{file_name}"
 
-def generate_sas_url(employee_id: int, file_name: str, expiry_years: int = 2):
-    """Generate a SAS URL for a blob with read permissions"""
+def generate_sas_url(employee_id: int, file_name: str, expiry_years: int = 10):
+    """Generate a SAS URL for a blob with read permissions (default 10-year expiry for long-term storage)"""
     blob_name = f"{employee_id}/{file_name}"
     sas_token = generate_blob_sas(
         account_name=ACCOUNT_NAME,

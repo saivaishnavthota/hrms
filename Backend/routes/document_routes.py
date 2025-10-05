@@ -215,7 +215,7 @@ def list_documents(
     for doc in documents:
         file_url = None
         if current_user.role == "HR":
-            file_url = generate_sas_url(employee_id, doc.file_name)
+            file_url = doc.file_url  # Use stored URL from database
 
         doc_list.append(
             DocumentStatus(
@@ -248,7 +248,7 @@ def preview_document(
     if current_user.role != "HR":
         raise HTTPException(status_code=403, detail="Access denied: HR only")
 
-    file_url = generate_sas_url(employee_id, document.file_name)
+    file_url = document.file_url  # Use stored URL from database
 
     return DocumentStatus(
         doc_type=document.doc_type,

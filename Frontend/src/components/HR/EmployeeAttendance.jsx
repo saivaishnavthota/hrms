@@ -61,6 +61,9 @@ const ManagerEmployeeAttendance = () => {
         };
         const type = typeMap[record.type] || record.type || 'Full-Time'; // Default to 'Full-Time' if type is missing
         
+        // Calculate total hours from subtasks (same as Manager component)
+        const totalHours = (record.subTasks || []).reduce((sum, st) => sum + parseFloat(st.hours || 0), 0);
+        
         // Transform projects with subtasks
         const projects = record.projects && record.projects.length > 0
           ? [...new Map(record.projects.map(p => [p.label, {
@@ -70,7 +73,7 @@ const ManagerEmployeeAttendance = () => {
                 .filter(st => st.project === p.label)
                 .map(st => ({
                   name: st.subTask,
-                  hours: st.hours
+                  hours: parseFloat(st.hours || 0)
                 }))
             }])).values()]
           : [];
@@ -83,7 +86,7 @@ const ManagerEmployeeAttendance = () => {
           day: record.day || new Date(record.date).toLocaleDateString('en-US', { weekday: 'long' }),
           date: record.date || 'N/A',
           status: record.status || 'Unknown',
-          hours: record.hours || 0,
+          hours: parseFloat(totalHours.toFixed(2)), // Use calculated hours from subtasks
           projects
         };
       });

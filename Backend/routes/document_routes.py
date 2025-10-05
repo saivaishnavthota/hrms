@@ -394,7 +394,7 @@ def get_all_documents(
                 EmployeeDocuments(
                     id=employee.id,
                     name=employee.name,
-                    email=employee.email or employee.company_email or "",
+                    email=employee.company_email or employee.email or "",
                     role=employee.role,
                     documents=doc_list
                 )

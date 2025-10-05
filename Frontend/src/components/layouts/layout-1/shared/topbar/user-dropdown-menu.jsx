@@ -32,6 +32,8 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Switch } from '@/components/ui/switch';
 import { logout } from '@/lib/auth';
+import { useUser } from '@/contexts/UserContext';
+import api from '@/lib/api';
 
 const I18N_LANGUAGES = [
   {
@@ -61,36 +63,57 @@ const I18N_LANGUAGES = [
 ];
 
 export function UserDropdownMenu({ trigger }) {
+  const { user } = useUser();
   const [employee, setEmployee] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchEmployeeData = async () => {
       try {
-        const userId = localStorage.getItem('userId');
-        if (!userId) {
-          setLoading(false);
-          return;
+        // First, use UserContext data as fallback
+        // Note: user.email already contains the company email from login response
+        if (user) {
+          setEmployee({
+            name: user.name,
+            email: user.email, // This is the company email
+            company_email: user.email, // Same as email
+            role: user.role,
+            employeeId: user.employeeId
+          });
         }
-        
-        // Use the API instance to go through the proxy
-        const response = await fetch(`http://localhost:2346/users/${userId}`);
-        if (response.ok) {
-          const data = await response.json();
+
+        // Try to fetch additional data from API
+        const userId = user?.employeeId || localStorage.getItem('userId');
+        if (userId) {
+          const { data } = await api.get(`/users/${userId}`);
           console.log('User dropdown data:', data); // Debug log
-          setEmployee(data);
-        } else {
-          console.error('Failed to fetch employee data:', response.status);
+          setEmployee({
+            name: data.name || user?.name,
+            email: data.company_email || data.email || user?.email,
+            company_email: data.company_email || data.email || user?.email,
+            role: data.role || user?.role,
+            employeeId: data.id || user?.employeeId
+          });
         }
       } catch (error) {
         console.error('Error fetching employee data:', error);
+        // Keep using UserContext data if API fails
+        if (user) {
+          setEmployee({
+            name: user.name,
+            email: user.email,
+            company_email: user.email,
+            role: user.role,
+            employeeId: user.employeeId
+          });
+        }
       } finally {
         setLoading(false);
       }
     };
 
     fetchEmployeeData();
-  }, []);
+  }, [user]);
   const currenLanguage = I18N_LANGUAGES[0];
   const { theme, setTheme } = useTheme();
 

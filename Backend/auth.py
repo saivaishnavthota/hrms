@@ -2,7 +2,7 @@ from datetime import timedelta, timezone, datetime
 from jose import jwt, JWTError
 from passlib.context import CryptContext
 from fastapi.security import OAuth2PasswordBearer
-from fastapi import HTTPException, Depends, Request
+from fastapi import HTTPException, Depends, Request,status
 from sqlmodel import Session, select
 from models.user_model import User
 from database import get_session
@@ -133,19 +133,6 @@ def role_required(role: Literal["HR", "Manager", "Employee","Account Manager"]):
         return current_user
     return Depends(dependency)
 
-
-# # Get current user from token
-# async def get_current_user(token: str = Depends(oauth2_scheme), session: Session = Depends(get_session)):
-#     payload = verify_token(token)
-#     if not payload:
-#         raise HTTPException(status_code=401, detail="Invalid Token")
-#     email = payload.get("sub")
-#     if not email:
-#         raise HTTPException(status_code=401, detail="Invalid Token: missing sub claim")
-#     user = session.exec(select(User).where(User.email == email)).first()
-#     if not user:
-#         raise HTTPException(status_code=404, detail="User Not Found")
-#     return user
 
 
 # # Role-based dependency

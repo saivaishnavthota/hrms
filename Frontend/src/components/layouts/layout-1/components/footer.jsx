@@ -18,9 +18,12 @@ export function Footer() {
             </a>
           </div>
           <nav className="flex order-1 md:order-2 gap-4 font-normal text-sm text-muted-foreground">
-          
-          
-        
+            {/* <a
+              href="/company-policies"
+              className="hover:text-primary"
+            >
+              Company Policies
+            </a> */}
             <a
               href="https://www.nxzen.com/about-us"
               target="_blank"

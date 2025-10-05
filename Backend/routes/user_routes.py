@@ -70,6 +70,7 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends(), session: Sessi
             name=db_user.name,
             role=db_user.role,
             email=db_user.company_email,
+            company_employee_id=db_user.company_employee_id,
             access_token=access_token,
             onboarding_status=db_user.o_status,
             login_status=db_user.login_status,
@@ -273,6 +274,8 @@ async def display_employees(hr_id: int = None, session: Session = Depends(get_se
                 e.company_email,
                 e.email,
                 e.role,
+                e.company_employee_id,
+                e.reassignment,
                 COALESCE(array_agg(DISTINCT hr.name) FILTER (WHERE hr.id IS NOT NULL), '{}') AS hr,
                 COALESCE(array_agg(DISTINCT mgr.name) FILTER (WHERE mgr.id IS NOT NULL), '{}') AS managers
             FROM employees e
@@ -286,7 +289,7 @@ async def display_employees(hr_id: int = None, session: Session = Depends(get_se
         if hr_id:
             base_query += " WHERE eh.hr_id = :hr_id"
 
-        base_query += " GROUP BY e.id, e.name, e.email, e.role ORDER BY e.name"
+        base_query += " GROUP BY e.id, e.name, e.email, e.role, e.company_employee_id, e.reassignment ORDER BY e.name"
 
         result = session.execute(text(base_query), {"hr_id": hr_id} if hr_id else {}).all()
         
@@ -298,6 +301,8 @@ async def display_employees(hr_id: int = None, session: Session = Depends(get_se
                 "to_email": row.email,
                 "email": row.company_email,
                 "role": row.role,
+                "company_employee_id": row.company_employee_id,
+                "reassignment": row.reassignment,
                 "hr": row.hr,
                 "managers": row.managers
             })

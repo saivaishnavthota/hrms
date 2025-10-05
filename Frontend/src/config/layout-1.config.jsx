@@ -129,6 +129,11 @@ export const MENU_SIDEBAR = [
     icon: CalendarCheck,
     path: '/hr/holidays',
   },
+  // {
+  //   title: 'Company Policies',
+  //   icon: FileText,
+  //   path: '/hr/company-policies',
+  // },
 ];
 
 export const MENU_MEGA = [

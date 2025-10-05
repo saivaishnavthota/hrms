@@ -141,13 +141,13 @@ const AccountManagerExpenseManagement = () => {
         submittedOn: formatDate(item.submitted_at || item.expense_date || item.date),
         status: mapStatus(item.status),
         attachments: item.attachment
-          ? [{ file_name: 'Attachment', file_path: item.attachment }]
+          ? [{ file_name: 'Attachment', file_url: item.attachment }]
           : item.attachments
           ? typeof item.attachments === 'string'
-            ? [{ file_name: 'Attachment', file_path: item.attachments }]
+            ? [{ file_name: 'Attachment', file_url: item.attachments }]
             : item.attachments.map((att) => ({
                 file_name: att.file_name || 'Attachment',
-                file_path: att.file_path,
+                file_url: att.file_url,
               }))
           : [],
       };
@@ -712,7 +712,7 @@ const AccountManagerExpenseManagement = () => {
                     {selectedExpense.attachments.map((att, idx) => (
                       <a
                         key={idx}
-                        href={att.file_path}
+                        href={att.file_url}
                         target="_blank"
                         rel="noreferrer"
                         className="text-blue-600 text-sm underline"

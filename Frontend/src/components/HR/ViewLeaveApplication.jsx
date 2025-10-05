@@ -1,7 +1,10 @@
 import React from 'react';
 import { X, Calendar, User, FileText, Clock } from 'lucide-react';
+import { useUser } from '@/contexts/UserContext';
 
 const ViewLeaveApplication = ({ isOpen, onClose, leaveData }) => {
+  const { user } = useUser();
+  
   if (!isOpen || !leaveData) return null;
 
   const getStatusBadge = (status) => {
@@ -58,7 +61,9 @@ const ViewLeaveApplication = ({ isOpen, onClose, leaveData }) => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Employee Name</label>
-                <p className="text-gray-900">{leaveData.employee || leaveData.employee_name || 'N/A'}</p>
+                <p className="text-gray-900">
+                  {leaveData.employee || leaveData.employee_name || user?.name || 'N/A'}
+                </p>
               </div>
               
             </div>
@@ -91,11 +96,11 @@ const ViewLeaveApplication = ({ isOpen, onClose, leaveData }) => {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Number of Days</label>
-                <p className="text-gray-900">{leaveData.days || leaveData.total_days || 'N/A'}</p>
+                <p className="text-gray-900">{leaveData.no_of_days || leaveData.days || leaveData.total_days || 'N/A'}</p>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Applied On</label>
-                <p className="text-gray-900">{formatDate(leaveData.appliedOn || leaveData.applied_date || leaveData.created_at)}</p>
+                <p className="text-gray-900">{formatDate(leaveData.created_at || leaveData.appliedOn || leaveData.applied_date)}</p>
               </div>
             </div>
           </div>

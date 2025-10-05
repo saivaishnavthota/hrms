@@ -32,6 +32,7 @@ async def get_locations(session: Session = Depends(get_session)):
             detail=f"Error fetching locations: {str(e)}"
         )
 
+@router.post("")
 @router.post("/")
 async def add_location(location: LocationCreate, session: Session = Depends(get_session)):
     try:

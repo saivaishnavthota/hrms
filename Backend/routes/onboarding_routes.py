@@ -1,7 +1,7 @@
 from models.onboarding_model import candidate,onboard_emp_doc
 from fastapi import APIRouter, Depends, HTTPException,Request
 
-from schemas.onboarding_schema import UserCreate,AssignEmployeeRequest,DocumentCreate,DocumentResponse,UsercreateResponse,EmployeeOnboardingRequest,EmployeeOnboardingResponse,DocumentStatus,EmployeeDocuments
+from schemas.onboarding_schema import UserCreate,AssignEmployeeRequest,ReassignEmployeeRequest,DocumentCreate,DocumentResponse,UsercreateResponse,EmployeeOnboardingRequest,EmployeeOnboardingResponse,DocumentStatus,EmployeeDocuments
 from database import get_session
 from fastapi.responses import JSONResponse,StreamingResponse
 from utils.email import send_login_email,send_onboarding_email,send_credentials_email
@@ -19,8 +19,8 @@ import filetype
 from passlib.context import CryptContext
 from typing import List, Optional
 
-from azure.storage.blob import BlobServiceClient, ContentSettings
-from datetime import datetime
+from azure.storage.blob import BlobServiceClient, ContentSettings, generate_blob_sas, BlobSasPermissions
+from datetime import datetime, timedelta
 from database import get_session
 import os
 from dotenv import load_dotenv
@@ -29,11 +29,27 @@ load_dotenv()
 
 AZURE_CONNECTION_STRING =os.getenv("AZURE_CONNECTION_STRING", "DefaultEndpointsProtocol=https;AccountName=hrmsnxzen;AccountKey=Jug56pLmeZIJplobcV+f20v7IXnh6PWuih0hxRYpvRXpGh6tnJrzALqtqL/hRR3lpZK0ZTKIs2Pv+AStDvBH4w==;EndpointSuffix=core.windows.net")
 AZURE_CONTAINER_NAME = os.getenv("AZURE_CONTAINER_NAME", "con-hrms")
+ACCOUNT_NAME = "hrmsnxzen"
+ACCOUNT_KEY = "Jug56pLmeZIJplobcV+f20v7IXnh6PWuih0hxRYpvRXpGh6tnJrzALqtqL/hRR3lpZK0ZTKIs2Pv+AStDvBH4w=="
+
 blob_service_client = BlobServiceClient.from_connection_string(AZURE_CONNECTION_STRING)
 container_client = blob_service_client.get_container_client(AZURE_CONTAINER_NAME)
 
 def build_blob_url(employee_id: int, file_name: str):
     return f"https://{blob_service_client.account_name}.blob.core.windows.net/{AZURE_CONTAINER_NAME}/{employee_id}/{file_name}"
+
+def generate_sas_url(employee_id: int, file_name: str, expiry_years: int = 2):
+    """Generate a SAS URL for a blob with read permissions"""
+    blob_name = f"{employee_id}/{file_name}"
+    sas_token = generate_blob_sas(
+        account_name=ACCOUNT_NAME,
+        container_name=AZURE_CONTAINER_NAME,
+        blob_name=blob_name,
+        account_key=ACCOUNT_KEY,
+        permission=BlobSasPermissions(read=True),
+        expiry=datetime.utcnow() + timedelta(days=365 * expiry_years)
+    )
+    return f"https://{ACCOUNT_NAME}.blob.core.windows.net/{AZURE_CONTAINER_NAME}/{blob_name}?{sas_token}"
 
 
 
@@ -165,67 +181,187 @@ async def onboard_employee(
 # Route: Upload Documents
 @router.post("/upload")
 async def upload_documents(request: Request, session: Session = Depends(get_session)):
+    print("=" * 80)
+    print("🚀 ONBOARDING UPLOAD ROUTE CALLED")
+    print("=" * 80)
+    
     try:
         form_data = await request.form()
-        logger.info(f"Received form data keys: {list(form_data.keys())}")
+        logger.info(f"📥 Received form data keys: {list(form_data.keys())}")
+        logger.info(f"📥 Total fields in form: {len(form_data.keys())}")
 
         employee_id = form_data.get("employeeId")
+        logger.info(f"👤 Employee ID from form: {employee_id}")
+        
         if not employee_id:
             raise HTTPException(status_code=400, detail="employeeId is required")
         try:
             employee_id = int(employee_id)
+            logger.info(f"✅ Employee ID validated: {employee_id}")
         except ValueError:
+            logger.error(f"❌ Invalid employee ID: {employee_id}")
             raise HTTPException(status_code=400, detail="employeeId must be an integer")
 
         uploaded_files = []
 
         for field_name, field_value in form_data.items():
+            logger.info(f"🔍 Processing field: {field_name}, type: {type(field_value)}")
+            
             if field_name == "employeeId":
+                logger.info(f"⏭️ Skipping employeeId field")
                 continue
 
             if hasattr(field_value, "read") and hasattr(field_value, "filename"):
+                logger.info(f"📄 Field {field_name} is a file with filename: {field_value.filename}")
+                
                 file_data = await field_value.read()
+                logger.info(f"📊 Read {len(file_data)} bytes for {field_name}")
+                
                 if not file_data:
-                    logger.warning(f"File {field_name} is empty")
+                    logger.warning(f"⚠️ File {field_name} is empty - skipping")
                     continue
 
-                # Unique blob name → employeeId/docType/filename
-                blob_name = f"{employee_id}/{field_name}/{field_value.filename}"
-
-                # Upload to Azure
+                # Define blob path (simpler structure without nested folder)
+                blob_name = f"{employee_id}/{field_value.filename}"
+                logger.info(f"🎯 Blob name will be: {blob_name}")
+                
                 blob_client = container_client.get_blob_client(blob_name)
-                content_settings = ContentSettings(content_type=field_value.content_type)
-                blob_client.upload_blob(file_data, overwrite=True, content_settings=content_settings)
+                content_settings = ContentSettings(content_type=field_value.content_type or "application/octet-stream")
+                logger.info(f"📋 Content type: {field_value.content_type or 'application/octet-stream'}")
 
-                file_url = blob_client.url
+                # Upload to Azure Blob Storage
+                logger.info(f"⬆️ Starting upload of {field_value.filename} to blob path: {blob_name}")
+                try:
+                    blob_client.upload_blob(file_data, overwrite=True, content_settings=content_settings)
+                    logger.info(f"✅ Successfully uploaded {field_value.filename} to Azure")
+                except Exception as blob_error:
+                    logger.error(f"❌ Blob upload failed for {field_value.filename}: {str(blob_error)}")
+                    logger.error(f"Traceback: {traceback.format_exc()}")
+                    raise HTTPException(status_code=500, detail=f"Blob upload failed: {str(blob_error)}")
+
+                # Generate SAS token and URL
+                logger.info(f"🔐 About to generate SAS token for {blob_name}")
+                logger.info(f"🔐 Using ACCOUNT_NAME: {ACCOUNT_NAME}")
+                logger.info(f"🔐 Using CONTAINER_NAME: {AZURE_CONTAINER_NAME}")
+                logger.info(f"🔐 Using blob_name: {blob_name}")
+                logger.info(f"🔐 Account key present: {bool(ACCOUNT_KEY)}, length: {len(ACCOUNT_KEY) if ACCOUNT_KEY else 0}")
+                
+                try:
+                    print(f"🟢 ENTERING SAS TOKEN GENERATION BLOCK for {field_value.filename}")
+                    
+                    sas_token = generate_blob_sas(
+                        account_name=ACCOUNT_NAME,
+                        container_name=AZURE_CONTAINER_NAME,
+                        blob_name=blob_name,
+                        account_key=ACCOUNT_KEY,
+                        permission=BlobSasPermissions(read=True),
+                        expiry=datetime.utcnow() + timedelta(days=365 * 2)
+                    )
+                    
+                    print(f"🟢 SAS TOKEN GENERATED: {sas_token[:50]}... (truncated)")
+                    logger.info(f"✅ Generated SAS token (first 50 chars): {sas_token[:50]}...")
+                    
+                    file_url = f"https://{ACCOUNT_NAME}.blob.core.windows.net/{AZURE_CONTAINER_NAME}/{blob_name}?{sas_token}"
+                    logger.info(f"🔗 Complete SAS URL generated for {field_value.filename}")
+                    logger.info(f"🔗 URL preview (first 150 chars): {file_url[:150]}...")
+                    
+                    print(f"🟢 SUCCESSFULLY GENERATED SAS URL for {field_value.filename}")
+                except Exception as e:
+                    logger.error(f"❌ Failed to generate SAS URL for {blob_name}: {str(e)}")
+                    logger.error(f"❌ Error type: {type(e).__name__}")
+                    logger.error(f"❌ Full traceback: {traceback.format_exc()}")
+                    print(f"🔴 SAS TOKEN GENERATION FAILED: {str(e)}")
+                    raise HTTPException(status_code=500, detail=f"Failed to generate SAS URL: {str(e)}")
+
+                # Delete existing document record to prevent duplication
+                logger.info(f"🔍 Checking for existing document: employee_id={employee_id}, doc_type={field_name}")
+                try:
+                    existing_doc = session.exec(
+                        select(onboard_emp_doc).where(
+                            onboard_emp_doc.employee_id == employee_id,
+                            onboard_emp_doc.doc_type == field_name
+                        )
+                    ).first()
+                    
+                    if existing_doc:
+                        logger.info(f"🗑️ Found existing document for {field_name}, deleting it...")
+                        logger.info(f"🗑️ Old file_url: {existing_doc.file_url[:100] if existing_doc.file_url else 'None'}...")
+                        session.delete(existing_doc)
+                        session.flush()  # Flush to apply delete before insert
+                        logger.info(f"✅ Deleted existing document record for {field_name}")
+                    else:
+                        logger.info(f"ℹ️ No existing document found for {field_name}")
+                except Exception as e:
+                    logger.warning(f"⚠️ Error checking/deleting existing document: {str(e)}")
+                    logger.warning(f"⚠️ Traceback: {traceback.format_exc()}")
 
                 # Insert metadata into DB
-                doc = onboard_emp_doc(
-                    employee_id=employee_id,
-                    doc_type=field_name,
-                    file_name=field_value.filename,
-                    file_url=file_url,
-                    uploaded_at=datetime.utcnow()
-                )
-                session.add(doc)
-                uploaded_files.append(
-                    {"doc_type": field_name, "file_name": field_value.filename, "file_url": file_url}
-                )
+                logger.info(f"💾 Preparing to insert document metadata into DB")
+                logger.info(f"💾 employee_id: {employee_id}")
+                logger.info(f"💾 doc_type: {field_name}")
+                logger.info(f"💾 file_name: {field_value.filename}")
+                logger.info(f"💾 file_url (first 150 chars): {file_url[:150]}...")
+                logger.info(f"💾 file_url contains '?': {('?' in file_url)}")
+                logger.info(f"💾 file_url contains 'sv=': {('sv=' in file_url)}")
+                
+                try:
+                    doc = onboard_emp_doc(
+                        employee_id=employee_id,
+                        doc_type=field_name,
+                        file_name=field_value.filename,
+                        file_url=file_url,
+                        uploaded_at=datetime.utcnow()
+                    )
+                    session.add(doc)
+                    logger.info(f"✅ Added document to session for {field_value.filename}")
+                    
+                    uploaded_files.append(
+                        {"doc_type": field_name, "file_name": field_value.filename, "file_url": file_url}
+                    )
+                    logger.info(f"✅ Appended to uploaded_files list")
+                    
+                    print(f"🟢 DB INSERT PREPARED for {field_value.filename} with URL: {file_url[:100]}...")
+                except Exception as e:
+                    logger.error(f"❌ DB insert failed for {field_value.filename}: {str(e)}")
+                    logger.error(f"❌ Traceback: {traceback.format_exc()}")
+                    raise HTTPException(status_code=500, detail=f"Database insert failed: {str(e)}")
 
         if uploaded_files:
+            logger.info(f"💾 Committing {len(uploaded_files)} documents to database...")
+            print(f"🟢 COMMITTING {len(uploaded_files)} DOCUMENTS")
+            
+            # Log each file being committed
+            for idx, file_info in enumerate(uploaded_files, 1):
+                logger.info(f"  {idx}. {file_info['doc_type']}: {file_info['file_name']}")
+                logger.info(f"     URL: {file_info['file_url'][:100]}...")
+                logger.info(f"     Has SAS token: {('?' in file_info['file_url'] and 'sv=' in file_info['file_url'])}")
+            
             session.commit()
+            logger.info(f"✅ Successfully committed {len(uploaded_files)} documents for employee {employee_id}")
+            print(f"🟢 COMMIT SUCCESSFUL - {len(uploaded_files)} DOCUMENTS SAVED")
+            print("=" * 80)
+            
             return {
                 "message": f"Successfully uploaded {len(uploaded_files)} documents",
                 "uploaded_files": uploaded_files,
                 "employeeId": employee_id,
             }
         else:
+            logger.warning(f"⚠️ No files were uploaded for employee {employee_id}")
+            print("🟡 NO FILES UPLOADED")
+            print("=" * 80)
             return {"message": "No files uploaded", "employeeId": employee_id}
 
-    except Exception as e:
+    except HTTPException:
+        logger.error(f"❌ HTTPException occurred, rolling back")
         session.rollback()
-        logger.error(f"Error uploading documents: {str(e)}")
-        logger.error(traceback.format_exc())
+        raise
+    except Exception as e:
+        logger.error(f"❌ Unexpected error uploading documents: {str(e)}")
+        logger.error(f"❌ Full traceback: {traceback.format_exc()}")
+        print(f"🔴 ERROR: {str(e)}")
+        print("=" * 80)
+        session.rollback()
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 
@@ -240,7 +376,7 @@ def all_documents(session: Session = Depends(get_session)):
         doc_list = [
             DocumentStatus(
                 doc_type=doc.doc_type,
-                file_url=build_blob_url(emp.id, doc.file_name),
+                file_url=doc.file_url,  # Use stored URL with SAS token from DB
                 uploaded_at=doc.uploaded_at.strftime("%d-%m-%Y") if doc.uploaded_at else None,
             )
             for doc in docs
@@ -268,7 +404,7 @@ def list_documents(employee_id: int, session: Session = Depends(get_session)):
     return [
         DocumentStatus(
             doc_type=doc.doc_type,
-            file_url=build_blob_url(employee_id, doc.file_name),
+            file_url=doc.file_url,  # Use stored URL with SAS token from DB
             uploaded_at=doc.uploaded_at.strftime("%d-%m-%Y") if doc.uploaded_at else None,
         )
         for doc in documents
@@ -287,7 +423,7 @@ def preview_document(employee_id: int, doc_type: str, session: Session = Depends
 
     return DocumentStatus(
         doc_type=document.doc_type,
-        file_url=build_blob_url(employee_id, document.file_name),
+        file_url=document.file_url,  # Use stored URL with SAS token from DB
         uploaded_at=document.uploaded_at.strftime("%d-%m-%Y") if document.uploaded_at else None,
     )
 
@@ -489,56 +625,170 @@ async def approve_employee(onboarding_id: int, session: Session = Depends(get_se
     except Exception as e:
         session.rollback()
         logger.error(f"Error approving employee {onboarding_id}: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Error approving employee: {str(e)}")
-
+        
 @router.post("/hr/assign")
 async def assign_employee(data: AssignEmployeeRequest, session: Session = Depends(get_session)):
     try:
+        # Check if employee exists and get reassignment status
         with session.connection().connection.cursor() as cur:
             cur.execute(
-                "CALL assign_employee(%s, %s, %s, %s, %s, %s)",
+                "SELECT reassignment FROM employees WHERE id = %s", 
+                (data.employee_id,)
+            )
+            result = cur.fetchone()
+            
+            if not result:
+                raise HTTPException(status_code=404, detail="Employee not found")
+            
+            is_first_assignment = not result[0]  # True if reassignment is False or NULL
+        
+        # For reassignment, send NULL for DOJ and company_employee_id so COALESCE preserves existing values
+        final_doj = data.doj if is_first_assignment else None
+        final_company_id = data.company_employee_id if is_first_assignment else None
+        
+        with session.connection().connection.cursor() as cur:
+            cur.execute(
+                "CALL assign_employee(%s, %s, %s, %s, %s, %s, %s, %s)",
                 (
                     data.employee_id,
                     data.location_id,
-                    data.doj,
+                    final_doj,  # NULL on reassignment, COALESCE will keep existing
                     data.company_email,
                     [data.manager1_id, data.manager2_id, data.manager3_id],
                     [data.hr1_id, data.hr2_id],
+                    data.role,
+                    final_company_id,  # NULL on reassignment, COALESCE will keep existing
                 )
             )
-        temp_password = generate_temp_password()
-        hashed_password = hash_password(temp_password)
+            
+            # Set reassignment=true after first assignment
+            if is_first_assignment:
+                cur.execute(
+                    "UPDATE employees SET reassignment = true WHERE id = %s",
+                    (data.employee_id,)
+                )
+        
+        # Only generate and store password for first assignment
+        if is_first_assignment:
+            temp_password = generate_temp_password()
+            hashed_password = hash_password(temp_password)
 
-        # Store hashed password in employees table
-        with session.connection().connection.cursor() as cur:
-            cur.execute(
-                "UPDATE employees SET password_hash = %s WHERE id = %s",
-                (hashed_password, data.employee_id)
-            )
+            with session.connection().connection.cursor() as cur:
+                cur.execute(
+                    "UPDATE employees SET password_hash = %s WHERE id = %s",
+                    (hashed_password, data.employee_id)
+                )
         
         session.commit()
-        with session.connection().connection.cursor() as cur:
-            cur.execute("SELECT name FROM locations WHERE id = %s", (data.location_id,))
-            location_row = cur.fetchone()
-        location_name = location_row[0] if location_row else "Not Assigned"
+        
+        # Only send email for first assignment
+        if is_first_assignment:
+            with session.connection().connection.cursor() as cur:
+                cur.execute("SELECT name FROM locations WHERE id = %s", (data.location_id,))
+                location_row = cur.fetchone()
+            location_name = location_row[0] if location_row else "Not Assigned"
 
-        await send_credentials_email(
-            to_email=data.to_email,
-            company_email=data.company_email,
-            temp_password=temp_password,  # send plain text
-            location=location_name,
-            doj=str(data.doj)
-        )
+            await send_credentials_email(
+                to_email=data.to_email,
+                company_email=data.company_email,
+                temp_password=temp_password,
+                location=location_name,
+                doj=str(data.doj)  # Use original doj for email
+            )
+        
         return {
             "status": "success",
-            "message": f"Employee {data.employee_id} assigned and credentials emailed"
+            "message": f"Employee {data.employee_id} {'reassigned successfully' if not is_first_assignment else 'assigned and credentials emailed successfully'}"
         }
 
+    except HTTPException:
+        raise
     except Exception as e:
         session.rollback()
         logger.error(f"Error assigning employee {data.employee_id}: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error assigning employee: {str(e)}")
+@router.post("/hr/reassign")
+async def reassign_employee(data: ReassignEmployeeRequest, session: Session = Depends(get_session)):
+    try:
+        # Verify employee exists and get current DOJ and company_employee_id
+        with session.connection().connection.cursor() as cur:
+            cur.execute(
+                "SELECT doj, company_employee_id FROM employees WHERE id = %s", 
+                (data.employee_id,)
+            )
+            result = cur.fetchone()
+            
+            if not result:
+                raise HTTPException(status_code=404, detail="Employee not found")
+            
+            existing_doj = result[0]
+            existing_company_id = result[1]
+        
+        # Update employee details directly
+        with session.connection().connection.cursor() as cur:
+            # Update main employee record
+            cur.execute(
+                """
+                UPDATE employees 
+                SET location_id = %s,
+                    company_email = %s,
+                    role = %s
+                    
+                WHERE id = %s
+                """,
+                (data.location_id, data.company_email, data.role, data.employee_id)
+            )
+            
+            # Delete existing manager assignments
+            cur.execute(
+                "DELETE FROM employee_managers WHERE employee_id = %s",
+                (data.employee_id,)
+            )
+            
+            # Insert new manager assignments
+            managers = [data.manager1_id, data.manager2_id, data.manager3_id]
+            for manager_id in managers:
+                if manager_id:
+                    cur.execute(
+                        """
+                        INSERT INTO employee_managers (employee_id, manager_id, created_at)
+                        VALUES (%s, %s, NOW())
+                        """,
+                        (data.employee_id, manager_id)
+                    )
+            
+            # Delete existing HR assignments
+            cur.execute(
+                "DELETE FROM employee_hrs WHERE employee_id = %s",
+                (data.employee_id,)
+            )
+            
+            # Insert new HR assignments
+            hrs = [data.hr1_id, data.hr2_id]
+            for hr_id in hrs:
+                if hr_id:
+                    cur.execute(
+                        """
+                        INSERT INTO employee_hrs (employee_id, hr_id, created_at)
+                        VALUES (%s, %s, NOW())
+                        """,
+                        (data.employee_id, hr_id)
+                    )
+        
+        session.commit()
+        
+        return {
+            "status": "success",
+            "message": f"Employee {data.employee_id} reassigned successfully"
+        }
 
+    except HTTPException:
+        raise
+    except Exception as e:
+        session.rollback()
+        logger.error(f"Error reassigning employee {data.employee_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error reassigning employee: {str(e)}")
+    
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 

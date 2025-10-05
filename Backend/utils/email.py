@@ -19,17 +19,32 @@ mail_conf = ConnectionConfig(
 
 async def send_login_email(email: EmailStr, temp_password: str):
     try:
-        reset_url = "http://127.0.0.1:8000/reset-password"  # Update for your frontend
         body = f"""
-        Your login credentials are:
-        Login ID (Email): {email}
-        Temporary Password: {temp_password}
+╔══════════════════════════════════════════════╗
+║                                              ║
+║         🔐  YOUR LOGIN CREDENTIALS           ║
+║                                              ║
+╚══════════════════════════════════════════════╝
 
-        Change your password here: {reset_url}
-        Please log in and change your password.
+Hello,
+
+Your account has been successfully created! Below are your login credentials:
+
+┌─────────────────────────────────────────────┐
+│  Login ID (Email): {email}
+│  Temporary Password: {temp_password}
+└─────────────────────────────────────────────┘
+
+⚠️  IMPORTANT: Please change your password immediately after your first login for security purposes.
+
+Best regards,
+Nxzen HR Team
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+This is an automated message. Please do not reply to this email.
         """
         message = MessageSchema(
-            subject="Your login creds",
+            subject="🔑 Your Login Credentials - Nxzen",
             recipients=[email],
             body=body,
             subtype="plain"
@@ -44,20 +59,36 @@ async def send_login_email(email: EmailStr, temp_password: str):
 
 async def send_onboarding_email(email: str, name: str):
     try:
-        subject = "Onboarding Completed ✅"
         body = f"""
-        Hi {name},
+╔══════════════════════════════════════════════╗
+║                                              ║
+║     🎉  ONBOARDING COMPLETE - WELCOME!       ║
+║                                              ║
+╚══════════════════════════════════════════════╝
 
-        Congratulations! 🎉  
-        Your onboarding process has been successfully completed.  
-        You can now access your employee dashboard.
+Hi {name},
 
-        Regards,  
-        HR Team
+Congratulations! 🎊
+
+Your onboarding process has been successfully completed, and we're thrilled to have you on board!
+
+✓ Profile Setup: Complete
+✓ Documentation: Verified
+✓ Account Access: Activated
+
+You can now access your employee dashboard and explore all the resources available to you.
+
+We're excited to see the great things you'll accomplish with us!
+
+Warm regards,
+Nxzen HR Team
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+This is an automated message. Please do not reply to this email.
         """
 
         message = MessageSchema(
-            subject="Your onboarding status",
+            subject="✅ Onboarding Successfully Completed - Welcome to Nxzen!",
             recipients=[email],
             body=body,
             subtype="plain"
@@ -65,33 +96,48 @@ async def send_onboarding_email(email: str, name: str):
 
         fm = FastMail(mail_conf)
         await fm.send_message(message)
-        print(f"✅ Login credentials email sent to {email}")
+        print(f"✅ Onboarding email sent to {email}")
         return True
     except Exception as e:
-        print(f"❌ Failed to send login credentials email: {e}")
+        print(f"❌ Failed to send onboarding email: {e}")
         return False
 
 async def send_credentials_email(to_email: str, company_email: str, temp_password: str, location: str, doj: str):
     try:
-        subject="Your Company Credentials"
+        body = f"""
+╔══════════════════════════════════════════════╗
+║                                              ║
+║      👋  WELCOME TO NXZEN - YOUR DETAILS     ║
+║                                              ║
+╚══════════════════════════════════════════════╝
+
+Hello,
+
+Welcome to Nxzen! We're delighted to have you join our team.
+
+Here are your official company credentials and details:
+
+┌─────────────────────────────────────────────┐
+│  📧 Company Email:      {company_email}
+│  🔐 Temporary Password: {temp_password}
+│  📍 Location:           {location}
+│  📅 Date of Joining:    {doj}
+└─────────────────────────────────────────────┘
+
+⚠️  SECURITY REMINDER:
+Please change your password immediately after your first login to ensure account security.
+
+We look forward to working with you!
+
+Best regards,
+Nxzen HR Team
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+This is an automated message. Please do not reply to this email.
+        """
         
-        body=f"""
-        Hello,
-
-        Welcome to the company Nxzen! Here are your credentials:
-
-        Company Email: {company_email}
-        Temporary Password: {temp_password}
-        Location: {location}
-        Date of Joining: {doj}
-
-        Please change your password after first login.
-
-        Regards,
-        HR Team
-        """ 
         message = MessageSchema(
-            subject=subject,
+            subject="🌟 Your Company Credentials - Welcome to Nxzen",
             recipients=[to_email],
             body=body,
             subtype="plain"
@@ -99,26 +145,43 @@ async def send_credentials_email(to_email: str, company_email: str, temp_passwor
 
         fm = FastMail(mail_conf)
         await fm.send_message(message)
-        print(f"✅ Login credentials email sent to {to_email}")
+        print(f"✅ Credentials email sent to {to_email}")
         return True
     except Exception as e:
-        print(f"❌ Failed to send login credentials email: {e}")
+        print(f"❌ Failed to send credentials email: {e}")
         return False
 
-async def forgot_password_mail(email:str,otp:str):
+async def forgot_password_mail(email: str, otp: str):
     try:
-        subject="Your otp for forgot password",
-        
-        body=f"""
-        Hello,
-        you otp :{otp}
-        Please change your password after login.
+        body = f"""
+╔══════════════════════════════════════════════╗
+║                                              ║
+║       🔒  PASSWORD RESET REQUEST - OTP       ║
+║                                              ║
+╚══════════════════════════════════════════════╝
 
-        Regards,
-        HR Team
-        """ 
+Hello,
+
+We received a request to reset your password. Use the OTP below to proceed:
+
+┌─────────────────────────────────────────────┐
+│                                             │
+│          Your OTP:  {otp}                   │
+│                                             │
+└─────────────────────────────────────────────┘
+
+
+⚠️  If you didn't request this password reset, please ignore this email or contact our support team immediately.
+
+Stay secure,
+Nxzen HR Team
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+This is an automated message. Please do not reply to this email.
+        """
+        
         message = MessageSchema(
-            subject="Your onboarding status",
+            subject="🔐 Password Reset OTP - Nxzen",
             recipients=[email],
             body=body,
             subtype="plain"
@@ -126,31 +189,45 @@ async def forgot_password_mail(email:str,otp:str):
 
         fm = FastMail(mail_conf)
         await fm.send_message(message)
-        print(f"✅ Login credentials email sent to {email}")
+        print(f"✅ Password reset OTP email sent to {email}")
         return True
     except Exception as e:
-        print(f"❌ Failed to send login credentials email: {e}")
+        print(f"❌ Failed to send password reset email: {e}")
         return False
     
 async def send_document_request_email(email: str, name: str, document_type: str):
     try:
-        subject = "Document Submission Request 📄"
-
         body = f"""
-        Hi {name},
+╔══════════════════════════════════════════════╗
+║                                              ║
+║      📄  DOCUMENT SUBMISSION REQUEST         ║
+║                                              ║
+╚══════════════════════════════════════════════╝
 
-        The HR team has requested you to submit the following document:
+Hi {name},
 
-        👉 Required Document: {document_type}
+The HR team requires you to submit an important document for your employee records.
 
-        Please upload the document at the earliest through your employee portal.
+┌─────────────────────────────────────────────┐
+│  📋 Required Document: {document_type}
+└─────────────────────────────────────────────┘
 
-        Regards,  
-        HR Team
+⚡ ACTION REQUIRED:
+Please upload the requested document through your employee portal at your earliest convenience.
+
+If you have any questions or need assistance with the submission process, feel free to reach out to the HR team.
+
+Thank you for your prompt attention to this matter!
+
+Best regards,
+Nxzen HR Team
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+This is an automated message. Please do not reply to this email.
         """
 
         message = MessageSchema(
-            subject=subject,
+            subject="📎 Document Submission Required - Nxzen HR",
             recipients=[email],
             body=body,
             subtype="plain"

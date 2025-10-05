@@ -18,6 +18,8 @@ import ExpenseManagement from '@/components/HR/ExpenseManagement';
 import DocumentCollection from '@/components/HR/DocumentCollection';
 import PendingRequests from '@/components/HR/PendingRequests';
 import ViewLeaveApplication from '@/components/HR/ViewLeaveApplication';
+import AddCompanyPolicy from '@/components/HR/AddCompanyPolicy';
+import CompanyPolicies from '@/components/Employee/CompanyPolicies';
 import Login from '@/components/auth/Login';
 import EmployeePage from '@/pages/employee/page';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
@@ -70,6 +72,7 @@ export const AppRoutingSetup = () => {
         <Route path="add-attendance" element={<HRAddAttendance />} />
         <Route path="employees-attendance" element={<EmployeeAttendance />} />
         <Route path="holidays" element={<Holidays />} />
+        {/* <Route path="company-policies" element={<AddCompanyPolicy />} /> */}
          <Route path="reset-password" element={< ChangePassword/>} />
         
       </Route>
@@ -80,6 +83,7 @@ export const AppRoutingSetup = () => {
         <Route path="add-attendance" element={<EmployeeAddAttendance />} />
         <Route path="apply-leave" element={<ApplyLeave />} />
         <Route path="submit-expense" element={<SubmitExpense />} />
+        {/* <Route path="company-policies" element={<CompanyPolicies />} /> */}
         <Route path="upload-documents" element={<UploadDocuments />} />
         <Route path="set-password" element={<SetPassword />} />
       </Route>

@@ -53,6 +53,19 @@ class AssignEmployeeRequest(SQLModel):
     doj: date
     to_email:EmailStr
     company_email: EmailStr   # HR provides this
+    company_employee_id: str | None = None  # Company-specific employee ID
+    role: str | None = None  # Optional role change during assignment
+    manager1_id: int
+    manager2_id: int | None = None
+    manager3_id: int | None = None
+    hr1_id: int
+    hr2_id: int | None = None
+
+class ReassignEmployeeRequest(SQLModel):
+    employee_id: int
+    location_id: int
+    company_email: EmailStr   # HR can update company email
+    role: str | None = None  # Optional role change during reassignment
     manager1_id: int
     manager2_id: int | None = None
     manager3_id: int | None = None

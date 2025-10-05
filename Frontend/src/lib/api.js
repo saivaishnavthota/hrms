@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 // Configurable Base URL with sensible defaults
-const BASE_URL = import.meta.env.VITE_API_URL;
+const BASE_URL = import.meta.env.VITE_API_URL || '';
 
 // Create axios instance with default configuration
 const api = axios.create({
@@ -185,6 +185,10 @@ export const onboardingAPI = {
   },
   handleAssignEmployee: async (employeeData) => {
     const response = await api.post('/onboarding/hr/assign', employeeData);
+    return response.data;
+  },
+  handleReassignEmployee: async (employeeData) => {
+    const response = await api.post('/onboarding/hr/reassign', employeeData);
     return response.data;
   },
   // POST /onboarding/hr/approve/{onboarding_id} - Approve employee
@@ -434,6 +438,48 @@ export const calendarAPI = {
   // GET /calendar/by-location/{location_id} - Get holidays by location
   getHolidaysByLocation: async (locationId) => {
     const response = await api.get(`/calendar/by-location/${locationId}`);
+    return response.data;
+  }
+};
+
+// Company Policies API endpoints
+export const policiesAPI = {
+  // POST /policies/upload - Upload new policy document
+  uploadPolicy: async (formData) => {
+    const response = await api.post('/policies/upload', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
+  },
+
+  // GET /policies/list - List all policies (optionally filtered by location)
+  listPolicies: async (locationId = null) => {
+    const params = locationId ? { location_id: locationId } : {};
+    const response = await api.get('/policies/list', { params });
+    return response.data;
+  },
+
+  // PUT /policies/edit/{policy_id} - Edit policy sections
+  editPolicy: async (policyId, formData) => {
+    const response = await api.put(`/policies/edit/${policyId}`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
+  },
+
+  // DELETE /policies/delete/{policy_id} - Delete policy (soft delete)
+  deletePolicy: async (policyId) => {
+    const response = await api.delete(`/policies/delete/${policyId}`);
+    return response.data;
+  },
+
+  // GET /policies/my-policies - Get policies for current user's location
+  getMyPolicies: async () => {
+    const response = await api.get('/policies/my-policies');
     return response.data;
   }
 };

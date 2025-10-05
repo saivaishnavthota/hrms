@@ -11,6 +11,7 @@ from sqlmodel import select
 router = APIRouter(prefix="/projects", tags=["Projects"])
 
 # Create Project AM
+@router.post("", response_model=ProjectRead)
 @router.post("/", response_model=ProjectRead)
 def create_project(
     project: ProjectCreate,

@@ -1,89 +1,59 @@
 import React, { useState, useEffect } from 'react';
-import api from '@/lib/api';
 import { 
   Eye, 
   Edit, 
-  Copy, 
-  Lock, 
   Trash2, 
   Search, 
   Filter, 
   UserPlus,
-  MoreHorizontal,
-  ChevronDown,
   X,
   User,
-  Mail,
-  Calendar,
-  MapPin,
-  Users
+  Mail
 } from 'lucide-react';
-import { toast } from 'react-toastify';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
-} from '@/components/ui/table';
-import { 
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { Input } from '@/components/ui/input';
-import { 
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { Label } from '@/components/ui/label';
-import { avatarBg } from '../../lib/avatarColors';
+import { toast } from 'sonner';
+import api from '../../lib/api';
 
-const BASE_URL = import.meta.env.VITE_API_URL;
+const getAvatarColor = (name) => {
+  const colors = [
+    'bg-blue-500',
+    'bg-green-500',
+    'bg-purple-500',
+    'bg-pink-500',
+    'bg-indigo-500',
+    'bg-red-500'
+  ];
+  const index = name.length % colors.length;
+  return colors[index];
+};
 
-
-  const EmployeeManagement = () => {
+const EmployeeManagement = () => {
   const [employees, setEmployees] = useState([]);
   const [managers, setManagers] = useState([]);
   const [hrs, setHrs] = useState([]);
   const [locations, setLocations] = useState([]);
-  const [, setLoading] = useState(true);
-  const [, setError] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [typeFilter, setTypeFilter] = useState('all');
   const [locationFilter, setLocationFilter] = useState('all');
-  const [hrFilter, setHrFilter] = useState('all');
-  const [managerFilter, setManagerFilter] = useState('all');
   const [showFilters, setShowFilters] = useState(false);
-  const [perPage, setPerPage] = useState('10');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState(null);
-  const [formData, setFormData] = useState({
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const [addFormData, setAddFormData] = useState({
     name: '',
     email: '',
-    role: '',
     type: ''
   });
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [errors, setErrors] = useState({});
+  const [addFormErrors, setAddFormErrors] = useState({});
 
-  const employmentTypes = ['Intern', 'Full-time', 'Contract'];
-  const roles = ['Employee', 'HR', 'Manager', 'Account Manager'];
-
-  // Edit form state
   const [editFormData, setEditFormData] = useState({
     fullName: '',
     companyMail: '',
+    companyEmployeeId: '',
+    role: '',
     dateOfJoining: '',
     location: '',
     hr1: '',
@@ -92,9 +62,11 @@ const BASE_URL = import.meta.env.VITE_API_URL;
     manager2: '',
     manager3: ''
   });
-  const [editErrors, setEditErrors] = useState({});
+  const [editFormErrors, setEditFormErrors] = useState({});
 
-  // Fetch all required data on component mount
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
   useEffect(() => {
     fetchAllData();
   }, []);
@@ -104,7 +76,6 @@ const BASE_URL = import.meta.env.VITE_API_URL;
       setLoading(true);
       setError(null);
       
-      // Fetch all data in parallel
       const [employeesRes, managersRes, hrsRes, locationsRes] = await Promise.all([
         api.get('/users/employees'),
         api.get('/users/managers'),
@@ -112,7 +83,6 @@ const BASE_URL = import.meta.env.VITE_API_URL;
         api.get('/locations/')
       ]);
 
-      // Process employees data (supports multiple response shapes)
       const rawEmployees = Array.isArray(employeesRes.data?.data)
         ? employeesRes.data.data
         : Array.isArray(employeesRes.data)
@@ -126,8 +96,9 @@ const BASE_URL = import.meta.env.VITE_API_URL;
         name: emp.name,
         to_email: emp.to_email ?? emp.personal_email,
         company_email: emp.email ?? emp.company_email,
-        employeeId: emp.employeeId ? `EMP${emp.employeeId}` : (emp.id ? `EMP${emp.id}` : ''),
-        type: emp.type || 'Employee',
+        company_employee_id: emp.company_employee_id,
+        reassignment: emp.reassignment === true,
+        type: emp.type || 'Full-time',
         designation: emp.role || 'Employee',
         status: emp.status || 'Active',
         location: emp.location_name || emp.location || '',
@@ -146,140 +117,41 @@ const BASE_URL = import.meta.env.VITE_API_URL;
       setLocations(locationsRes.data.status === 'success' ? locationsRes.data.data : []);
       
     } catch (err) {
-      console.error('Error fetching data:', err);
-      console.error('Error details:', err.response?.data || err.message);
-      toast.error("Failed to fetch data. Please try again.");
-
-      
-      
+      console.error('Error fetching employee data:', err);
+      setError('Failed to load employee data');
+      toast.error('Failed to load employee data');
     } finally {
       setLoading(false);
     }
   };
 
-  // Assignment functionality
-  const handleAssignEmployee = async (employeeData) => {
-    try {
-      setIsSubmitting(true);
-      
-      const assignmentData = {
-        employee_id: employeeData.employee_id,
-        location_id: employeeData.location_id,
-        doj: employeeData.doj,
-        to_email: employeeData.to_email,
-        company_email: employeeData.company_email,
-        manager1_id: employeeData.manager1_id,
-        manager2_id: employeeData.manager2_id || null,
-        manager3_id: employeeData.manager3_id || null,
-        hr1_id: employeeData.hr1_id,
-        hr2_id: employeeData.hr2_id || null
-      };
-
-      const response = await api.post('onboarding/hr/assign', assignmentData);
-      
-      if (response.status === 200) {
-        toast.success('Employee assigned successfully!');
-        // Refresh the employee list
-        await fetchAllData();
-        setIsEditModalOpen(false);
-      }
-    } catch (err) {
-      console.log(employeeData);
-      console.error('Error assigning employee:', err);
-      toast.error('Failed to assign employee. Please try again.');
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const handleInputChange = (field, value) => {
-    setFormData(prev => ({
-      ...prev,
-      [field]: value
-    }));
-    // Clear error when user starts typing
-    if (errors[field]) {
-      setErrors(prev => ({
-        ...prev,
-        [field]: ''
-      }));
-    }
-  };
-
-  const validateForm = () => {
-    const newErrors = {};
+  const filteredEmployees = employees.filter(employee => {
+    const matchesSearch = employee.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         employee.company_email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         employee.company_employee_id?.toLowerCase().includes(searchTerm.toLowerCase());
     
-    if (!formData.name.trim()) {
-      newErrors.name = 'Name is required';
-    }
+    const matchesStatus = statusFilter === 'all' || employee.status?.toLowerCase() === statusFilter.toLowerCase();
+    const matchesType = typeFilter === 'all' || employee.type?.toLowerCase() === typeFilter.toLowerCase();
+    const matchesLocation = locationFilter === 'all' || employee.location === locationFilter;
     
-    if (!formData.email.trim()) {
-      newErrors.email = 'Email is required';
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
-      newErrors.email = 'Please enter a valid email address';
-    }
-    
-    if (!formData.type) {
-      newErrors.type = 'Employment type is required';
-    }
-    
-    if (!formData.role) {
-      newErrors.role = 'Role is required';
-    }
-    
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
+    return matchesSearch && matchesStatus && matchesType && matchesLocation;
+  });
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    
-    if (!validateForm()) {
-      return;
-    }
-
-    setIsSubmitting(true);
-    try {
-      await api.post("/onboarding/hr/create_employee", formData);
-
-      toast.success("Employee created successfully!");
-
-      setFormData({ name: "", email: "", role: "", type: "" });
-      setIsModalOpen(false);
-
-      await fetchAllData();
-    } catch (err) {
-      console.error("Error creating employee:", err.response?.data || err.message);
-      toast.error(
-        "Error creating employee: " + (err.response?.data?.detail || "Unknown error")
-      );
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-  
-  const closeModal = () => {
-    setIsModalOpen(false);
-    setFormData({
-      name: '',
-      email: '',
-      role: '',
-      type: ''
-    });
-    setErrors({});
+  const handleViewEmployee = (employee) => {
+    setSelectedEmployee(employee);
+    setIsViewModalOpen(true);
   };
 
   const handleEditEmployee = (employee) => {
     setSelectedEmployee(employee);
-    
-    // Parse assigned HR and managers from the employee data
     const assignedHRs = employee.hr && employee.hr !== 'Not Assigned' ? employee.hr.split(', ') : [];
     const assignedManagers = employee.managers && employee.managers !== 'Not Assigned' ? employee.managers.split(', ') : [];
-   
 
     setEditFormData({
       fullName: employee.name || '',
       companyMail: employee.company_email || '',
+      companyEmployeeId: employee.company_employee_id || '',
+      role: employee.designation || '',
       dateOfJoining: employee.dateOfJoining || '',
       location: employee.location,
       hr1: assignedHRs[0] || '',
@@ -288,907 +160,761 @@ const BASE_URL = import.meta.env.VITE_API_URL;
       manager2: assignedManagers[1] || '',
       manager3: assignedManagers[2] || ''
     });
-    setEditErrors({});
+    setEditFormErrors({});
     setIsEditModalOpen(true);
   };
 
-  const handleViewEmployee = (employee) => {
-    setSelectedEmployee(employee);
-    setIsViewModalOpen(true);
-  };
-
-  const closeViewModal = () => {
-    setIsViewModalOpen(false);
-    setSelectedEmployee(null);
-  };
-
-  const closeEditModal = () => {
-    setIsEditModalOpen(false);
-    setSelectedEmployee(null);
-    setEditFormData({
-      fullName: '',
-      companyMail: '',
-      dateOfJoining: '',
-      location: '',
-      hr1: '',
-      hr2: '',
-      manager1: '',
-      manager2: '',
-      manager3: ''
-    });
-    setEditErrors({});
-  };
-
-  const handleEditInputChange = (field, value) => {
-    setEditFormData(prev => ({
-      ...prev,
-      [field]: value
-    }));
-    // Clear error when user starts typing
-    if (editErrors[field]) {
-      setEditErrors(prev => ({
-        ...prev,
-        [field]: ''
-      }));
+  const handleAddInputChange = (field, value) => {
+    setAddFormData(prev => ({ ...prev, [field]: value }));
+    if (addFormErrors[field]) {
+      setAddFormErrors(prev => ({ ...prev, [field]: '' }));
     }
   };
 
-  const validateEditForm = () => {
-    const newErrors = {};
-    
-    if (!editFormData.fullName.trim()) {
-      newErrors.fullName = 'Full name is required';
+  const validateAddForm = () => {
+    const errors = {};
+    if (!addFormData.name.trim()) errors.name = 'Name is required';
+    if (!addFormData.email.trim()) {
+      errors.email = 'Email is required';
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(addFormData.email)) {
+      errors.email = 'Please enter a valid email address';
     }
-    
-    if (!editFormData.companyMail.trim()) {
-      newErrors.companyMail = 'Company email is required';
-    } else if (!/\S+@\S+\.\S+/.test(editFormData.companyMail)) {
-      newErrors.companyMail = 'Please enter a valid email address';
-    }
-    
-    if (!editFormData.dateOfJoining) {
-      newErrors.dateOfJoining = 'Date of joining is required';
-    }
-    
-    if (!editFormData.location) {
-      newErrors.location = 'Location is required';
-    }
-    
-    if (!editFormData.hr1) {
-      newErrors.hr1 = 'HR-1 is required';
-    }
-    
-    if (!editFormData.manager1) {
-      newErrors.manager1 = 'Manager-1 is required';
-    }
-    
-    setEditErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    if (!addFormData.type) errors.type = 'Employment type is required';
+    setAddFormErrors(errors);
+    return Object.keys(errors).length === 0;
   };
 
-  const handleEditSubmit = async (e) => {
+  const handleAddSubmit = async (e) => {
     e.preventDefault();
-    
-    if (!validateEditForm()) {
-      return;
-    }
-    
+    if (!validateAddForm()) return;
+
     setIsSubmitting(true);
-    
     try {
-      // Find the IDs for selected managers and HRs
-      const hr1Id = hrs.find(hr => hr.name === editFormData.hr1)?.id;
-      const hr2Id = hrs.find(hr => hr.name === editFormData.hr2)?.id;
-      const manager1Id = managers.find(manager => manager.name === editFormData.manager1)?.id;
-      const manager2Id = managers.find(manager => manager.name === editFormData.manager2)?.id;
-      const manager3Id = managers.find(manager => manager.name === editFormData.manager3)?.id;
-      const locationId = locations.find(location => location.name === editFormData.location)?.id;
-      
-      // Prepare request body in the format expected by backend
-      const requestBody = {
-        employee_id: selectedEmployee?.id || 0,
-        location_id: locationId || 0,
-        doj: editFormData.dateOfJoining,
-        to_email: selectedEmployee?.to_email,
-        company_email: editFormData.companyMail,
-        manager1_id: manager1Id || null,
-        manager2_id: manager2Id || null,
-        manager3_id: manager3Id || null,
-        hr1_id: hr1Id || null,
-        hr2_id: hr2Id || null
+      const submitData = {
+        name: addFormData.name,
+        email: addFormData.email,
+        type: addFormData.type,
+        role: 'Employee'
       };
       
-      console.log('Sending request body:', requestBody);
+      await api.post('/onboarding/hr/create_employee', submitData);
+      toast.success('Employee created successfully!');
       
-      const response = await api.post('/onboarding/hr/assign', requestBody);
-      
-      if (response.status === 200) {
-        toast.success("Employee assigned successfully!");
-        await fetchAllData();
-        closeEditModal();
-      }
-    } catch (err) {
-      console.error("Error assigning employee:", err.response?.data || err.message);
-      toast.error(
-        "Error assigning employee: " + (err.response?.data?.detail || "Unknown error")
-      );
+      setAddFormData({ name: '', email: '', type: '' });
+      setIsModalOpen(false);
+      await fetchAllData();
+    } catch (error) {
+      console.error('Error creating employee:', error);
+      toast.error('Error creating employee: ' + (error.response?.data?.detail || error.message));
     } finally {
       setIsSubmitting(false);
     }
   };
-  
-  const getAvatarColor = (name) => avatarBg(name);
 
-  const filteredEmployees = employees.filter(employee => {
-    const matchesSearch = employee.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         employee.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         employee.employeeId?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         employee.designation?.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesStatus = statusFilter === 'all' || employee.status?.toLowerCase() === statusFilter.toLowerCase();
-    const matchesType = typeFilter === 'all' || employee.type?.toLowerCase() === typeFilter.toLowerCase();
-    const matchesLocation = locationFilter === 'all' || employee.location === locationFilter;
-    const matchesHr = hrFilter === 'all' || employee.hr === hrFilter;
-    const matchesManager = managerFilter === 'all' || employee.managers?.includes(managerFilter);
-    
-    return matchesSearch && matchesStatus && matchesType && matchesLocation && matchesHr && matchesManager;
-  });
+  const handleEditInputChange = (field, value) => {
+    setEditFormData(prev => ({ ...prev, [field]: value }));
+    if (editFormErrors[field]) {
+      setEditFormErrors(prev => ({ ...prev, [field]: '' }));
+    }
+  };
 
-  const ActionButton = ({  icon: Icon, onClick, variant = "ghost", size = "sm", className = "" }) => (
-    <Button
-      variant={variant}
-      size={size}
-      mode="icon"
-      onClick={onClick}
-      className={`h-8 w-8 p-0 ${className}`}
-    >
-      {Icon && <Icon className="h-4 w-4" />}
-    </Button>
-  );
+  const validateEditForm = () => {
+    const errors = {};
+    if (!editFormData.companyMail.trim()) {
+      errors.companyMail = 'Company email is required';
+    } else if (!/\S+@\S+\.\S+/.test(editFormData.companyMail)) {
+      errors.companyMail = 'Please enter a valid email address';
+    }
+    if (!selectedEmployee?.reassignment && !editFormData.dateOfJoining.trim()) {
+      errors.dateOfJoining = 'Date of joining is required';
+    }
+    if (!editFormData.location) errors.location = 'Location is required';
+    if (!editFormData.hr1) errors.hr1 = 'HR-1 is required';
+    if (!editFormData.manager1) errors.manager1 = 'Manager-1 is required';
+    
+    setEditFormErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  const handleEditSubmit = async (e) => {
+    e.preventDefault();
+    if (!validateEditForm()) return;
+
+    setIsSubmitting(true);
+    try {
+      const hr1Id = hrs.find(hr => hr.name === editFormData.hr1)?.id;
+      const hr2Id = hrs.find(hr => hr.name === editFormData.hr2)?.id;
+      const manager1Id = managers.find(m => m.name === editFormData.manager1)?.id;
+      const manager2Id = managers.find(m => m.name === editFormData.manager2)?.id;
+      const manager3Id = managers.find(m => m.name === editFormData.manager3)?.id;
+      const locationId = locations.find(l => l.name === editFormData.location)?.id;
+
+      let response;
+      
+      if (selectedEmployee?.reassignment) {
+        const reassignBody = {
+          employee_id: selectedEmployee?.id || 0,
+          location_id: locationId || 0,
+          company_email: editFormData.companyMail,
+          role: editFormData.role || selectedEmployee?.designation || 'Employee'
+        };
+        
+        if (manager1Id) reassignBody.manager1_id = manager1Id;
+        if (manager2Id) reassignBody.manager2_id = manager2Id;
+        if (manager3Id) reassignBody.manager3_id = manager3Id;
+        if (hr1Id) reassignBody.hr1_id = hr1Id;
+        if (hr2Id) reassignBody.hr2_id = hr2Id;
+        
+        response = await api.post('/onboarding/hr/reassign', reassignBody);
+      } else {
+        if (!editFormData.dateOfJoining || !editFormData.dateOfJoining.trim()) {
+          toast.error('Date of joining is required for assignment');
+          return;
+        }
+        
+        const assignBody = {
+          employee_id: selectedEmployee?.id || 0,
+          location_id: locationId || 0,
+          doj: editFormData.dateOfJoining,
+          to_email: selectedEmployee?.to_email,
+          company_email: editFormData.companyMail,
+          company_employee_id: editFormData.companyEmployeeId || null,
+          role: editFormData.role || 'Employee',
+          manager1_id: manager1Id || null,
+          manager2_id: manager2Id || null,
+          manager3_id: manager3Id || null,
+          hr1_id: hr1Id || null,
+          hr2_id: hr2Id || null
+        };
+        
+        response = await api.post('/onboarding/hr/assign', assignBody);
+      }
+      
+      if (response.status === 200) {
+        toast.success(selectedEmployee?.reassignment ? "Employee reassigned successfully!" : "Employee assigned successfully!");
+        await fetchAllData();
+        setIsEditModalOpen(false);
+      }
+    } catch (error) {
+      console.error('Error assigning/reassigning employee:', error);
+      toast.error('Error: ' + (error.response?.data?.detail || error.message));
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   return (
-    <div className="p-6 space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold text-gray-900">Employee Management</h1>
-        <Button className="bg-green-500 hover:bg-green-600 text-white" onClick={() => setIsModalOpen(true)}>
-          <UserPlus className="h-4 w-4 mr-2" />
-          Add Employee
-        </Button>
-      </div>
+    <div className="min-h-screen bg-gray-50 p-6">
+      <div className="max-w-7xl mx-auto space-y-6">
+        <div className="flex items-center justify-between">
+          <h1 className="text-3xl font-bold text-gray-900">Employee Management</h1>
+          <button 
+            onClick={() => setIsModalOpen(true)}
+            className="flex items-center gap-2 bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg transition-colors"
+          >
+            <UserPlus className="h-5 w-5" />
+            Add Employee
+          </button>
+        </div>
 
-      {/* Search and Filters */}
-      <div className="space-y-4">  
-        <div className="flex items-center justify-between gap-4">  
-          <div className="flex items-center gap-4 flex-1">
-            <div className="relative flex-1 max-w-sm">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-              <Input
-                placeholder="Search by name, email, ID, or designation..."
+        <div className="bg-white rounded-lg shadow p-4 space-y-4">
+          <div className="flex items-center gap-4">
+            <div className="relative flex-1 max-w-md">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
+              <input
+                type="text"
+                placeholder="Search by name, email, or company ID..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
             </div>
-            <Button 
-              variant={showFilters ? "default" : "outline"} 
-              className="gap-2"
+            <button 
               onClick={() => setShowFilters(!showFilters)}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
+                showFilters ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
             >
-              <Filter className="h-4 w-4" />
+              <Filter className="h-5 w-5" />
               Filters
-              {(statusFilter !== 'all' || typeFilter !== 'all' || locationFilter !== 'all' || hrFilter !== 'all' || managerFilter !== 'all') && (
-                <Badge variant="secondary" className="ml-1 px-1.5 py-0.5 text-xs">
-                  {[statusFilter, typeFilter, locationFilter, hrFilter, managerFilter].filter(f => f !== 'all').length}
-                </Badge>
-              )}
-            </Button>
+            </button>
           </div>
-         
-          <div className="flex items-center gap-4"> 
-            <div className="flex items-center gap-2">
-              <Button variant="ghost" size="sm" mode="icon">
-                <MoreHorizontal className="h-4 w-4" />
-              </Button>
-              <Button variant="ghost" size="sm" mode="icon">
-                <MoreHorizontal className="h-4 w-4" />
-              </Button>
+
+          {showFilters && (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4 border-t">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
+                <select 
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="all">All Status</option>
+                  <option value="active">Active</option>
+                  <option value="inactive">Inactive</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Employment Type</label>
+                <select 
+                  value={typeFilter}
+                  onChange={(e) => setTypeFilter(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="all">All Types</option>
+                  <option value="full-time">Full-time</option>
+                  <option value="contract">Contract</option>
+                  <option value="intern">Intern</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Location</label>
+                <select 
+                  value={locationFilter}
+                  onChange={(e) => setLocationFilter(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="all">All Locations</option>
+                  {locations.map(loc => (
+                    <option key={loc.id} value={loc.name}>{loc.name}</option>
+                  ))}
+                </select>
+              </div>
             </div>
-            <div className="flex items-center gap-2 text-sm text-gray-600"> 
-              <span>Per Page:</span>
-              <Select value={perPage} onValueChange={setPerPage}>
-                <SelectTrigger className="w-16 h-8">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                <SelectItem value="5">5</SelectItem>
-                <SelectItem value="10">10</SelectItem>
-                <SelectItem value="20">20</SelectItem>
-                <SelectItem value="50">50</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+          )}
         </div>
 
-        {/* Filter Panel */}
-        {showFilters && (
-          <div className="bg-gray-50 border border-gray-200 rounded-lg p-4"> 
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-sm font-medium text-gray-900">Filter Options</h3>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  setStatusFilter('all');
-                  setTypeFilter('all');
-                  setLocationFilter('all');
-                  setHrFilter('all');
-                  setManagerFilter('all');
-                }}
-                className="text-sm text-gray-600 hover:text-gray-900"
-              >
-                Clear All
-              </Button>
-            </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4"> 
-              {/* Status Filter */}
-              <div>
-                <Label className="text-sm font-medium text-gray-700 mb-2 block">Status</Label>
-                <Select value={statusFilter} onValueChange={setStatusFilter}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="All Status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Status</SelectItem>
-                    <SelectItem value="active">Active</SelectItem>
-                    <SelectItem value="inactive">Inactive</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Type Filter */}
-              <div>
-                <Label className="text-sm font-medium text-gray-700 mb-2 block">Employment Type</Label>
-                <Select value={typeFilter} onValueChange={setTypeFilter}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="All Types" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Types</SelectItem>
-                    {employmentTypes.map(type => (
-                      <SelectItem key={type} value={type.toLowerCase()}>{type}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Location Filter */}
-              <div>
-                <Label className="text-sm font-medium text-gray-700 mb-2 block">Location</Label>
-                <Select value={locationFilter} onValueChange={setLocationFilter}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="All Locations" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Locations</SelectItem>
-                    {locations.map(location => (
-                      <SelectItem key={location.id} value={location.name}>{location.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* HR Filter */}
-              <div>
-                <Label className="text-sm font-medium text-gray-700 mb-2 block">Assigned HR</Label>
-                <Select value={hrFilter} onValueChange={setHrFilter}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="All HRs" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All HRs</SelectItem>
-                    {hrs.map(hr => (
-                      <SelectItem key={hr.id} value={hr.name}>{hr.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Manager Filter */}
-              <div>
-                <Label className="text-sm font-medium text-gray-700 mb-2 block">Manager</Label>
-                <Select value={managerFilter} onValueChange={setManagerFilter}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="All Managers" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Managers</SelectItem>
-                    {managers.map(manager => (
-                      <SelectItem key={manager.id} value={manager.name}>{manager.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div> 
-          </div> 
+        {loading && (
+          <div className="bg-white rounded-lg shadow p-12 text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto"></div>
+            <p className="mt-4 text-gray-600">Loading employees...</p>
+          </div>
         )}
-      </div> 
 
-      {/* Table */}
-      <div className="bg-white rounded-lg border">
-        <Table>
-          <TableHeader>
-            <TableRow className="bg-gray-50">
-              <TableHead className="w-12 text-center">S.No</TableHead>
-              <TableHead>Employee Details</TableHead>
-              <TableHead>EmpID</TableHead>
-              <TableHead>Type</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>HR</TableHead>
-              <TableHead>Managers</TableHead>
-              <TableHead className="text-center">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filteredEmployees.map((employee, index) => (
-              <TableRow key={employee.id} className="hover:bg-gray-50">
-                <TableCell className="text-center font-medium">
-                  {index + 1}
-                </TableCell>
-                <TableCell>
-                  <div className="flex items-center gap-3">
-                    <div className={`w-10 h-10 rounded-full ${getAvatarColor(employee.name)} flex items-center justify-center text-white font-medium text-sm`}>
-                      {employee.avatar}
-                    </div>
-                    <div>
-                      <div className="font-medium text-gray-900">{employee.name}</div>
-                      <div className="text-sm text-gray-500">{employee.company_email}</div>
-                    </div>
-                  </div>
-                </TableCell>
-                <TableCell>
-                  <span className="text-gray-900 font-medium">{employee.employeeId}</span>
-                </TableCell>
-                <TableCell>
-                  <span className="text-gray-900">{employee.type}</span>
-                </TableCell>
-                <TableCell>
-                  <Badge 
-                    variant="success" 
-                    appearance="light" 
-                    size="sm"
-                    className="text-green-700 bg-green-100"
-                  >
-                    {employee.status}
-                  </Badge>
-                </TableCell>
-                <TableCell>
-                  <span className="text-gray-900">{employee.hr}</span>
-                </TableCell>
-                <TableCell>
-                  <span className="text-gray-900">{employee.managers}</span>
-                </TableCell>
-                <TableCell>
-                  <div className="flex items-center justify-center gap-1">
-                    <ActionButton 
-                      icon={Eye} 
-                      onClick={() => handleViewEmployee(employee)}
-                      className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-                    />
-                    <ActionButton 
-                      icon={Edit} 
-                      onClick={() => handleEditEmployee(employee)}
-                      className="text-orange-600 hover:text-orange-700 hover:bg-orange-50"
-                    />
-                   
-            
-                    <ActionButton 
-                      icon={Trash2} 
-                      onClick={() => console.log('Delete', employee.id)}
-                      className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                    />
-                  </div>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
+        {error && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700">
+            <p>{error}</p>
+            <button 
+              onClick={fetchAllData}
+              className="mt-2 text-sm text-red-600 underline hover:text-red-800"
+            >
+              Try again
+            </button>
+          </div>
+        )}
 
-      {/* Pagination info */}
-      <div className="flex items-center justify-between text-sm text-gray-600">
-        <span>Showing {filteredEmployees.length} of {employees.length} entries</span>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" disab led>
-            Previous
-          </Button>
-          <Button variant="outline" size="sm" className="bg-blue-500 text-white border-blue-500">
-            1
-          </Button>
-          <Button variant="outline" size="sm" disabled>
-            Next
-          </Button>
-        </div>
-      </div>
-
-      {/* Add Employee Modal */}
-      {isModalOpen && (
-        <div className="fixed inset-0 bg-transparent backdrop-blur-[2px] flex items-center justify-center z-50">  
-          <div className="bg-gradient-to-br from-white via-gray-50 to-blue-50 rounded-xl shadow-2xl border border-gray-200 p-6 w-full max-w-md mx-4"> 
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-semibold text-gray-900">Add New Employee</h2>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={closeModal}
-                className="h-8 w-8 p-0"
-              >
-                <X className="h-4 w-4" />
-              </Button>
+        {!loading && !error && (
+          <div className="bg-white rounded-lg shadow overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-gray-50 border-b border-gray-200">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">S.No</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Employee Details</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Company ID</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">HR</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Managers</th>
+                    <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {filteredEmployees.map((employee, index) => (
+                  <tr key={employee.id} className="hover:bg-gray-50 transition-colors">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                      {index + 1}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center gap-3">
+                        <div className={`w-10 h-10 rounded-full ${getAvatarColor(employee.name)} flex items-center justify-center text-white font-medium`}>
+                          {employee.avatar}
+                        </div>
+                        <div>
+                          <div className="font-medium text-gray-900">{employee.name}</div>
+                          <div className="text-sm text-gray-500">{employee.company_email}</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className="px-2 py-1 text-sm font-semibold text-blue-700 bg-blue-50 rounded">
+                        {employee.company_employee_id || 'Not Set'}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`px-2 py-1 text-xs font-semibold rounded ${
+                        employee.designation === 'HR' ? 'text-purple-700 bg-purple-50' :
+                        employee.designation === 'Manager' ? 'text-orange-700 bg-orange-50' :
+                        'text-gray-700 bg-gray-50'
+                      }`}>
+                        {employee.designation || 'Employee'}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {employee.type}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                        {employee.status}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {employee.hr}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {employee.managers}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-center">
+                      <div className="flex items-center justify-center gap-2">
+                        <button
+                          onClick={() => handleViewEmployee(employee)}
+                          className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                          title="View"
+                        >
+                          <Eye className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={() => handleEditEmployee(employee)}
+                          className="p-2 text-orange-600 hover:bg-orange-50 rounded-lg transition-colors"
+                          title="Edit"
+                        >
+                          <Edit className="h-4 w-4" />
+                        </button>
+                        <button
+                          className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                          title="Delete"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+                </tbody>
+              </table>
             </div>
-            
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <Label htmlFor="name" className="text-sm font-medium text-gray-700">
-                  Name
-                </Label>
-                <div className="relative">
-                  <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                  <Input
-                    id="name"
-                    type="text"
-                    value={formData.name}
-                    onChange={(e) => handleInputChange('name', e.target.value)}
-                    className={`mt-1 pl-10 ${errors.name ? 'border-red-500' : ''}`}
-                    placeholder="Enter employee name"
-                  />
-                </div>
-                {errors.name && (
-                  <p className="text-red-500 text-sm mt-1">{errors.name}</p>
-                )}
-              </div>
+          </div>
+        )}
 
-              <div>
-                <Label htmlFor="email" className="text-sm font-medium text-gray-700">
-                  Email
-                </Label>
-                <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                  <Input
-                    id="email"
-                    type="email"
-                    value={formData.email}
-                    onChange={(e) => handleInputChange('email', e.target.value)}
-                    className={`mt-1 pl-10 ${errors.email ? 'border-red-500' : ''}`}
-                    placeholder="Enter email address"
-                  />
-                </div>
-                {errors.email && (
-                  <p className="text-red-500 text-sm mt-1">{errors.email}</p>
-                )}
-              </div>
+        {!loading && !error && (
+          <div className="text-sm text-gray-600">
+            Showing {filteredEmployees.length} of {employees.length} employees
+          </div>
+        )}
 
-              <div>
-                <Label htmlFor="type" className="text-sm font-medium text-gray-700">
-                  Employment Type
-                </Label>
-                <Select value={formData.type} onValueChange={(value) => handleInputChange('type', value)}>
-                  <SelectTrigger className={`mt-1 ${errors.type ? 'border-red-500' : ''}`}>
-                    <SelectValue placeholder="Select employment type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {employmentTypes.map((type) => (
-                      <SelectItem key={type} value={type}>
-                        {type}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {errors.type && (
-                  <p className="text-red-500 text-sm mt-1">{errors.type}</p>
-                )}
-              </div>
-
-              <div>
-                <Label htmlFor="role" className="text-sm font-medium text-gray-700">
-                  Role
-                </Label>
-                <Select value={formData.role} onValueChange={(value) => handleInputChange('role', value)}>
-                  <SelectTrigger className={`mt-1 ${errors.role ? 'border-red-500' : ''}`}>
-                    <SelectValue placeholder="Select role" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {roles.map((role) => (
-                      <SelectItem key={role} value={role}>
-                        {role}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {errors.role && (
-                  <p className="text-red-500 text-sm mt-1">{errors.role}</p>
-                )}
-              </div>
-
-              <div className="flex gap-3 pt-4">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={closeModal}
-                  className="flex-1"
-                  disabled={isSubmitting}
+        {isModalOpen && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-xl shadow-2xl max-w-md w-full">
+              <div className="p-6 border-b border-gray-200 flex items-center justify-between">
+                <h2 className="text-xl font-bold text-gray-900">Add New Employee</h2>
+                <button
+                  onClick={() => setIsModalOpen(false)}
+                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
                 >
-                  Cancel
-                </Button>
-                <Button
-                  type="submit"
-                  className="flex-1 bg-green-500 hover:bg-green-600 text-white"
-                  disabled={isSubmitting}
-                >
-                  {isSubmitting ? 'Creating...' : 'Submit'}
-                </Button>
+                  <X className="h-5 w-5" />
+                </button>
               </div>
-            </form>
-          </div>  
-        </div> 
-      )}
-
-      {/* Edit Employee Modal */}
-      {isEditModalOpen && (
-        <div className="fixed inset-0 bg-transparent backdrop-blur-[2px] flex items-center justify-center p-4 z-50">  
-          <div className="bg-gradient-to-br from-white via-gray-50 to-blue-50 rounded-xl shadow-2xl border border-gray-200 max-w-2xl w-full max-h-[90vh] overflow-hidden transform transition-all duration-300 scale-100">
-            {/* Modal Header */}
-            <div className="px-6 py-4 bg-gradient-to-r from-primary/5 to-primary/10 border-b border-primary/20 flex items-center justify-between">
-              <h2 className="text-xl font-bold text-primary">Edit Employee</h2>
-              <button
-                onClick={closeEditModal}
-                className="p-2 hover:bg-primary/10 rounded-full transition-colors"
-              >
-                <X className="w-5 h-5 text-primary/70 hover:text-primary" />
-              </button>
-            </div>
-
-            {/* Modal Content */}
-            <div className="p-6 overflow-y-auto max-h-[calc(90vh-120px)]">
-              <form onSubmit={handleEditSubmit} className="space-y-4">
-                {/* Full Name */}
+              <form onSubmit={handleAddSubmit} className="p-6 space-y-4">
                 <div>
-                  <Label htmlFor="fullName" className="text-sm font-medium text-gray-700">
-                    Full Name <span className="text-red-500">*</span>
-                  </Label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Name <span className="text-red-500">*</span>
+                  </label>
                   <div className="relative">
                     <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                    <Input
-                      id="fullName"
+                    <input
                       type="text"
-                      value={editFormData.fullName}
-                      onChange={(e) => handleEditInputChange('fullName', e.target.value)}
-                      className={`mt-1 pl-10 ${editErrors.fullName ? 'border-red-500' : ''}`}
-                      placeholder="Enter full name"
+                      value={addFormData.name}
+                      onChange={(e) => handleAddInputChange('name', e.target.value)}
+                      className={`w-full pl-10 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500 ${
+                        addFormErrors.name ? 'border-red-500' : 'border-gray-300'
+                      }`}
+                      placeholder="Enter employee name"
                     />
                   </div>
-                  {editErrors.fullName && (
-                    <p className="text-red-500 text-xs mt-1">{editErrors.fullName}</p>
+                  {addFormErrors.name && (
+                    <p className="text-red-500 text-xs mt-1">{addFormErrors.name}</p>
                   )}
                 </div>
-
-                {/* Employee ID */}
                 <div>
-                  <Label className="text-sm font-medium text-gray-700">
-                    Employee ID
-                  </Label>
-                  <div className="mt-1 p-3 bg-blue-50 border border-blue-200 rounded-md">
-                    <span className="text-sm font-mono text-blue-800">
-                      {selectedEmployee ? selectedEmployee.employeeId || 'EMP-' + String(selectedEmployee.id).padStart(4, '0') : 'EMP-0001'}
-                    </span>
-                    <p className="text-xs text-blue-600 mt-1">Auto-generated when employee is created</p>
-                  </div>
-                </div>
-
-                {/* Company Mail */}
-                <div>
-                  <Label htmlFor="companyMail" className="text-sm font-medium text-gray-700">
-                    Company Mail <span className="text-red-500">*</span>
-                  </Label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Email <span className="text-red-500">*</span>
+                  </label>
                   <div className="relative">
                     <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                    <Input
-                      id="companyMail"
+                    <input
                       type="email"
-                      value={editFormData.companyMail}
-                      onChange={(e) => handleEditInputChange('companyMail', e.target.value)}
-                      className={`mt-1 pl-10 ${editErrors.companyMail ? 'border-red-500' : ''}`}
-                      placeholder="Enter company email"
+                      value={addFormData.email}
+                      onChange={(e) => handleAddInputChange('email', e.target.value)}
+                      className={`w-full pl-10 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500 ${
+                        addFormErrors.email ? 'border-red-500' : 'border-gray-300'
+                      }`}
+                      placeholder="Enter email address"
                     />
                   </div>
-                  {editErrors.companyMail && (
-                    <p className="text-red-500 text-xs mt-1">{editErrors.companyMail}</p>
+                  {addFormErrors.email && (
+                    <p className="text-red-500 text-xs mt-1">{addFormErrors.email}</p>
                   )}
                 </div>
-
-                {/* Date of Joining */}
                 <div>
-                  <Label htmlFor="dateOfJoining" className="text-sm font-medium text-gray-700">
-                    Date of Joining <span className="text-red-500">*</span>
-                  </Label>
-                  <div className="relative">
-                    <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                    <Input
-                      id="dateOfJoining"
-                      type="date"
-                      value={editFormData.dateOfJoining}
-                      onChange={(e) => handleEditInputChange('dateOfJoining', e.target.value)}
-                      className={`mt-1 pl-10 ${editErrors.dateOfJoining ? 'border-red-500' : ''}`}
-                    />
-                  </div>
-                  {editErrors.dateOfJoining && (
-                    <p className="text-red-500 text-xs mt-1">{editErrors.dateOfJoining}</p>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Employment Type <span className="text-red-500">*</span>
+                  </label>
+                  <select 
+                    value={addFormData.type}
+                    onChange={(e) => handleAddInputChange('type', e.target.value)}
+                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500 ${
+                      addFormErrors.type ? 'border-red-500' : 'border-gray-300'
+                    }`}
+                  >
+                    <option value="">Select type</option>
+                    <option value="Full-time">Full-time</option>
+                    <option value="Contract">Contract</option>
+                    <option value="Intern">Intern</option>
+                  </select>
+                  {addFormErrors.type && (
+                    <p className="text-red-500 text-xs mt-1">{addFormErrors.type}</p>
                   )}
                 </div>
-
-                {/* Location */}
-                <div>
-                  <Label htmlFor="location" className="text-sm font-medium text-gray-700">
-                    Location <span className="text-red-500">*</span>
-                  </Label>
-                  <Select value={editFormData.location} onValueChange={(value) => handleEditInputChange('location', value)}>
-                    <SelectTrigger className={`mt-1 ${editErrors.location ? 'border-red-500' : ''}`}>
-                      <SelectValue placeholder="Select location" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {locations.map((location) => (
-                        <SelectItem key={location.id} value={location.name}>
-                          {location.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  {editErrors.location && (
-                    <p className="text-red-500 text-xs mt-1">{editErrors.location}</p>
-                  )}
-                </div>
-
-                {/* HR Fields */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="hr1" className="text-sm font-medium text-gray-700">
-                      HR-1 <span className="text-red-500">*</span>
-                    </Label>
-                    <Select value={editFormData.hr1} onValueChange={(value) => handleEditInputChange('hr1', value)}>
-                      <SelectTrigger className={`mt-1 ${editErrors.hr1 ? 'border-red-500' : ''}`}>
-                        <SelectValue placeholder="Select HR-1" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {hrs.map((hr) => (
-                          <SelectItem key={hr.id} value={hr.name}>
-                            {hr.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    {editErrors.hr1 && (
-                      <p className="text-red-500 text-xs mt-1">{editErrors.hr1}</p>
-                    )}
-                  </div>
-
-                  <div>
-                    <Label htmlFor="hr2" className="text-sm font-medium text-gray-700">
-                      HR-2
-                    </Label>
-                    <Select value={editFormData.hr2} onValueChange={(value) => handleEditInputChange('hr2', value)}>
-                      <SelectTrigger className="mt-1">
-                        <SelectValue placeholder="Select HR-2" />
-                      </SelectTrigger>
-                      <SelectContent>
-                           {hrs.map((hr) => (
-                             <SelectItem key={hr.id} value={hr.name}>
-                               {hr.name}
-                             </SelectItem>
-                           ))}
-                         </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-
-                {/* Manager Fields */}
-                <div className="space-y-4">
-                  <div>
-                    <Label htmlFor="manager1" className="text-sm font-medium text-gray-700">
-                      Manager-1 <span className="text-red-500">*</span>
-                    </Label>
-                    <Select value={editFormData.manager1} onValueChange={(value) => handleEditInputChange('manager1', value)}>
-                      <SelectTrigger className={`mt-1 ${editErrors.manager1 ? 'border-red-500' : ''}`}>
-                        <SelectValue placeholder="Select Manager-1" />
-                      </SelectTrigger>
-                      <SelectContent>
-                           {managers.map((manager) => (
-                             <SelectItem key={manager.id} value={manager.name}>
-                               {manager.name}
-                             </SelectItem>
-                           ))}
-                         </SelectContent>
-                    </Select>
-                    {editErrors.manager1 && (
-                      <p className="text-red-500 text-xs mt-1">{editErrors.manager1}</p>
-                    )}
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="manager2" className="text-sm font-medium text-gray-700">
-                        Manager-2
-                      </Label>
-                      <Select value={editFormData.manager2} onValueChange={(value) => handleEditInputChange('manager2', value)}>
-                        <SelectTrigger className="mt-1">
-                          <SelectValue placeholder="Select Manager-2" />
-                        </SelectTrigger>
-                        <SelectContent>
-                           {managers.map((manager) => (
-                             <SelectItem key={manager.id} value={manager.name}>
-                               {manager.name}
-                             </SelectItem>
-                           ))}
-                         </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div>
-                      <Label htmlFor="manager3" className="text-sm font-medium text-gray-700">
-                        Manager-3
-                      </Label>
-                      <Select value={editFormData.manager3} onValueChange={(value) => handleEditInputChange('manager3', value)}>
-                        <SelectTrigger className="mt-1">
-                          <SelectValue placeholder="Select Manager-3" />
-                        </SelectTrigger>
-                        <SelectContent>
-                           {managers.map((manager) => (
-                             <SelectItem key={manager.id} value={manager.name}>
-                               {manager.name}
-                             </SelectItem>
-                           ))}
-                         </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Modal Footer */}
-                <div className="flex gap-3 pt-4 border-t border-primary/10">
-                  <Button
+                <div className="flex gap-3 pt-4">
+                  <button
                     type="button"
-                    variant="outline"
-                    onClick={closeEditModal}
-                    className="flex-1 border-primary/20 text-primary hover:bg-primary/5 hover:border-primary/30"
+                    onClick={() => setIsModalOpen(false)}
+                    className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
                     disabled={isSubmitting}
                   >
                     Cancel
-                  </Button>
-                  <Button
+                  </button>
+                  <button 
                     type="submit"
-                    className="flex-1 bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg"
+                    className="flex-1 px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors disabled:opacity-50"
                     disabled={isSubmitting}
                   >
-                    {isSubmitting ? 'Assigning...' : 'Update Employee'}
-                  </Button>
+                    {isSubmitting ? 'Creating...' : 'Submit'}
+                  </button>
                 </div>
               </form>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* View Employee Modal */}
-      {isViewModalOpen && selectedEmployee && (
-        <div className="fixed inset-0 bg-transparent backdrop-blur-[2px] flex items-center justify-center z-50">
-          <div className="bg-gradient-to-br from-white via-gray-50 to-blue-50 rounded-xl shadow-2xl border border-gray-200 p-6 w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-semibold text-gray-900">Employee Details</h2>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={closeViewModal}
-                className="text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-full p-2"
-              >
-                ✕
-              </Button>
-            </div>
-
-            <div className="space-y-6">
-              {/* Employee Basic Info */}
-              <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-100">
-                <h3 className="text-lg font-medium text-gray-900 mb-4">Basic Information</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="flex items-center gap-3">
-                    <div className={`w-12 h-12 rounded-full ${getAvatarColor(selectedEmployee.name)} flex items-center justify-center text-white font-medium`}>
-                      {selectedEmployee.avatar}
+        {isEditModalOpen && selectedEmployee && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+              <div className="p-6 border-b border-gray-200 flex items-center justify-between bg-blue-50">
+                <h2 className="text-2xl font-bold text-blue-900">
+                  {selectedEmployee.reassignment ? 'Reassign Employee' : 'Assign Employee'}
+                </h2>
+                <button
+                  onClick={() => setIsEditModalOpen(false)}
+                  className="p-2 hover:bg-blue-100 rounded-lg transition-colors"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+              <form onSubmit={handleEditSubmit} className="p-6 space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Full Name
+                  </label>
+                  <input
+                    type="text"
+                    value={editFormData.fullName}
+                    disabled
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100 text-gray-600 cursor-not-allowed"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Company Email {!selectedEmployee.reassignment && <span className="text-red-500">*</span>}
+                  </label>
+                  <input
+                    type="email"
+                    value={editFormData.companyMail}
+                    onChange={(e) => handleEditInputChange('companyMail', e.target.value)}
+                    disabled={selectedEmployee.reassignment}
+                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${
+                      selectedEmployee.reassignment ? 'bg-gray-100 text-gray-600 cursor-not-allowed' : ''
+                    } ${editFormErrors.companyMail ? 'border-red-500' : 'border-gray-300'}`}
+                  />
+                  {editFormErrors.companyMail && (
+                    <p className="text-red-500 text-xs mt-1">{editFormErrors.companyMail}</p>
+                  )}
+                </div>
+                {!selectedEmployee.reassignment && (
+                  <>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Company Employee ID
+                      </label>
+                      <input
+                        type="text"
+                        value={editFormData.companyEmployeeId}
+                        onChange={(e) => handleEditInputChange('companyEmployeeId', e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                        placeholder="e.g., 800001"
+                      />
                     </div>
                     <div>
-                      <div className="font-medium text-gray-900">{selectedEmployee.name}</div>
-                      <div className="text-sm text-gray-500">{selectedEmployee.employeeId}</div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Date of Joining <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="date"
+                        value={editFormData.dateOfJoining}
+                        onChange={(e) => handleEditInputChange('dateOfJoining', e.target.value)}
+                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${
+                          editFormErrors.dateOfJoining ? 'border-red-500' : 'border-gray-300'
+                        }`}
+                      />
+                      {editFormErrors.dateOfJoining && (
+                        <p className="text-red-500 text-xs mt-1">{editFormErrors.dateOfJoining}</p>
+                      )}
                     </div>
+                  </>
+                )}
+                {selectedEmployee.reassignment && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Company Employee ID
+                    </label>
+                    <input
+                      type="text"
+                      value={editFormData.companyEmployeeId}
+                      disabled
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100 text-gray-600 cursor-not-allowed"
+                    />
+                  </div>
+                )}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Role</label>
+                  <select 
+                    value={editFormData.role}
+                    onChange={(e) => handleEditInputChange('role', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">Select role</option>
+                    <option value="Employee">Employee</option>
+                    <option value="HR">HR</option>
+                    <option value="Manager">Manager</option>
+                    <option value="Account Manager">Account Manager</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Location <span className="text-red-500">*</span>
+                  </label>
+                  <select 
+                    value={editFormData.location}
+                    onChange={(e) => handleEditInputChange('location', e.target.value)}
+                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${
+                      editFormErrors.location ? 'border-red-500' : 'border-gray-300'
+                    }`}
+                  >
+                    <option value="">Select location</option>
+                    {locations.map(loc => (
+                      <option key={loc.id} value={loc.name}>{loc.name}</option>
+                    ))}
+                  </select>
+                  {editFormErrors.location && (
+                    <p className="text-red-500 text-xs mt-1">{editFormErrors.location}</p>
+                  )}
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      HR-1 <span className="text-red-500">*</span>
+                    </label>
+                    <select 
+                      value={editFormData.hr1}
+                      onChange={(e) => handleEditInputChange('hr1', e.target.value)}
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${
+                        editFormErrors.hr1 ? 'border-red-500' : 'border-gray-300'
+                      }`}
+                    >
+                      <option value="">Select HR</option>
+                      {hrs.map(hr => (
+                        <option key={hr.id} value={hr.name}>{hr.name}</option>
+                      ))}
+                    </select>
+                    {editFormErrors.hr1 && (
+                      <p className="text-red-500 text-xs mt-1">{editFormErrors.hr1}</p>
+                    )}
                   </div>
                   <div>
-                    <label className="text-sm font-medium text-gray-600">Company Email</label>
-                    <div className="text-gray-900">{selectedEmployee.company_email || 'N/A'}</div>
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium text-gray-600">Personal Email</label>
-                    <div className="text-gray-900">{selectedEmployee.to_email || 'N/A'}</div>
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium text-gray-600">Employment Type</label>
-                    <div className="text-gray-900">{selectedEmployee.type}</div>
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium text-gray-600">Designation</label>
-                    <div className="text-gray-900">{selectedEmployee.designation}</div>
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium text-gray-600">Status</label>
-                    <div>
-                      <Badge 
-                        variant="success" 
-                        appearance="light" 
-                        size="sm"
-                        className="text-green-700 bg-green-100"
-                      >
-                        {selectedEmployee.status}
-                      </Badge>
-                    </div>
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium text-gray-600">Location</label>
-                    <div className="text-gray-900">{selectedEmployee.location || 'Not Assigned'}</div>
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium text-gray-600">Date of Joining</label>
-                    <div className="text-gray-900">{selectedEmployee.dateOfJoining || 'Not Available'}</div>
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium text-gray-600">Joined Date</label>
-                    <div className="text-gray-900">{selectedEmployee.joinedDate}</div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">HR-2</label>
+                    <select 
+                      value={editFormData.hr2}
+                      onChange={(e) => handleEditInputChange('hr2', e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="">Select HR</option>
+                      {hrs.map(hr => (
+                        <option key={hr.id} value={hr.name}>{hr.name}</option>
+                      ))}
+                    </select>
                   </div>
                 </div>
-              </div>
-
-              {/* Assignment Details */}
-              <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-100">
-                <h3 className="text-lg font-medium text-gray-900 mb-4">Assignment Details</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Manager-1 <span className="text-red-500">*</span>
+                  </label>
+                  <select 
+                    value={editFormData.manager1}
+                    onChange={(e) => handleEditInputChange('manager1', e.target.value)}
+                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${
+                      editFormErrors.manager1 ? 'border-red-500' : 'border-gray-300'
+                    }`}
+                  >
+                    <option value="">Select Manager</option>
+                    {managers.map(manager => (
+                      <option key={manager.id} value={manager.name}>{manager.name}</option>
+                    ))}
+                  </select>
+                  {editFormErrors.manager1 && (
+                    <p className="text-red-500 text-xs mt-1">{editFormErrors.manager1}</p>
+                  )}
+                </div>
+                <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="text-sm font-medium text-gray-600">Assigned HR</label>
-                    <div className="text-gray-900">{selectedEmployee.hr}</div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Manager-2</label>
+                    <select 
+                      value={editFormData.manager2}
+                      onChange={(e) => handleEditInputChange('manager2', e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="">Select Manager</option>
+                      {managers.map(manager => (
+                        <option key={manager.id} value={manager.name}>{manager.name}</option>
+                      ))}
+                    </select>
                   </div>
                   <div>
-                    <label className="text-sm font-medium text-gray-600">Assigned Managers</label>
-                    <div className="text-gray-900">{selectedEmployee.managers}</div>
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium text-gray-600">Document Count</label>
-                    <div className="text-gray-900">{selectedEmployee.document_count} documents</div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Manager-3</label>
+                    <select 
+                      value={editFormData.manager3}
+                      onChange={(e) => handleEditInputChange('manager3', e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="">Select Manager</option>
+                      {managers.map(manager => (
+                        <option key={manager.id} value={manager.name}>{manager.name}</option>
+                      ))}
+                    </select>
                   </div>
                 </div>
-              </div>
-            </div>
-
-            {/* Modal Footer */}
-            <div className="flex justify-end pt-6 border-t border-gray-200 mt-6">
-              <Button
-                variant="outline"
-                onClick={closeViewModal}
-                className="px-6 py-2 border-gray-300 text-gray-700 hover:bg-gray-50"
-              >
-                Close
-              </Button>
+                <div className="flex gap-3 pt-4">
+                  <button
+                    type="button"
+                    onClick={() => setIsEditModalOpen(false)}
+                    className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                    disabled={isSubmitting}
+                  >
+                    Cancel
+                  </button>
+                  <button 
+                    type="submit"
+                    className="flex-1 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors disabled:opacity-50"
+                    disabled={isSubmitting}
+                  >
+                    {isSubmitting 
+                      ? (selectedEmployee.reassignment ? 'Reassigning...' : 'Assigning...') 
+                      : (selectedEmployee.reassignment ? 'Reassign' : 'Assign')
+                    }
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
-        </div>
-      )}
-    </div>
+        )}
+
+        {isViewModalOpen && selectedEmployee && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+              <div className="p-6 border-b border-gray-200 flex items-center justify-between">
+                <h2 className="text-2xl font-bold text-gray-900">Employee Details</h2>
+                <button
+                  onClick={() => setIsViewModalOpen(false)}
+                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+              <div className="p-6 space-y-6">
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <h3 className="text-lg font-semibold mb-4">Basic Information</h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-sm font-medium text-gray-600">Name</label>
+                      <div className="text-gray-900">{selectedEmployee.name}</div>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-gray-600">Company Email</label>
+                      <div className="text-gray-900">{selectedEmployee.company_email}</div>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-gray-600">Personal Email</label>
+                      <div className="text-gray-900">{selectedEmployee.to_email}</div>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-gray-600">Company Employee ID</label>
+                      <div className="text-gray-900">
+                        <span className="px-2 py-1 text-sm font-semibold text-blue-700 bg-blue-50 rounded">
+                          {selectedEmployee.company_employee_id || 'Not Set'}
+                        </span>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-gray-600">Role</label>
+                      <div className="text-gray-900">{selectedEmployee.designation}</div>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-gray-600">Employment Type</label>
+                      <div className="text-gray-900">{selectedEmployee.type}</div>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-gray-600">Status</label>
+                      <div className="text-gray-900">
+                        <span className="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                          {selectedEmployee.status}
+                        </span>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-gray-600">Reassignment Status</label>
+                      <div className="text-gray-900">
+                        <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                          selectedEmployee.reassignment ? 'bg-yellow-100 text-yellow-800' : 'bg-blue-100 text-blue-800'
+                        }`}>
+                          {selectedEmployee.reassignment ? 'Reassigned' : 'Initial Assignment'}
+                        </span>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-gray-600">Location</label>
+                      <div className="text-gray-900">{selectedEmployee.location}</div>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-gray-600">Date of Joining</label>
+                      <div className="text-gray-900">{selectedEmployee.dateOfJoining || 'Not Set'}</div>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-gray-600">HR</label>
+                      <div className="text-gray-900">{selectedEmployee.hr}</div>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-gray-600">Managers</label>
+                      <div className="text-gray-900">{selectedEmployee.managers}</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 };
 
 export default EmployeeManagement;
-

@@ -60,7 +60,11 @@ export function EmployeeLayout() {
         <footer className="employee-footer">
           <div className="employee-footer-container">
             <div className="employee-footer-content">
-              © 2025 Employee Portal. All rights reserved.
+              <span>© 2025 Employee Portal. All rights reserved.</span>
+              {/* <span className="mx-2">•</span>
+              <a href="/company-policies" className="text-blue-600 hover:text-blue-700 hover:underline">
+                Company Policies
+              </a> */}
             </div>
           </div>
         </footer>

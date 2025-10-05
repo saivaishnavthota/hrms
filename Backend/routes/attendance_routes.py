@@ -44,6 +44,7 @@ def get_active_projects(
         for p in projects
     ]
  
+@router.post("", response_model=dict)
 @router.post("/", response_model=dict)
 async def save_attendance(
     data: Dict[str, AttendanceCreate],
@@ -52,12 +53,23 @@ async def save_attendance(
     hr_id: int = Query(None),
     session: Session = Depends(get_session)
 ):
+    print("=" * 80)
+    print("🚀 ATTENDANCE SAVE ROUTE CALLED")
+    print(f"📊 Received data keys: {list(data.keys())}")
+    print(f"👤 employee_id={employee_id}, manager_id={manager_id}, hr_id={hr_id}")
+    print("=" * 80)
+    
     user_id = employee_id or manager_id or hr_id
     if not user_id:
+        print("❌ No user_id provided")
         raise HTTPException(status_code=400, detail="employee_id, manager_id, or hr_id is required")
+    
+    print(f"✅ Using user_id: {user_id}")
  
     try:
         for date_str, entry in data.items():
+            print(f"\n📅 Processing date: {date_str}")
+            print(f"   Action: {entry.action}, Hours: {entry.hours if hasattr(entry, 'hours') else 'N/A'}")
             if (not entry.action or entry.action.strip() == "") and \
                (not entry.project_ids or len(entry.project_ids) == 0) and \
                (not entry.sub_tasks or len(entry.sub_tasks) == 0):
@@ -124,11 +136,17 @@ async def save_attendance(
                 raise HTTPException(status_code=500, detail=result[0])
  
         session.commit()
+        print("✅ Attendance commit successful")
+        print("=" * 80)
         return {"success": True, "message": "Attendance submitted successfully"}
  
     except HTTPException:
+        print("❌ HTTPException occurred")
+        print("=" * 80)
         raise
     except Exception as e:
+        print(f"❌ Unexpected error: {str(e)}")
+        print("=" * 80)
         session.rollback()
         raise HTTPException(status_code=500, detail=str(e))
  

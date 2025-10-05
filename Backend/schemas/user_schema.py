@@ -19,11 +19,14 @@ class UserResponse(SQLModel):
     name: str
     role: str
     email: str
+    company_employee_id: Optional[str] = None
+    reassignment: Optional[bool] = None  # Track if employee has been assigned before
     onboarding_status: bool
     message: Optional[str] = None
     access_token: Optional[str] = None
     login_status: Optional[bool] = None
     type: Optional[str] = None
+    location_id: Optional[int] = None
 
 class UseronboardingResponse(SQLModel):
     employeeId: int

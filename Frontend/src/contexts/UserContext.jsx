@@ -48,6 +48,7 @@ export const UserProvider = ({ children }) => {
         name: loginResponse.name,
         role: loginResponse.role,
         email: loginResponse.email,
+        company_employee_id: loginResponse.company_employee_id,
         onboarding_status: loginResponse.onboarding_status,
         login_status: loginResponse.login_status,
         access_token: loginResponse.access_token,

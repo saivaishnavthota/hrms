@@ -67,11 +67,20 @@ export function UserDropdownMenu({ trigger }) {
   useEffect(() => {
     const fetchEmployeeData = async () => {
       try {
-        const userId = localStorage.getItem('userId') || '50';
-        const response = await fetch(`http://localhost:8000/users/${userId}`);
+        const userId = localStorage.getItem('userId');
+        if (!userId) {
+          setLoading(false);
+          return;
+        }
+        
+        // Use the API instance to go through the proxy
+        const response = await fetch(`http://localhost:2346/users/${userId}`);
         if (response.ok) {
           const data = await response.json();
+          console.log('User dropdown data:', data); // Debug log
           setEmployee(data);
+        } else {
+          console.error('Failed to fetch employee data:', response.status);
         }
       } catch (error) {
         console.error('Error fetching employee data:', error);
@@ -108,10 +117,10 @@ export function UserDropdownMenu({ trigger }) {
                 {loading ? 'Loading...' : (employee ? `${employee.name}` : 'Employee')}
               </Link>
               <a
-                href={`mailto:${employee?.company_email || 'employee@company.com'}`}
+                href={`mailto:${employee?.company_email || employee?.email || 'employee@company.com'}`}
                 className="text-xs text-muted-foreground hover:text-primary"
               >
-                {loading ? 'Loading...' : (employee?.company_email || 'employee@company.com')}
+                {loading ? 'Loading...' : (employee?.company_email || employee?.email || 'No email')}
               </a>
             </div>
           </div>

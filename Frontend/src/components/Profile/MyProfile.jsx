@@ -48,6 +48,7 @@ const fetchEmployeeProfile = async () => {
 
     // Fetch profile data
     const response = await api.get(`/users/${employeeId}`);
+    console.log('Profile Data:', response.data); // Debug log
     setProfileData(response.data);
 
     // Fetch projects for this employee
@@ -172,6 +173,13 @@ const fetchEmployeeProfile = async () => {
                 <Mail className="h-4 w-4 text-muted-foreground" />
                 <span className="text-sm">{profileData?.company_email || user?.email || 'N/A'}</span>
               </div>
+              
+              {(profileData?.company_employee_id || user?.company_employee_id) && (
+                <div className="flex items-center gap-2">
+                  <UserCheck className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm">Company ID: {profileData?.company_employee_id || user?.company_employee_id}</span>
+                </div>
+              )}
               
               {(profileData?.contactNumber || user?.contactNumber) && (
                 <div className="flex items-center gap-2">

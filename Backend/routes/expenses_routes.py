@@ -20,12 +20,27 @@ router = APIRouter(prefix="/expenses", tags=["Expenses"])
 load_dotenv()
 AZURE_CONNECTION_STRING = os.getenv("AZURE_CONNECTION_STRING", "DefaultEndpointsProtocol=https;AccountName=hrmsnxzen;AccountKey=Jug56pLmeZIJplobcV+f20v7IXnh6PWuih0hxRYpvRXpGh6tnJrzALqtqL/hRR3lpZK0ZTKIs2Pv+AStDvBH4w==;EndpointSuffix=core.windows.net")
 AZURE_CONTAINER_NAME = os.getenv("AZURE_CONTAINER_NAME", "con-hrms")
+ACCOUNT_NAME = os.getenv("ACCOUNT_NAME", "hrmsnxzen")
+ACCOUNT_KEY = os.getenv("ACCOUNT_KEY", "Jug56pLmeZIJplobcV+f20v7IXnh6PWuih0hxRYpvRXpGh6tnJrzALqtqL/hRR3lpZK0ZTKIs2Pv+AStDvBH4w==")
+
 blob_service_client = BlobServiceClient.from_connection_string(AZURE_CONNECTION_STRING)
 container_client = blob_service_client.get_container_client(AZURE_CONTAINER_NAME)
 
-def build_blob_url(employee_id: int, file_name: str) -> str:
-    """Generate the Azure Blob URL for a file."""
-    return f"https://{blob_service_client.account_name}.blob.core.windows.net/{AZURE_CONTAINER_NAME}/expenses/{employee_id}/{file_name}"
+def build_blob_url_with_sas(employee_id: int, file_name: str) -> str:
+    """Generate the Azure Blob URL with SAS token for a file."""
+    blob_name = f"expenses/{employee_id}/{file_name}"
+    
+    # Generate SAS token valid for 1 year
+    sas_token = generate_blob_sas(
+        account_name=ACCOUNT_NAME,
+        container_name=AZURE_CONTAINER_NAME,
+        blob_name=blob_name,
+        account_key=ACCOUNT_KEY,
+        permission=BlobSasPermissions(read=True),
+        expiry=datetime.utcnow() + timedelta(days=365)
+    )
+    
+    return f"https://{ACCOUNT_NAME}.blob.core.windows.net/{AZURE_CONTAINER_NAME}/{blob_name}?{sas_token}"
 
 @router.post("/submit-exp", response_model=dict)
 async def submit_expense(
@@ -76,7 +91,7 @@ async def submit_expense(
                     blob_client = container_client.get_blob_client(blob_name)
                     content_settings = ContentSettings(content_type=file.content_type)
                     blob_client.upload_blob(file_data, overwrite=True, content_settings=content_settings)
-                    file_url = build_blob_url(employee_id, file.filename)
+                    file_url = build_blob_url_with_sas(employee_id, file.filename)
 
                     # Call add_expense_attachment function
                     result = session.execute(
@@ -94,6 +109,7 @@ async def submit_expense(
                         attachments.append({
                             "attachment_id": result.attachment_id,
                             "file_name": result.file_name,
+                            "file_url": result.file_url,
                             "file_type": result.file_type,
                             "file_size": result.file_size,
                             "uploaded_at": result.uploaded_at,
@@ -148,7 +164,7 @@ async def add_attachment(
         blob_client = container_client.get_blob_client(blob_name)
         content_settings = ContentSettings(content_type=file.content_type)
         blob_client.upload_blob(file_data, overwrite=True, content_settings=content_settings)
-        file_url = build_blob_url(user_id, file.filename)
+        file_url = build_blob_url_with_sas(user_id, file.filename)
 
         result = session.execute(
             text("SELECT * FROM add_expense_attachment(:request_id, :file_name, :file_url, :file_type, :file_size)"),
@@ -168,6 +184,7 @@ async def add_attachment(
         return {
             "attachment_id": result.attachment_id,
             "file_name": result.file_name,
+            "file_url": result.file_url,
             "file_type": result.file_type,
             "file_size": result.file_size,
             "uploaded_at": result.uploaded_at,
@@ -227,6 +244,7 @@ def list_my_expenses(
             {
                 "attachment_id": att.attachment_id,
                 "file_name": att.file_name,
+                "file_url": att.file_url,
                 "file_type": att.file_type,
                 "file_size": att.file_size,
                 "uploaded_at": att.uploaded_at,
@@ -298,6 +316,7 @@ def list_all_expenses(
             {
                 "attachment_id": att.attachment_id,
                 "file_name": att.file_name,
+                "file_url": att.file_url,
                 "file_type": att.file_type,
                 "file_size": att.file_size,
                 "uploaded_at": att.uploaded_at,
@@ -442,6 +461,7 @@ def list_all_expenses(
             {
                 "attachment_id": att.attachment_id,
                 "file_name": att.file_name,
+                "file_url": att.file_url,
                 "file_type": att.file_type,
                 "file_size": att.file_size,
                 "uploaded_at": att.uploaded_at,
@@ -582,6 +602,7 @@ def list_acc_mgr_expenses(
             {
                 "attachment_id": att.attachment_id,
                 "file_name": att.file_name,
+                "file_url": att.file_url,
                 "file_type": att.file_type,
                 "file_size": att.file_size,
                 "uploaded_at": att.uploaded_at,

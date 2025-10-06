@@ -142,7 +142,7 @@ const LeaveRequests = () => {
   }, [leaveRequests, sortConfig]);
 
   return (
-    <div className="p-6">
+    <div className="p-6 bg-gray-50">
       {/* Tab Navigation */}
       <div className="mb-6">
         <div className="border-b border-gray-200">

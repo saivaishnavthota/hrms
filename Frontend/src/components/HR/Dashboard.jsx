@@ -530,7 +530,7 @@ useEffect(() => {
               <p className="text-3xl font-bold text-gray-900">
                 {isLoadingEmployees ? '…' : totalEmployees ?? '—'}
               </p>
-              <p className="text-sm text-green-600 mt-1">+10 this month</p>
+              
             </div>
             <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
               <Users className="w-6 h-6 text-blue-600" />
@@ -542,8 +542,8 @@ useEffect(() => {
         <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600 mb-1">Attendance rate</p>
-              <p className="text-3xl font-bold text-gray-900">{attMonthCounts.total ? Math.round((attMonthCounts.present / attMonthCounts.total) * 100) : 0}%</p>
+              <p className="text-sm text-gray-600 mb-1">Attendance rate (WFH)</p>
+              <p className="text-3xl font-bold text-gray-900">{attMonthCounts.total ? Math.round((attMonthCounts.wfh / attMonthCounts.total) * 100) : 0}%</p>
               <p className="text-sm text-green-500 mt-1">{attTodayCounts.wfh || 0} work from home today</p>
             </div>
             <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
@@ -556,7 +556,7 @@ useEffect(() => {
         <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600 mb-1">Attendance Rate</p>
+              <p className="text-sm text-gray-600 mb-1">Attendance Rate (Present)</p>
               <p className="text-3xl font-bold text-gray-900">{attMonthCounts.total ? Math.round((attMonthCounts.present / attMonthCounts.total) * 100) : 0}%</p>
               <p className="text-sm text-green-500 mt-1">{attTodayCounts.present || 0} present today</p>
             </div>

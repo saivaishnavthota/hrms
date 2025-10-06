@@ -141,6 +141,22 @@ export default function NewUserDetails() {
     // Date of Birth validation
     if (!formData.dob) {
       newErrors.dob = 'Date of birth is required';
+    } else {
+      // Calculate age
+      const birthDate = new Date(formData.dob);
+      const today = new Date();
+      let age = today.getFullYear() - birthDate.getFullYear();
+      const monthDiff = today.getMonth() - birthDate.getMonth();
+      
+      // Adjust age if birthday hasn't occurred this year yet
+      if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+        age--;
+      }
+      
+      // Validate age is at least 18
+      if (age < 18) {
+        newErrors.dob = 'You must be at least 18 years old';
+      }
     }
 
     // Latest Graduation Year validation
@@ -304,6 +320,7 @@ export default function NewUserDetails() {
                 value={formData.dob}
                 onChange={handleInputChange}
                 disabled={isCompleted}
+                max={new Date(new Date().setFullYear(new Date().getFullYear() - 18)).toISOString().split('T')[0]}
                 className={`w-full pl-10 pr-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
                   errors.dob ? 'border-red-500 bg-red-50' : 'border-gray-300'
                 } ${isCompleted ? 'bg-gray-100 cursor-not-allowed' : ''}`}

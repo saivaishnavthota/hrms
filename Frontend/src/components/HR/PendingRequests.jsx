@@ -229,7 +229,7 @@ const PendingRequests = () => {
 
   if (error) {
     return (
-      <div className="p-6">
+      <div className="p-6 bg-gray-50">
         <div className="bg-red-50 border border-red-200 rounded-lg p-4">
           <div className="flex items-center">
             <div className="flex-shrink-0">

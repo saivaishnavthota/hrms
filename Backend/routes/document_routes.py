@@ -208,8 +208,10 @@ def list_documents(
     current_user: User = Depends(get_current_user)
 ):
     documents = session.exec(select(Document).where(Document.employee_id == employee_id)).all()
+    
+    # Return empty array instead of 404 to allow frontend to display empty cards
     if not documents:
-        raise HTTPException(status_code=404, detail="No documents found for this employee")
+        return []
 
     doc_list = []
     for doc in documents:

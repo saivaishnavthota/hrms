@@ -174,7 +174,7 @@ const Holidays = () => {
   };
 
   return (
-    <div className="p-6 bg-white">
+    <div className="p-6 bg-gray-50">
       {/* Header */}
       <div className="flex justify-between items-center mb-6">
         <div>

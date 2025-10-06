@@ -85,6 +85,7 @@ def apply_leave(leave: dict, session: Session = Depends(get_session)):
             "totalDays": total_days,  # ✅ dynamic corrected leave days
             "reason": row.reason,
             "status": row.status,
+            "createdAt": row.created_at
         }
 
     except Exception as e:

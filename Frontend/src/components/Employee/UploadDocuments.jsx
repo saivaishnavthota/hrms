@@ -27,13 +27,14 @@ const UploadDocuments = ({ id }) => {
         if (!employeeId) return;
 
         const res = await api.get(`/documents/emp/${employeeId}`);
-        const backendDocsArray = res.data;
+        const backendDocsArray = res.data || []; // Handle empty response
 
         const backendDocs = {};
         backendDocsArray.forEach((doc) => {
           backendDocs[doc.doc_type] = doc;
         });
 
+        // Always create cards for all document types
         const mappedDocs = documentTypes.map((type) => ({
           id: Date.now() + Math.random(),
           type,
@@ -49,6 +50,19 @@ const UploadDocuments = ({ id }) => {
       } catch (err) {
         console.error("Error fetching documents:", err);
         
+        // Initialize with empty document cards even on error
+        const emptyDocs = documentTypes.map((type) => ({
+          id: Date.now() + Math.random(),
+          type,
+          name: "",
+          url: "",
+          status: "pending",
+          description: "",
+          file: null,
+          size: 0,
+        }));
+        
+        setDocuments(emptyDocs);
       }
     };
 

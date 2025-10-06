@@ -170,12 +170,16 @@ const EmployeePage = () => {
     try {
       if (!user?.employeeId) return;
       const resp = await api.get(`/documents/emp/${user.employeeId}`);
-      const map = resp?.data || {};
-      const required = Object.keys(map).length;
-      const completed = Object.values(map).filter(Boolean).length;
+      const uploadedDocs = resp?.data || [];
+      
+      // Total required documents (matching the documentTypes array in UploadDocuments.jsx)
+      const required = 16;
+      // Completed documents are those that have been uploaded
+      const completed = Array.isArray(uploadedDocs) ? uploadedDocs.length : 0;
+      
       setDocumentsStatus({ completed, required });
     } catch (err) {
-      setDocumentsStatus({ completed: 0, required: 0 });
+      setDocumentsStatus({ completed: 0, required: 16 });
     }
   };
 

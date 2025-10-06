@@ -183,6 +183,20 @@ def upgrade() -> None:
             FROM onboarding_emp_details
             WHERE employee_id = p_onboarding_id;
             
+            -- Copy documents from onboarding to employee_documents
+            INSERT INTO employee_documents (
+                employee_id, doc_type, file_id, file_name, file_url, uploaded_at
+            )
+            SELECT 
+                new_emp_id,
+                doc_type,
+                COALESCE(file_name, doc_type || '_' || new_emp_id::text) as file_id,
+                COALESCE(file_name, doc_type || '.pdf') as file_name,
+                file_url,
+                uploaded_at
+            FROM onboarding_emp_docs
+            WHERE employee_id = p_onboarding_id;
+            
             -- Delete from onboarding tables
             DELETE FROM onboarding_employees WHERE id = p_onboarding_id;
             DELETE FROM onboarding_emp_docs WHERE employee_id = p_onboarding_id;

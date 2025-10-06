@@ -286,7 +286,7 @@ CREATE TABLE public.leave_approvals (
 );
 
 -- Weekoff Table
-CREATE TABLE public.weekoff (
+CREATE TABLE public.weekoffs (
     id SERIAL PRIMARY KEY,
     employee_id INTEGER NOT NULL REFERENCES employees(id),
     week_start DATE NOT NULL,
@@ -306,6 +306,26 @@ CREATE TABLE public.company_policies (
     created_at TIMESTAMP NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
     deleted_at TIMESTAMP
+);
+
+-- Sessions Table (for authentication and session management)
+CREATE TABLE public.sessions (
+    session_id VARCHAR PRIMARY KEY,
+    user_id INTEGER NOT NULL,
+    role VARCHAR NOT NULL,
+    user_type VARCHAR NOT NULL,
+    expires_at TIMESTAMP NOT NULL,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Master Calendar Table (for holidays management)
+CREATE TABLE public.master_calendar (
+    id SERIAL PRIMARY KEY,
+    location_id INTEGER NOT NULL REFERENCES locations(id),
+    holiday_date DATE NOT NULL,
+    holiday_name VARCHAR NOT NULL,
+    UNIQUE(location_id, holiday_date)
 );
 
 -- Create indexes for better performance
@@ -846,6 +866,20 @@ BEGIN
            graduation_year, work_experience_years, emergency_contact_name,
            emergency_contact_number, emergency_contact_relation, NOW(), NOW()
     FROM onboarding_emp_details
+    WHERE employee_id = p_onboarding_id;
+    
+    -- Copy documents from onboarding to employee_documents
+    INSERT INTO employee_documents (
+        employee_id, doc_type, file_id, file_name, file_url, uploaded_at
+    )
+    SELECT 
+        new_emp_id,
+        doc_type,
+        COALESCE(file_name, doc_type || '_' || new_emp_id::text) as file_id,
+        COALESCE(file_name, doc_type || '.pdf') as file_name,
+        file_url,
+        uploaded_at
+    FROM onboarding_emp_docs
     WHERE employee_id = p_onboarding_id;
     
     -- Delete from onboarding tables

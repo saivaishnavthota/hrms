@@ -350,23 +350,9 @@ async def get_onboarded_employees(session: Session = Depends(get_session)):
             LEFT JOIN (
                 SELECT 
                     employee_id,
-                    (CASE WHEN aadhar IS NOT NULL THEN 1 ELSE 0 END +
-                     CASE WHEN pan IS NOT NULL THEN 1 ELSE 0 END +
-                     CASE WHEN latest_graduation_certificate IS NOT NULL THEN 1 ELSE 0 END +
-                     CASE WHEN updated_resume IS NOT NULL THEN 1 ELSE 0 END +
-                     CASE WHEN offer_letter IS NOT NULL THEN 1 ELSE 0 END +
-                     CASE WHEN latest_compensation_letter IS NOT NULL THEN 1 ELSE 0 END +
-                     CASE WHEN experience_relieving_letter IS NOT NULL THEN 1 ELSE 0 END +
-                     CASE WHEN latest_3_months_payslips IS NOT NULL THEN 1 ELSE 0 END +
-                     CASE WHEN form16_or_12b_or_taxable_income IS NOT NULL THEN 1 ELSE 0 END +
-                     CASE WHEN ssc_certificate IS NOT NULL THEN 1 ELSE 0 END +
-                     CASE WHEN hsc_certificate IS NOT NULL THEN 1 ELSE 0 END +
-                     CASE WHEN hsc_marksheet IS NOT NULL THEN 1 ELSE 0 END +
-                     CASE WHEN graduation_marksheet IS NOT NULL THEN 1 ELSE 0 END +
-                     CASE WHEN postgraduation_marksheet IS NOT NULL THEN 1 ELSE 0 END +
-                     CASE WHEN postgraduation_certificate IS NOT NULL THEN 1 ELSE 0 END +
-                     CASE WHEN passport IS NOT NULL THEN 1 ELSE 0 END) as total_docs
-                FROM documents
+                    COUNT(*) as total_docs
+                FROM employee_documents
+                GROUP BY employee_id
             ) doc_count ON u.id = doc_count.employee_id
             LEFT JOIN employee_hrs eh ON u.id = eh.employee_id
             LEFT JOIN employees hr ON eh.hr_id = hr.id
@@ -439,53 +425,51 @@ async def get_employee_documents(employee_id: int, session: Session = Depends(ge
                 detail="Onboarded employee not found"
             )
 
-        # Get document information
+        # Get document information from employee_documents table
         doc_query = text("""
             SELECT 
-                aadhar, pan, latest_graduation_certificate, updated_resume,
-                offer_letter, latest_compensation_letter, experience_relieving_letter,
-                latest_3_months_payslips, form16_or_12b_or_taxable_income,
-                ssc_certificate, hsc_certificate, hsc_marksheet,
-                graduation_marksheet, postgraduation_marksheet, 
-                postgraduation_certificate, passport, uploaded_at
-            FROM documents 
+                id,
+                doc_type,
+                file_name,
+                file_url,
+                uploaded_at
+            FROM employee_documents 
             WHERE employee_id = :employee_id
+            ORDER BY uploaded_at DESC
         """)
         
-        doc_result = session.execute(doc_query, {"employee_id": employee_id}).first()
+        doc_results = session.execute(doc_query, {"employee_id": employee_id}).all()
+        
+        # Map doc_type to display names
+        doc_type_display = {
+            "aadhar": "Aadhar Card",
+            "pan": "PAN Card", 
+            "latest_graduation_certificate": "Graduation Certificate",
+            "updated_resume": "Resume",
+            "offer_letter": "Offer Letter",
+            "latest_compensation_letter": "Compensation Letter",
+            "experience_relieving_letter": "Experience Letter",
+            "latest_3_months_payslips": "Payslips",
+            "form16_or_12b_or_taxable_income": "Tax Documents",
+            "ssc_certificate": "SSC Certificate",
+            "hsc_certificate": "HSC Certificate", 
+            "hsc_marksheet": "HSC Marksheet",
+            "graduation_marksheet": "Graduation Marksheet",
+            "postgraduation_marksheet": "Post Graduation Marksheet",
+            "postgraduation_certificate": "Post Graduation Certificate",
+            "passport": "Passport"
+        }
         
         documents = []
-        if doc_result:
-            doc_fields = {
-                "aadhar": "Aadhar Card",
-                "pan": "PAN Card", 
-                "latest_graduation_certificate": "Graduation Certificate",
-                "updated_resume": "Resume",
-                "offer_letter": "Offer Letter",
-                "latest_compensation_letter": "Compensation Letter",
-                "experience_relieving_letter": "Experience Letter",
-                "latest_3_months_payslips": "Payslips",
-                "form16_or_12b_or_taxable_income": "Tax Documents",
-                "ssc_certificate": "SSC Certificate",
-                "hsc_certificate": "HSC Certificate", 
-                "hsc_marksheet": "HSC Marksheet",
-                "graduation_marksheet": "Graduation Marksheet",
-                "postgraduation_marksheet": "Post Graduation Marksheet",
-                "postgraduation_certificate": "Post Graduation Certificate",
-                "passport": "Passport"
-            }
-            
-            doc_id = 1
-            for field, display_name in doc_fields.items():
-                if getattr(doc_result, field):
-                    documents.append({
-                        "id": doc_id,
-                        "name": f"{display_name}.pdf",
-                        "type": display_name,
-                        "url": f"/documents/{employee_id}/{field}",
-                        "uploadDate": doc_result.uploaded_at.strftime("%Y-%m-%d") if doc_result.uploaded_at else None
-                    })
-                    doc_id += 1
+        for doc in doc_results:
+            display_name = doc_type_display.get(doc.doc_type, doc.doc_type.replace('_', ' ').title())
+            documents.append({
+                "id": doc.id,
+                "name": doc.file_name,
+                "type": display_name,
+                "url": doc.file_url,
+                "uploadDate": doc.uploaded_at.strftime("%Y-%m-%d") if doc.uploaded_at else None
+            })
 
         return {
             "status": "success",

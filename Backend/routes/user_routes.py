@@ -135,7 +135,7 @@ async def verify_otp(req: VerifyOtpRequest, session: Session = Depends(get_sessi
     """
     try:
         employee = session.exec(
-            select(User).where(User.email == req.email.lower())
+            select(User).where(User.company_email == req.email.lower())
         ).first()
 
         if not employee:
@@ -193,7 +193,16 @@ async def change_password(req: ChangePasswordRequest, session: Session = Depends
 @router.post("/forgot-password")
 async def forgot_password(req: ForgotPasswordRequest, session: Session = Depends(get_session)):
     try:
-        employee = session.exec(select(User).where(User.email == req.email.lower())).first()
+        # Try company_email first (primary), then fallback to personal email
+        employee = session.exec(
+            select(User).where(User.company_email == req.email.lower())
+        ).first()
+        
+        if not employee:
+            employee = session.exec(
+                select(User).where(User.email == req.email.lower())
+            ).first()
+        
         if not employee:
             raise HTTPException(status_code=404, detail="Email not found")
 
@@ -207,7 +216,7 @@ async def forgot_password(req: ForgotPasswordRequest, session: Session = Depends
         session.refresh(employee)
 
         # Send OTP via email
-        email_sent = await forgot_password_mail(req.email, f"Your OTP is {otp}")
+        email_sent = await forgot_password_mail(req.email, otp)
         if not email_sent:
             raise HTTPException(status_code=500, detail="Failed to send email")
 

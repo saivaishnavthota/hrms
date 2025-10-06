@@ -323,7 +323,7 @@ export default function Login() {
                 value={formData.email}
                 onChange={handleInputChange}
                 className="w-full pl-10 pr-4 py-3 bg-slate-800/70 border border-slate-600/50 rounded-xl text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-green-500/50 focus:border-green-500/50 transition-all duration-200"
-                placeholder="Enter your email"
+                placeholder="Enter your company email"
                 required
               />
             </div>
@@ -404,13 +404,13 @@ export default function Login() {
           <div className="bg-slate-800/90 backdrop-blur-md border border-slate-700/50 rounded-2xl p-8 w-full max-w-md shadow-2xl">
             <div className="text-center mb-6">
               <h2 className="text-2xl font-bold text-white mb-2">Reset Password</h2>
-              <p className="text-slate-400">Enter your email address and we'll send you a link to reset your password.</p>
+              <p className="text-slate-400">Enter your company email address and we'll send you a code to reset your password.</p>
             </div>
 
             <form onSubmit={handleForgotPasswordSubmit} className="space-y-6">
               <div>
                 <label htmlFor="forgotEmail" className="block text-sm font-medium text-slate-200 mb-2">
-                  Email Address
+                  Company Email Address
                 </label>
                 <div className="relative">
                   <input
@@ -419,7 +419,7 @@ export default function Login() {
                     value={forgotPasswordEmail}
                     onChange={(e) => setForgotPasswordEmail(e.target.value)}
                     className="w-full px-4 py-3 bg-slate-800/70 border border-slate-600/50 rounded-xl text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-green-500/50 focus:border-green-500/50 transition-all duration-200 pl-12"
-                    placeholder="Enter your email"
+                    placeholder="Enter your company email"
                     required
                   />
                   <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-5 h-5" />

@@ -10,7 +10,7 @@ import {
   User,
   Mail
 } from 'lucide-react';
-import { toast } from 'sonner';
+import { toast } from 'react-toastify' ;
 import api from '../../lib/api';
 
 const getAvatarColor = (name) => {

@@ -1,12 +1,93 @@
-# React + Vite
+HR Management Portal (React + Vite + FastAPI + PostgreSQL)
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A full-stack HR Management Portal designed to streamline employee and HR workflows — including onboarding employees, leave management, document uploads, assigning projects, holidays management, expense management , and employee engagement tracking.
+Built with React + Vite, FastAPI, and PostgreSQL, this app delivers speed, reliability, and scalability.
 
-Currently, two official plugins are available:
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+Key Features
 
-## Expanding the ESLint configuration
+1. For HR
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+Onboard new employeess, Documents Collection
+
+View, approve, or reject leave applications
+
+View, approve, or reject expense applications
+
+Assign leave balances to employees
+
+Track employee attendance and performance
+
+2. Account Manager 
+
+Add Projects 
+
+View, approve, or reject expense applications
+
+3. For Manager
+
+Assign projects to employees
+
+View, approve, or reject leave applications
+
+View, approve, or reject expense applications
+
+Track employee attendance and performance
+
+4. For Employees
+
+Apply for leaves, expense and track approval status
+
+View company policies divided into interactive info sections
+
+Access personal profile, leave balance, and HR announcements
+
+Core Features
+
+Secure login & authentication using JWT
+
+FastAPI-based REST API with PostgreSQL integration
+
+Responsive UI with modern design (Vite + Tailwind)
+
+Centralized state management & API handling with Axios
+
+Automatic email notifications for key HR events
+
+Tech Stack
+
+| Layer                     | Technology                                                  |
+| ------------------------- | ----------------------------------------------------------- |
+| Frontend                  | React (Vite), Axios, Tailwind CSS / ShadCN UI, Lucide Icons |
+| Backend                   | FastAPI, SQLModel / SQLAlchemy                              |
+| Database                  | PostgreSQL                                                  |
+| Authentication            | JWT (OAuth2 Password Bearer)                                |
+| Email Service             | Nodemailer (Gmail SMTP)                                     |
+| Deployment (Optional)     | Docker, Render / Railway, Netlify / Vercel                  |
+
+Setup Instructions
+1. Clone the Repository
+git clone https://github.com/saivaishnavthota/hrms.git
+
+2. Backend Installations
+pip install -r requirements.txt
+
+3. Run database migrations (if using Alembic or SQLModel):
+alembic upgrade head
+
+4. Start the FastAPI server:
+uvicorn main:app --reload
+
+5. Frontend Setup (React + Vite) 
+   Installations: npm install
+
+Common Commands :
+
+| Command                     | Description                       |
+| --------------------------- | --------------------------------- |
+| `npm run dev`               | Run React app in development mode |
+| `uvicorn main:app --reload` | Start FastAPI backend             |
+| `alembic upgrade head`      | Apply database migrations         |
+| `npm run build`             | Build frontend for production     |
+| `npm run preview`           | Preview production build          |
+

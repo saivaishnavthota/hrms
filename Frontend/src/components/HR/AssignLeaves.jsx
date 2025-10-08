@@ -30,12 +30,12 @@ const AssignLeaves = () => {
       setEmployeesError(null);
       setLoadingEmployees(true);
       try {
-        const res = await api.get('/users/onboarded-employees');
-        const list = Array.isArray(res.data) ? res.data : res.data?.data || [];
+        const res = await api.get('/users/employees');
+        const list = res.data?.employees || [];
         const mapped = list.map(e => ({
-          id: e.id,
+          id: e.employeeId,
           employee: e.name,
-          email: e.email || e.personal_email || '',
+          email: e.to_email || e.email || '',
           avatar: e.avatar || null,
           type: e.type || 'Full-time',
           role: e.role || 'Employee',

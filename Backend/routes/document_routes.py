@@ -366,13 +366,28 @@ def get_all_documents(
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user)
 ):
-    """Get all employees with their uploaded documents"""
+    """Get all employees with their uploaded documents (filtered by HR assignment for regular HRs)"""
     if current_user.role != "HR":
         raise HTTPException(status_code=403, detail="Access denied: HR only")
 
     try:
-        # Get all employees
-        employees = session.exec(select(User)).all()
+        # If super_hr, get all employees; otherwise, only get assigned employees
+        if current_user.super_hr:
+            employees = session.exec(select(User)).all()
+        else:
+            # Get only employees assigned to this HR
+            from models.employee_assignment_model import EmployeeHR
+            assigned_employee_ids = session.exec(
+                select(EmployeeHR.employee_id).where(EmployeeHR.hr_id == current_user.id)
+            ).all()
+            
+            if not assigned_employee_ids:
+                return []
+            
+            employee_ids = [e[0] if isinstance(e, tuple) else e for e in assigned_employee_ids]
+            employees = session.exec(
+                select(User).where(User.id.in_(employee_ids))
+            ).all()
         
         result = []
         for employee in employees:

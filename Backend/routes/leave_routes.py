@@ -94,10 +94,22 @@ def apply_leave(leave: dict, session: Session = Depends(get_session)):
 # ------------------ EMPLOYEE LEAVE HISTORY ------------------ #
 @router.get("/all_leaves/{employee_id}", response_model=list[LeaveResponse])
 def get_all_leaves(employee_id: int, session: Session = Depends(get_session)):
-    leaves = session.exec(
-        select(LeaveManagement).where(LeaveManagement.employee_id == employee_id)
-    ).all()
-    return leaves
+    statement = (
+        select(LeaveManagement, User.name)
+        .join(User, LeaveManagement.employee_id == User.id)
+        .where(LeaveManagement.employee_id == employee_id)
+    )
+    results = session.exec(statement).all()
+
+    leaves_with_name = []
+    for leave, name in results:
+        leave_dict = leave.dict()
+        leave_dict["employee_name"] = name
+        leaves_with_name.append(leave_dict)
+
+    return leaves_with_name
+
+
 
 
 @router.get("/manager/pending-leaves/{manager_id}")

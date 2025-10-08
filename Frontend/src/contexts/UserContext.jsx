@@ -23,6 +23,10 @@ export const UserProvider = ({ children }) => {
         
         if (storedUser && authToken) {
           const userData = JSON.parse(storedUser);
+          // Ensure super_hr is properly handled (could be undefined, null, or false)
+          userData.super_hr = userData.super_hr === true;
+          console.log('Loaded user from localStorage:', userData);
+          console.log('super_hr value:', userData.super_hr);
           setUser(userData);
         }
       } catch (error) {
@@ -42,6 +46,7 @@ export const UserProvider = ({ children }) => {
   const loginUser = (loginResponse) => {
     try {
       console.log('loginUser called with:', loginResponse);
+      console.log('super_hr from response:', loginResponse.super_hr);
       
       const userData = {
         employeeId: loginResponse.employeeId,
@@ -54,10 +59,12 @@ export const UserProvider = ({ children }) => {
         access_token: loginResponse.access_token,
         type: loginResponse.type,
         message: loginResponse.message,
-        location_id: loginResponse.location_id || null
+        location_id: loginResponse.location_id || null,
+        super_hr: loginResponse.super_hr === true  // Ensure it's explicitly a boolean
       };
 
       console.log('Processed userData:', userData);
+      console.log('super_hr after processing:', userData.super_hr);
       setUser(userData);
       
       // Store in localStorage

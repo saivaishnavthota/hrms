@@ -48,12 +48,8 @@ const ManagerEmployeeAttendance = () => {
 
     const transformData = (data) => {
       return data.map((record, index) => {
-        const typeMap = {
-          'Employee': 'Full-Time',
-          'Intern': 'Intern',
-          'Contract': 'Contract'
-        };
-        const type = typeMap[record.type] || record.type || 'Full-Time';
+        // Use employment_type directly from backend (Full-Time or Contract)
+        const type = record.type || 'Full-Time';
         const totalHours = (record.subTasks || []).reduce((sum, st) => sum + parseFloat(st.hours || 0), 0);
 
         return {
@@ -253,7 +249,6 @@ const ManagerEmployeeAttendance = () => {
                 >
                   <option value="all">All Types</option>
                   <option value="Full-Time">Full-Time</option>
-                  <option value="Intern">Intern</option>
                   <option value="Contract">Contract</option>
                 </select>
                 <select

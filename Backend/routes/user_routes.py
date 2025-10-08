@@ -29,23 +29,6 @@ logger = logging.getLogger(__name__)
 
 
 
-@router.post("/hr/approve", response_model=UserHrAccept)
-async def hr_accept(data: HrApproveRequest, session: Session = Depends(get_session)):
-    # Find employee
-    user = db.query(users).filter(users.id == data.employee_id).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="Employee not found")
-
-    # Update onboarding status
-    employee.o_status = True
-    session.commit()
-    session.refresh(employee)
-
-    return UserHrAccept(
-        employee_id=employee.id,
-        o_status=employee.o_status,
-        message="Employee onboarding approved by HR"
-    )
 
 @router.post("/login", response_model=Union[UserResponse, UseronboardingResponse])
 async def login(form_data: OAuth2PasswordRequestForm = Depends(), session: Session = Depends(get_session)):
@@ -76,6 +59,7 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends(), session: Sessi
             login_status=db_user.login_status,
             type=db_user.role,
             location_id=db_user.location_id,
+            super_hr=db_user.super_hr if db_user.role == "HR" else None,
             message=f"Welcome, {db_user.name}!"
         )
 
@@ -269,39 +253,64 @@ async def display_hrs(session: Session = Depends(get_session)):
 # ----------------------------
 # Get all employees with their assigned HRs and Managers
 # ----------------------------
+# Get all onboarded employees with their assignments and location
+# ----------------------------------------------------------------
 @router.get("/employees")
-async def display_employees(hr_id: int = None, session: Session = Depends(get_session)):
+async def display_employees(
+    hr_id: int = None,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user)
+):
     """
-    Get all employees with their assigned HRs and Managers.
-    If `hr_id` is provided, filter employees assigned to that HR.
+    Get all employees with their assigned HRs, Managers, and Location.
+    - Super-HR sees all employees or can filter by specific HR.
+    - Regular HR only sees their assigned employees.
     """
     try:
         base_query = """
             SELECT
-                e.id AS employeeId,
-                INITCAP(e.name) AS name,
-                e.company_email,
-                e.email,
-                e.role,
-                e.company_employee_id,
-                e.reassignment,
-                COALESCE(array_agg(DISTINCT hr.name) FILTER (WHERE hr.id IS NOT NULL), '{}') AS hr,
-                COALESCE(array_agg(DISTINCT mgr.name) FILTER (WHERE mgr.id IS NOT NULL), '{}') AS managers
-            FROM employees e
-            LEFT JOIN employee_hrs eh ON e.id = eh.employee_id
-            LEFT JOIN employees hr ON eh.hr_id = hr.id
-            LEFT JOIN employee_managers em ON e.id = em.employee_id
-            LEFT JOIN employees mgr ON em.manager_id = mgr.id
+        e.id AS employeeId,
+        INITCAP(e.name) AS name,
+        e.company_email,
+        e.email,
+        e.role,
+        e.company_employee_id,
+        e.reassignment,
+        e.doj,
+        COALESCE(array_agg(DISTINCT hr.name) FILTER (WHERE hr.id IS NOT NULL), '{}') AS hr,
+        COALESCE(array_agg(DISTINCT mgr.name) FILTER (WHERE mgr.id IS NOT NULL), '{}') AS managers,
+        l.id AS location_id,
+        l.name AS location_name
+    FROM employees e
+    LEFT JOIN employee_hrs eh ON e.id = eh.employee_id
+    LEFT JOIN employees hr ON eh.hr_id = hr.id
+    LEFT JOIN employee_managers em ON e.id = em.employee_id
+    LEFT JOIN employees mgr ON em.manager_id = mgr.id
+    LEFT JOIN locations l ON e.location_id = l.id
         """
 
-        # Filter by hr_id if provided
-        if hr_id:
+        # Determine HR filter logic
+        filter_hr_id = None
+        if current_user.role == "HR":
+            if getattr(current_user, "super_hr", False):
+                # Super-HR can filter by hr_id if given
+                filter_hr_id = hr_id
+            else:
+                # Regular HR sees only their employees
+                filter_hr_id = current_user.id
+
+        if filter_hr_id:
             base_query += " WHERE eh.hr_id = :hr_id"
 
-        base_query += " GROUP BY e.id, e.name, e.email, e.role, e.company_employee_id, e.reassignment ORDER BY e.name"
+        base_query += """
+            GROUP BY e.id, e.name, e.email, e.role, e.company_email, e.company_employee_id,
+                     e.reassignment, e.doj, l.id, l.name
+            ORDER BY e.name
+        """
 
-        result = session.execute(text(base_query), {"hr_id": hr_id} if hr_id else {}).all()
-        
+        params = {"hr_id": filter_hr_id} if filter_hr_id else {}
+        result = session.execute(text(base_query), params).all()
+
         employees = []
         for row in result:
             employees.append({
@@ -313,7 +322,10 @@ async def display_employees(hr_id: int = None, session: Session = Depends(get_se
                 "company_employee_id": row.company_employee_id,
                 "reassignment": row.reassignment,
                 "hr": row.hr,
-                "managers": row.managers
+                "managers": row.managers,
+                "location_id": row.location_id,
+                "location_name": row.location_name,
+                "doj": row.doj,
             })
 
         return {"count": len(employees), "employees": employees}
@@ -321,96 +333,6 @@ async def display_employees(hr_id: int = None, session: Session = Depends(get_se
     except Exception as e:
         logger.error(f"Error fetching employees: {str(e)}")
         raise HTTPException(status_code=500, detail="Internal server error")
-
-
-# Get all onboarded employees with document status
-# -----------------------------------------------
-@router.get("/onboarded-employees")
-async def get_onboarded_employees(session: Session = Depends(get_session)):
-    """
-    Fetch all onboarded employees (employees who have completed onboarding process)
-    with their document status and additional details for the OnboardedEmployees component
-    """
-    try:
-        query = text("""
-            SELECT
-                u.id,
-                INITCAP(u.name) as name,
-                u.company_email as email,
-                u.email as personal_email,
-                u.role,
-                u.employment_type as type,
-                CASE 
-                    WHEN u.o_status = true THEN 'Active'
-                    ELSE 'Pending'
-                END as status,
-                u.created_at,
-                u.location_id,
-                l.name as location_name,
-                u.doj,
-                -- Get document counts from emp_doc table
-                COALESCE(doc_count.total_docs, 0) as document_count,
-                -- Collect HR names linked to the employee
-                COALESCE(array_agg(DISTINCT hr.name) FILTER (WHERE hr.id IS NOT NULL), '{}') AS hr,
-                -- Collect Manager names linked to the employee
-                COALESCE(array_agg(DISTINCT mgr.name) FILTER (WHERE mgr.id IS NOT NULL), '{}') AS managers
-            FROM employees u
-            LEFT JOIN locations l ON u.location_id = l.id
-            LEFT JOIN (
-                SELECT 
-                    employee_id,
-                    COUNT(*) as total_docs
-                FROM employee_documents
-                GROUP BY employee_id
-            ) doc_count ON u.id = doc_count.employee_id
-            LEFT JOIN employee_hrs eh ON u.id = eh.employee_id
-            LEFT JOIN employees hr ON eh.hr_id = hr.id
-            LEFT JOIN employee_managers em ON u.id = em.employee_id
-            LEFT JOIN employees mgr ON em.manager_id = mgr.id
-            WHERE u.o_status = true  -- Only onboarded employees
-            GROUP BY u.id, u.name, u.company_email, u.email, u.role, u.employment_type, u.o_status, u.created_at, u.location_id, l.name, u.doj, doc_count.total_docs
-            ORDER BY u.created_at DESC;
-        """)
-
-        result = session.execute(query).all()
-        employees = []
-        
-        for row in result:
-            # Generate avatar initials from name
-            name_parts = row.name.split()
-            avatar = ''.join([part[0].upper() for part in name_parts[:2]]) if name_parts else 'NA'
-            
-            employees.append({
-                "id": row.id,
-                "name": row.name,
-                "email": row.email,
-                "personal_email": row.personal_email,
-                "type": row.type or "Full-time",
-                "role": row.role,
-                "status": row.status,
-                "avatar": avatar,
-                "document_count": row.document_count,
-                "location_id": row.location_id,
-                "location_name": row.location_name,
-                "doj": row.doj.isoformat() if row.doj else None,
-                "hr": row.hr if row.hr else [],
-                "managers": row.managers if row.managers else [],
-                "created_at": row.created_at.isoformat() if row.created_at else None
-            })
-
-        return {
-            "status": "success",
-            "count": len(employees),
-            "data": employees
-        }
-
-    except Exception as e:
-        logger.error(f"Error fetching onboarded employees: {str(e)}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"Internal server error: {str(e)}"
-        )
-
 # Get documents for a specific onboarded employee
 # ----------------------------------------------
 @router.get("/onboarded-employees/{employee_id}/documents")
@@ -704,7 +626,8 @@ def get_employee_profile(employee_id: int, session: Session = Depends(get_sessio
             "employmentType": employee.employment_type if details else None,
             "contactNumber": details.contact_no if details else None,
             "dateOfJoining": employee.doj if details else None,
-            "location": location_name
+            "location": location_name,
+            "super_hr": employee.super_hr   
         }
 
 @router.get("/me")

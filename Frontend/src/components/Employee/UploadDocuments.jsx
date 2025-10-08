@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Upload, X } from "lucide-react";
+import { Upload, X, FileUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useUser } from "../../contexts/UserContext";
 import api from "@/lib/api"; // Axios instance
@@ -151,7 +151,9 @@ const UploadDocuments = ({ id }) => {
         {documents.map((doc) => (
           <div key={doc.id} className="flex items-center gap-3 border p-2 rounded-md">
             <div className="flex-1">
-              <p className="font-medium text-card-foreground">{doc.type.replace(/_/g, " ")}</p>
+              <p className="font-medium text-card-foreground">{doc.type
+  .replace(/_/g, " ")
+  .replace(/\b\w/g, (char) => char.toUpperCase())}</p>
               <p className="text-xs text-muted-foreground">{doc.name || "No file selected"}</p>
               <p className="text-xs text-muted-foreground">{formatFileSize(doc.size)}</p>
             </div>
@@ -163,11 +165,11 @@ const UploadDocuments = ({ id }) => {
               id={`file-${doc.type}`}
             />
             <div className="flex gap-2">
-              <Button variant="outline" size="sm" onClick={() => document.getElementById(`file-${doc.type}`).click()}>
-                <Upload className="h-4 w-4 mr-1" /> Upload
+              <Button type="button" variant="outline" size="sm" onClick={() => document.getElementById(`file-${doc.type}`).click()}>
+                <FileUp className="h-4 w-4 mr-1" /> Select File
               </Button>
               {doc.file && (
-                <Button variant="ghost" size="sm" onClick={() => handleRemoveDocument(doc.type)}>
+                <Button type="button" variant="ghost" size="sm" onClick={() => handleRemoveDocument(doc.type)}>
                   <X className="h-4 w-4" />
                 </Button>
               )}
@@ -183,6 +185,7 @@ const UploadDocuments = ({ id }) => {
         ))}
 
         <Button type="submit" disabled={isUploading} className="mt-4 w-full">
+          <Upload className="h-4 w-4 mr-2" />
           {isUploading ? "Uploading..." : "Upload Documents"}
         </Button>
       </form>

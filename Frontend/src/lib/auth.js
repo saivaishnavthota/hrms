@@ -26,7 +26,8 @@ export const getCurrentUser = () => {
     userId,
     isEmployee: userType === 'Employee',
     isHR: userType === 'Hr',
-    isManager: userType === 'Manager'
+    isManager: userType === 'Manager',
+    isIntern: userType === 'Intern'
   };
 };
 
@@ -88,6 +89,8 @@ export const getRedirectPath = (userType) => {
   switch (norm) {
     case 'employee':
       return '/employee';
+    case 'intern':
+      return '/intern';
     case 'hr':
       return '/hr/dashboard';
     case 'accountmanager':

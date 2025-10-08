@@ -236,14 +236,16 @@ useEffect(() => {
 
   let full = 0, contract = 0, intern = 0;
   list.forEach((emp) => {
-    const t = String(emp.type || emp.employment_type || '').toLowerCase().replace('-', '_').trim();
+    // Check role for interns, employment_type for others
+    const role = String(emp.role || '').toLowerCase().trim();
+    const empType = String(emp.type || emp.employment_type || '').toLowerCase().replace('-', '_').trim();
 
-    if (t.includes('full_time')) {
-      full += 1;
-    } else if (t.includes('contract')) {
-      contract += 1;
-    } else if (t.includes('intern')) {
+    if (role === 'intern') {
       intern += 1;
+    } else if (empType.includes('full_time') || empType.includes('fulltime')) {
+      full += 1;
+    } else if (empType.includes('contract')) {
+      contract += 1;
     }
   });
 

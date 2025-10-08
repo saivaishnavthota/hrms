@@ -15,6 +15,7 @@ class LeaveCreate(SQLModel):
 class LeaveResponse(SQLModel):
     id: int
     employee_id: int
+    employee_name: str
     leave_type: str
     reason: Optional[str]
     start_date: date

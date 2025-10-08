@@ -80,7 +80,7 @@ const ManagerEmployees = () => {
             email: e?.company_email || e?.email || e?.companyEmail || '—',
             type: mapType.get(Number(id)) || 'Employee',
             projects: e?.projects || e?.project_list || [],
-            hrList: e?.hr_list || e?.hrs || [],
+            hrList: e?.hr || e?.hr || [],
           };
         });
 

@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'react-toastify' ;
 import api from '../../lib/api';
+import { useUser } from '@/contexts/UserContext';
 
 const getAvatarColor = (name) => {
   const colors = [
@@ -27,6 +28,14 @@ const getAvatarColor = (name) => {
 };
 
 const EmployeeManagement = () => {
+  const { user } = useUser();
+  const isSuperHR = user?.role === 'HR' && user?.super_hr === true;
+  
+  // Debug logging
+  console.log('EmployeeManagement - User:', user);
+  console.log('EmployeeManagement - isSuperHR:', isSuperHR);
+  console.log('EmployeeManagement - user.super_hr:', user?.super_hr);
+  
   const [employees, setEmployees] = useState([]);
   const [managers, setManagers] = useState([]);
   const [hrs, setHrs] = useState([]);
@@ -45,6 +54,7 @@ const EmployeeManagement = () => {
   const [addFormData, setAddFormData] = useState({
     name: '',
     email: '',
+    role: 'Employee',
     type: ''
   });
   const [addFormErrors, setAddFormErrors] = useState({});
@@ -179,6 +189,7 @@ const EmployeeManagement = () => {
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(addFormData.email)) {
       errors.email = 'Please enter a valid email address';
     }
+    if (!addFormData.role) errors.role = 'Role is required';
     if (!addFormData.type) errors.type = 'Employment type is required';
     setAddFormErrors(errors);
     return Object.keys(errors).length === 0;
@@ -194,13 +205,13 @@ const EmployeeManagement = () => {
         name: addFormData.name,
         email: addFormData.email,
         type: addFormData.type,
-        role: 'Employee'
+        role: addFormData.role
       };
       
       await api.post('/onboarding/hr/create_employee', submitData);
       toast.success('Employee created successfully!');
       
-      setAddFormData({ name: '', email: '', type: '' });
+      setAddFormData({ name: '', email: '', role: 'Employee', type: '' });
       setIsModalOpen(false);
       await fetchAllData();
     } catch (error) {
@@ -308,13 +319,15 @@ const EmployeeManagement = () => {
       <div className="max-w-7xl mx-auto space-y-6">
         <div className="flex items-center justify-between">
           <h1 className="text-3xl font-bold text-gray-900">Employee Management</h1>
-          <button 
-            onClick={() => setIsModalOpen(true)}
-            className="flex items-center gap-2 bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg transition-colors"
-          >
-            <UserPlus className="h-5 w-5" />
-            Add Employee
-          </button>
+          {isSuperHR && (
+            <button 
+              onClick={() => setIsModalOpen(true)}
+              className="flex items-center gap-2 bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg transition-colors"
+            >
+              <UserPlus className="h-5 w-5" />
+              Add Employee
+            </button>
+          )}
         </div>
 
         <div className="bg-white rounded-lg shadow p-4 space-y-4">
@@ -364,7 +377,6 @@ const EmployeeManagement = () => {
                   <option value="all">All Types</option>
                   <option value="full-time">Full-time</option>
                   <option value="contract">Contract</option>
-                  <option value="intern">Intern</option>
                 </select>
               </div>
               <div>
@@ -474,19 +486,23 @@ const EmployeeManagement = () => {
                         >
                           <Eye className="h-4 w-4" />
                         </button>
-                        <button
-                          onClick={() => handleEditEmployee(employee)}
-                          className="p-2 text-orange-600 hover:bg-orange-50 rounded-lg transition-colors"
-                          title="Edit"
-                        >
-                          <Edit className="h-4 w-4" />
-                        </button>
-                        <button
-                          className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                          title="Delete"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
+                        {isSuperHR && (
+                          <>
+                            <button
+                              onClick={() => handleEditEmployee(employee)}
+                              className="p-2 text-orange-600 hover:bg-orange-50 rounded-lg transition-colors"
+                              title="Assign/Edit"
+                            >
+                              <Edit className="h-4 w-4" />
+                            </button>
+                            <button
+                              className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                              title="Delete"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -558,6 +574,24 @@ const EmployeeManagement = () => {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Role <span className="text-red-500">*</span>
+                  </label>
+                  <select 
+                    value={addFormData.role}
+                    onChange={(e) => handleAddInputChange('role', e.target.value)}
+                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500 ${
+                      addFormErrors.role ? 'border-red-500' : 'border-gray-300'
+                    }`}
+                  >
+                    <option value="Employee">Employee</option>
+                    <option value="Intern">Intern</option>
+                  </select>
+                  {addFormErrors.role && (
+                    <p className="text-red-500 text-xs mt-1">{addFormErrors.role}</p>
+                  )}
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
                     Employment Type <span className="text-red-500">*</span>
                   </label>
                   <select 
@@ -570,7 +604,6 @@ const EmployeeManagement = () => {
                     <option value="">Select type</option>
                     <option value="Full-time">Full-time</option>
                     <option value="Contract">Contract</option>
-                    <option value="Intern">Intern</option>
                   </select>
                   {addFormErrors.type && (
                     <p className="text-red-500 text-xs mt-1">{addFormErrors.type}</p>

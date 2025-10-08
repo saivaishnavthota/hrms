@@ -41,6 +41,8 @@ export function Header({ menu }) {
     if (path.startsWith('/account-manager')) return 'Account Manager Portal';
     if (path.startsWith('/employee')) return 'Employee Portal';
     if (path.startsWith('/hr')) return 'HR Portal';
+
+    if (path.startsWith('/intern')) return 'Intern Portal';
     return 'Portal';
   };
 

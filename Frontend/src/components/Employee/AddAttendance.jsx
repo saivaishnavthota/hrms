@@ -254,13 +254,15 @@ const AddAttendance = () => {
       }
     }
   };
-
   const fetchWeeklyAttendance = async () => {
     try {
       if (!user?.employeeId) return;
-
+   
       setLoading(true);
       const weekDates = getWeekDates(currentWeek);
+      const weekStart = formatDateLocal(weekDates[0]);
+      const weekEnd = formatDateLocal(weekDates[6]);
+   
       const baseData = {};
       weekDates.forEach((date, index) => {
         const dateStr = formatDateLocal(date);
@@ -268,18 +270,22 @@ const AddAttendance = () => {
           date: dateStr,
           day: date.toLocaleDateString('en-US', { weekday: 'long' }),
           status: '',
-          hours: 0,
+          hours: 0.0,
           projects: [],
           submitted: false
         };
       });
-
+   
       const response = await api.get('/attendance/weekly', {
-        params: { employee_id: user.employeeId }
+        params: {
+          employee_id: user.employeeId,
+          week_start: weekStart, // Pass week_start
+          week_end: weekEnd      // Pass week_end
+        }
       });
-
-      console.log('Weekly Attendance Response:', response.data); // Debugging
-
+   
+      console.log('Weekly Attendance Response:', response.data);
+   
       if (response.data) {
         const updatedData = { ...baseData };
         Object.keys(response.data).forEach(dateStr => {
@@ -287,24 +293,26 @@ const AddAttendance = () => {
           const rowIndex = Object.keys(updatedData).find(key =>
             updatedData[key].date === dateStr
           );
-
+   
           if (rowIndex !== undefined) {
             const projects = (attendance.projects || []).map(p => ({
               projectId: String(p.value),
               projectName: p.label,
               subtasks: (attendance.subTasks || [])
                 .filter(st => st.project === p.label)
-                .flatMap(st => (st.subTasks || []).map(sub => ({ name: sub.sub_task, hours: sub.hours })))
+                .flatMap(st => (st.subTasks || []).map(sub => ({
+                  name: sub.sub_task,
+                  hours: parseFloat(sub.hours || 0)
+                })))
             }));
-
-            // Calculate total hours from subtasks
+   
             const totalHours = projects.reduce((sum, project) =>
-              sum + (project.subtasks || []).reduce((subSum, subtask) => subSum + (subtask.hours || 0), 0), 0);
-
+              sum + (project.subtasks || []).reduce((subSum, subtask) => subSum + parseFloat(subtask.hours || 0), 0), 0);
+   
             updatedData[rowIndex] = {
               ...updatedData[rowIndex],
               status: attendance.action || attendance.status,
-              hours: totalHours,
+              hours: parseFloat(totalHours.toFixed(2)),
               projects: projects,
               submitted: !!attendance.action
             };
@@ -328,7 +336,7 @@ const AddAttendance = () => {
       setLoading(false);
     }
   };
-
+  
   const handleStatusChange = (index, status) => {
     setAttendanceData(prev => ({
       ...prev,
@@ -1138,7 +1146,6 @@ const AddAttendance = () => {
                     >
                       <option value="all">All Types</option>
                       <option value="Full-Time">Full-Time</option>
-                      <option value="Intern">Intern</option>
                       <option value="Contract">Contract</option>
                     </select>
                   </div>

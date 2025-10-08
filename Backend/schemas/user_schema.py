@@ -27,6 +27,7 @@ class UserResponse(SQLModel):
     login_status: Optional[bool] = None
     type: Optional[str] = None
     location_id: Optional[int] = None
+    super_hr: Optional[bool] = None  # Indicates if HR has elevated access
 
 class UseronboardingResponse(SQLModel):
     employeeId: int

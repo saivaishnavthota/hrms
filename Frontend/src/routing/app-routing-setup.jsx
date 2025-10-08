@@ -1,8 +1,10 @@
 import { Layout1Page } from '@/pages/layout-1/page';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { Layout1 } from '@/components/layouts/layout-1';
+import { HRLayoutWrapper } from '@/components/layouts/HRLayoutWrapper';
 // Employee layout now uses Layout1 with employee-specific menu
 import { MENU_SIDEBAR_EMPLOYEE } from '@/config/employee-layout.config';
+import { MENU_SIDEBAR_INTERN } from '@/config/intern-layout.config';
 import { MENU_SIDEBAR_MANAGER } from '@/config/manager-layout.config';
 import { MENU_SIDEBAR_ACCOUNT_MANAGER } from '@/config/account-manager-layout.config';
 import EmployeeManagement from '@/components/HR/EmployeeManagement';
@@ -22,6 +24,7 @@ import AddCompanyPolicy from '@/components/HR/AddCompanyPolicy';
 import CompanyPolicies from '@/components/Employee/CompanyPolicies';
 import Login from '@/components/auth/Login';
 import EmployeePage from '@/pages/employee/page';
+import InternPage from '@/pages/intern/page';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import NewUserDetails from '@/components/Onboarding/NewUserDetails';
 import NewUserUploadDocs from '@/components/Onboarding/NewUserUploadDocs';
@@ -55,7 +58,7 @@ export const AppRoutingSetup = () => {
       <Route path="/upload-documents" element={<NewUserUploadDocs />} />
       
       {/* Protected HR routes */}
-      <Route path="/hr" element={<ProtectedRoute allowedRoles={["Hr"]}><Layout1 /></ProtectedRoute>}>
+      <Route path="/hr" element={<ProtectedRoute allowedRoles={["Hr"]}><HRLayoutWrapper /></ProtectedRoute>}>
         <Route index element={<Dashboard />} />
         <Route path="dashboard" element={<Dashboard />} />
         <Route path="employee-management" element={<EmployeeManagement />} />
@@ -84,6 +87,16 @@ export const AppRoutingSetup = () => {
         <Route path="apply-leave" element={<ApplyLeave />} />
         <Route path="submit-expense" element={<SubmitExpense />} />
         {/* <Route path="company-policies" element={<CompanyPolicies />} /> */}
+        <Route path="upload-documents" element={<UploadDocuments />} />
+        <Route path="set-password" element={<SetPassword />} />
+      </Route>
+      
+      {/* Protected Intern routes using Layout1 with intern menu */}
+      <Route path="/intern" element={<ProtectedRoute allowedRoles={["Intern"]}><Layout1 menu={MENU_SIDEBAR_INTERN} /></ProtectedRoute>}>
+        <Route index element={<InternPage />} />
+        <Route path="add-attendance" element={<EmployeeAddAttendance />} />
+        <Route path="apply-leave" element={<ApplyLeave />} />
+        <Route path="submit-expense" element={<SubmitExpense />} />
         <Route path="upload-documents" element={<UploadDocuments />} />
         <Route path="set-password" element={<SetPassword />} />
       </Route>

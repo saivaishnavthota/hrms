@@ -19,6 +19,7 @@ class User(SQLModel, table=True):
     login_status: Optional[bool] = Field(default=False)
     location_id: Optional[int] = Field(default=None, foreign_key="locations.id")
     employment_type: Optional[str] = Field(default="Full-Time", max_length=50)
+    super_hr: Optional[bool] = Field(default=False)  # True for super-HR with elevated access
     
     doj: Optional[datetime] = Field(default=None)
 

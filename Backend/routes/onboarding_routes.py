@@ -66,9 +66,15 @@ logger = logging.getLogger(__name__)
 async def create_employee(
     user:UserCreate,
     session:Session=Depends(get_session),
-    current_user: User =Depends(get_session)
-
+    current_user: User = Depends(get_current_user)
 ):
+    # Only super-HR can create employees
+    if current_user.role != "HR" or not current_user.super_hr:
+        raise HTTPException(
+            status_code=403, 
+            detail="Access denied: Only Super-HR can create employees"
+        )
+    
     db_user = session.exec(select(User).where(User.email == user.email)).first()
     if db_user:
         raise HTTPException(status_code=400, detail="Email already registered")
@@ -554,10 +560,20 @@ async def get_employee_details(
 
 
 @router.get("/all")
-async def get_all_onboarding_employees(session: Session = Depends(get_session)):
+async def get_all_onboarding_employees(
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user)
+):
     """
-    Retrieve all employees from the onboarding_employees table
+    Retrieve all employees from the onboarding_employees table (Super-HR only)
     """
+    # Only super-HR can view onboarding employees
+    if current_user.role != "HR" or not current_user.super_hr:
+        raise HTTPException(
+            status_code=403, 
+            detail="Access denied: Only Super-HR can view onboarding employees"
+        )
+    
     try:
         if session is None:
             raise HTTPException(status_code=500, detail="Database session is not available")
@@ -598,13 +614,24 @@ async def get_all_onboarding_employees(session: Session = Depends(get_session)):
 
 
 @router.post("/hr/approve/{onboarding_id}")
-async def approve_employee(onboarding_id: int, session: Session = Depends(get_session)):
+async def approve_employee(
+    onboarding_id: int, 
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user)
+):
     """
-    Approve an employee:
+    Approve an employee (Super-HR only):
     - Moves data from onboarding tables to main tables
     - Calls the stored procedure approve_employee(onboarding_id, OUT new_emp_id)
     - Regenerates SAS tokens for all transferred documents
     """
+    # Only super-HR can approve employees
+    if current_user.role != "HR" or not current_user.super_hr:
+        raise HTTPException(
+            status_code=403, 
+            detail="Access denied: Only Super-HR can approve onboarding employees"
+        )
+    
     try:
         with session.connection().connection.cursor() as cur:
             # Call the stored procedure
@@ -629,7 +656,18 @@ async def approve_employee(onboarding_id: int, session: Session = Depends(get_se
         raise HTTPException(status_code=500, detail=str(e))
         
 @router.post("/hr/assign")
-async def assign_employee(data: AssignEmployeeRequest, session: Session = Depends(get_session)):
+async def assign_employee(
+    data: AssignEmployeeRequest, 
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user)
+):
+    # Only super-HR can assign employees
+    if current_user.role != "HR" or not current_user.super_hr:
+        raise HTTPException(
+            status_code=403, 
+            detail="Access denied: Only Super-HR can assign employees"
+        )
+    
     try:
         # Check if employee exists and get reassignment status
         with session.connection().connection.cursor() as cur:
@@ -803,10 +841,21 @@ def hash_password(password: str) -> str:
     return pwd_context.hash(password)
 
 @router.delete("/hr/reject/{onboarding_id}")
-async def reject_employee(onboarding_id: int, session: Session = Depends(get_session)):
+async def reject_employee(
+    onboarding_id: int, 
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user)
+):
     """
-    Reject an employee → delete from onboarding_employees
+    Reject an employee → delete from onboarding_employees (Super-HR only)
     """
+    # Only super-HR can reject employees
+    if current_user.role != "HR" or not current_user.super_hr:
+        raise HTTPException(
+            status_code=403, 
+            detail="Access denied: Only Super-HR can reject onboarding employees"
+        )
+    
     try:
         with session.connection().connection.cursor() as cur:
             cur.execute("DELETE FROM onboarding_employees WHERE id = %s", (onboarding_id,))
@@ -822,10 +871,21 @@ async def reject_employee(onboarding_id: int, session: Session = Depends(get_ses
 
 # Route: Delete employee (same as reject, for admin use)
 @router.delete("/hr/delete/{onboarding_id}")
-async def delete_employee(onboarding_id: int, session: Session = Depends(get_session)):
+async def delete_employee(
+    onboarding_id: int, 
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user)
+):
     """
-    Delete an employee → same as reject
+    Delete an employee → same as reject (Super-HR only)
     """
+    # Only super-HR can delete employees
+    if current_user.role != "HR" or not current_user.super_hr:
+        raise HTTPException(
+            status_code=403, 
+            detail="Access denied: Only Super-HR can delete onboarding employees"
+        )
+    
     try:
         with session.connection().connection.cursor() as cur:
             cur.execute("DELETE FROM onboarding_employees WHERE id = %s", (onboarding_id,))

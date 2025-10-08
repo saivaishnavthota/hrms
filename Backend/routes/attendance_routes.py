@@ -149,21 +149,35 @@ async def save_attendance(
         print("=" * 80)
         session.rollback()
         raise HTTPException(status_code=500, detail=str(e))
- 
+
+
+
+        
 @router.get("/weekly", response_model=Dict[str, AttendanceResponse])
 def get_weekly_attendance(
     employee_id: int = Query(None),
     manager_id: int = Query(None),
     hr_id: int = Query(None),
+    week_start: Optional[str] = Query(None),
+    week_end: Optional[str] = Query(None),    
     session: Session = Depends(get_session),
 ):
     user_id = employee_id or manager_id or hr_id
     if not user_id:
         raise HTTPException(status_code=400, detail="employee_id, manager_id, or hr_id is required")
  
-    today = date.today()
-    monday = today - timedelta(days=today.weekday())
-    sunday = monday + timedelta(days=6)
+    # Determine the week range
+    if week_start and week_end:
+        try:
+            monday = datetime.strptime(week_start, '%Y-%m-%d').date()
+            sunday = datetime.strptime(week_end, '%Y-%m-%d').date()
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid date format for week_start or week_end. Use YYYY-MM-DD.")
+    else:
+        # Default to current week if no parameters provided
+        today = date.today()
+        monday = today - timedelta(days=today.weekday())
+        sunday = monday + timedelta(days=6)
  
     query = text("""
         SELECT
@@ -193,19 +207,19 @@ def get_weekly_attendance(
             attendance[key] = {
                 "date": key,
                 "action": row.action or "",
-                "hours": 0.0,  # Initialize to 0.0, will be updated by subtask hours
+                "hours": 0.0,
                 "status": row.action or "",
                 "projects": [],
                 "subTasks": []
             }
-        
+       
         if row.project_name and {"value": str(row.project_id), "label": row.project_name, "total_hours": float(row.total_project_hours or 0)} not in attendance[key]["projects"]:
             attendance[key]["projects"].append({
                 "value": str(row.project_id),
                 "label": row.project_name,
                 "total_hours": float(row.total_project_hours or 0)
             })
-        
+       
         if row.sub_task and row.project_name:
             sub_task_entry = next((st for st in attendance[key]["subTasks"] if st["project"] == row.project_name), None)
             if sub_task_entry:
@@ -220,14 +234,12 @@ def get_weekly_attendance(
                     "subTasks": [{"sub_task": row.sub_task, "hours": float(row.sub_task_hours)}]
                 })
  
-        # Update total hours based on sum of sub_task_hours
         attendance[key]["hours"] = round(sum(
             float(st["hours"]) for sub_task in attendance[key]["subTasks"] for st in sub_task["subTasks"]
         ), 2)
  
-    print(f"Weekly Attendance Response: {attendance}")  # Debug log
+    print(f"Weekly Attendance Response for {week_start} to {week_end}: {attendance}")
     return attendance
- 
 @router.get("/daily", response_model=List[dict])
 def get_daily_attendance(
     year: int,

@@ -176,7 +176,7 @@ const getLeaveTypeColor = (leaveType) => {
         setBalances({
           sick: {
             available: availableSick,
-            applied: totals.sick.approved + totals.sick.rejected,
+            applied: totals.sick.approved,
             // allocated reflects available + approved (exclude rejected)
             allocated: availableSick + totals.sick.approved,
           },

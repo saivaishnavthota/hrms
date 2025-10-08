@@ -174,9 +174,33 @@ def hr_leave_action(leave_id: int, data: dict, session: Session = Depends(get_se
     if action not in ["Approved", "Rejected"]:
         raise HTTPException(status_code=400, detail="Invalid action")
 
+    # Update leave status
     leave.hr_status = action
     leave.updated_at = datetime.now()
     leave.status = action  # final status depends on HR decision
+
+    # If approved, deduct from leave balance
+    if action == "Approved":
+        # Get employee's leave balance
+        balance = session.query(LeaveBalance).filter_by(employee_id=leave.employee_id).first()
+        
+        if balance:
+            # Map leave type to balance field and deduct
+            leave_type = leave.leave_type.strip()
+            
+            if leave_type == "Sick Leave":
+                balance.sick_leaves = max(0, balance.sick_leaves - leave.no_of_days)
+            elif leave_type == "Casual Leave":
+                balance.casual_leaves = max(0, balance.casual_leaves - leave.no_of_days)
+            elif leave_type == "Annual Leave":
+                balance.paid_leaves = max(0, balance.paid_leaves - leave.no_of_days)
+            elif leave_type == "Maternity Leave":
+                balance.maternity_leave = max(0, balance.maternity_leave - leave.no_of_days)
+            elif leave_type == "Paternity Leave":
+                balance.paternity_leave = max(0, balance.paternity_leave - leave.no_of_days)
+            
+            balance.updated_at = datetime.now()
+            session.add(balance)
 
     session.add(leave)
     session.commit()

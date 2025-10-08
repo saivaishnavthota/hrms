@@ -40,14 +40,7 @@ CREATE TABLE public.employees (
 );
 
 -- Employee Master Table
-CREATE TABLE public.employee_master (
-    emp_id INTEGER PRIMARY KEY REFERENCES employees(id),
-    manager1_id INTEGER NOT NULL REFERENCES employees(id),
-    hr1_id INTEGER NOT NULL REFERENCES employees(id),
-    manager2_id INTEGER REFERENCES employees(id),
-    manager3_id INTEGER REFERENCES employees(id),
-    hr2_id INTEGER REFERENCES employees(id)
-);
+
 
 -- Employee Details Table
 CREATE TABLE public.employee_details (
@@ -472,113 +465,156 @@ END;
 $$;
 
 -- 6. Apply Leave Function
-CREATE OR REPLACE FUNCTION public.apply_leave(
-    e_employee_id INTEGER, 
-    e_leave_type VARCHAR, 
-    e_reason VARCHAR, 
-    e_start_date DATE, 
-    e_end_date DATE, 
-    e_no_of_days INTEGER
-)
-RETURNS TEXT
-LANGUAGE plpgsql
-AS $$
+CREATE OR REPLACE FUNCTION public.apply_leave(e_employee_id integer, e_leave_type character varying, e_reason character varying, e_start_date date, e_end_date date, e_no_of_days integer)
+ RETURNS TABLE(id integer, employee_id integer, leave_type character varying, reason character varying, start_date date, end_date date, no_of_days integer, status character varying, manager_status character varying, hr_status character varying, created_at timestamp without time zone, updated_at timestamp without time zone)
+ LANGUAGE plpgsql
+AS $function$
 BEGIN
+    RETURN QUERY
     INSERT INTO leave_management(
-        employee_id, leave_type, reason, start_date, end_date, 
-        no_of_days, status, manager_status, hr_status, created_at, updated_at
+        employee_id, leave_type, reason, start_date, end_date,no_of_days,
+        status, manager_status, hr_status, created_at, updated_at
     )
-    VALUES(
-        e_employee_id, e_leave_type, e_reason, e_start_date, e_end_date, 
-        e_no_of_days, 'pending', 'pending', 'pending', NOW(), NOW()
-    );
-    
-    RETURN 'Leave applied successfully';
-EXCEPTION
-    WHEN OTHERS THEN
-        RETURN 'Error applying leave: ' || SQLERRM;
+    VALUES (
+        e_employee_id,
+        e_leave_type,
+        e_reason,
+        e_start_date,
+        e_end_date,
+        e_no_of_days,
+        'Pending',
+        'Pending',
+        'Pending',
+        NOW(),
+        NOW()
+    )
+    RETURNING leave_management.id,
+              leave_management.employee_id,
+              leave_management.leave_type,
+              leave_management.reason,
+              leave_management.start_date,
+              leave_management.end_date,
+              leave_management.no_of_days,
+              leave_management.status,
+              leave_management.manager_status,
+              leave_management.hr_status,
+              leave_management.created_at,
+              leave_management.updated_at;
 END;
-$$;
+$function$;
 
--- 7. Save Employee Master Function
-CREATE OR REPLACE FUNCTION public.save_employee_master(
-    e_emp_id INTEGER, 
-    e_m1_id INTEGER, 
-    e_hr1_id INTEGER, 
-    e_m2_id INTEGER DEFAULT NULL, 
-    e_m3_id INTEGER DEFAULT NULL, 
-    e_hr2_id INTEGER DEFAULT NULL
-) 
-RETURNS TEXT
-LANGUAGE plpgsql
-AS $$
-BEGIN
-    INSERT INTO employee_master (emp_id, manager1_id, hr1_id, manager2_id, manager3_id, hr2_id)
-    VALUES (e_emp_id, e_m1_id, e_hr1_id, e_m2_id, e_m3_id, e_hr2_id);
-    
-    RETURN 'Employee master details saved successfully';
-EXCEPTION
-    WHEN OTHERS THEN
-        RETURN 'Error saving employee master: ' || SQLERRM;
-END;
-$$;
 
 -- 8. Save Attendance Function (Updated to support FLOAT hours)
-CREATE OR REPLACE FUNCTION public.save_attendance(
-    e_emp_id INTEGER, 
-    e_date DATE, 
-    e_action VARCHAR, 
-    e_hours FLOAT, 
-    e_project_ids INTEGER[], 
-    e_sub_tasks JSONB
-) 
-RETURNS TEXT
-LANGUAGE plpgsql
-AS $$
+CREATE OR REPLACE FUNCTION public.save_attendance(e_emp_id integer, e_date date, e_action character varying, e_hours double precision, e_project_ids integer[], e_sub_tasks jsonb)
+ RETURNS text
+ LANGUAGE plpgsql
+AS $function$
 DECLARE
-    attendance_id INT;
-    project_id INT;
-    day_name VARCHAR;
-    sub_task_obj JSONB;
-    sub_task_text VARCHAR;
-    sub_task_hours FLOAT;
+    v_attendance_id INT;
+    v_sub_task jsonb;
+    v_project_id integer;
+    v_sub_task_text text;
+    v_sub_task_hours float;
+    v_total_sub_task_hours float := 0;
 BEGIN
-    -- Get day of week
-    SELECT TO_CHAR(e_date, 'Day') INTO day_name;
-    
-    -- Insert or update attendance record
-    INSERT INTO attendance (employee_id, date, day, action, status, hours, created_at, updated_at)
-    VALUES (e_emp_id, e_date, day_name, e_action, 'present', e_hours, NOW(), NOW())
-    ON CONFLICT (employee_id, date)
-    DO UPDATE SET
-        action = EXCLUDED.action,
-        status = EXCLUDED.status,
-        hours = EXCLUDED.hours,
-        updated_at = NOW()
-    RETURNING id INTO attendance_id;
-    
-    -- Delete existing project associations
-    DELETE FROM attendance_projects WHERE attendance_id = attendance_id;
-    
-    -- Add new project associations with subtasks
-    IF e_sub_tasks IS NOT NULL THEN
-        FOR sub_task_obj IN SELECT * FROM jsonb_array_elements(e_sub_tasks)
+    IF e_hours < 0 THEN
+        RAISE EXCEPTION 'Total hours cannot be negative: %', e_hours;
+    END IF;
+    IF e_project_ids IS NOT NULL AND array_length(e_project_ids, 1) > 0 THEN
+        FOR v_project_id IN SELECT unnest(e_project_ids)
         LOOP
-            project_id := (sub_task_obj->>'project_id')::INTEGER;
-            sub_task_text := sub_task_obj->>'sub_task';
-            sub_task_hours := (sub_task_obj->>'hours')::FLOAT;
-            
-            INSERT INTO attendance_projects (attendance_id, project_id, sub_task, hours)
-            VALUES (attendance_id, project_id, sub_task_text, sub_task_hours);
+            IF NOT EXISTS (
+                SELECT 1
+                FROM employee_project_assignments epa
+                WHERE epa.employee_id = e_emp_id AND epa.project_id = v_project_id
+            ) THEN
+                RAISE EXCEPTION 'Invalid project_id % for employee %', v_project_id, e_emp_id;
+            END IF;
         END LOOP;
     END IF;
-    
+    IF e_sub_tasks IS NOT NULL AND jsonb_array_length(e_sub_tasks) > 0 THEN
+        FOR v_sub_task IN SELECT jsonb_array_elements(e_sub_tasks)
+        LOOP
+            v_project_id := (v_sub_task->>'project_id')::integer;
+            v_sub_task_text := v_sub_task->>'sub_task';
+            v_sub_task_hours := (v_sub_task->>'hours')::float;
+            IF v_project_id IS NULL OR v_sub_task_text IS NULL OR v_sub_task_hours IS NULL THEN
+                RAISE EXCEPTION 'Invalid project_id, sub_task, or hours in sub_task: %', v_sub_task;
+            END IF;
+            IF v_sub_task_hours < 0 THEN
+                RAISE EXCEPTION 'Hours cannot be negative in sub_task: %', v_sub_task;
+            END IF;
+            IF NOT EXISTS (
+                SELECT 1
+                FROM employee_project_assignments epa
+                WHERE epa.employee_id = e_emp_id AND epa.project_id = v_project_id
+            ) THEN
+                RAISE EXCEPTION 'Invalid project_id % for employee % in sub_task', v_project_id, e_emp_id;
+            END IF;
+            v_total_sub_task_hours := v_total_sub_task_hours + v_sub_task_hours;
+        END LOOP;
+        IF v_total_sub_task_hours != e_hours THEN
+            RAISE EXCEPTION 'Total subtask hours (%) does not match provided hours (%)', v_total_sub_task_hours, e_hours;
+        END IF;
+    END IF;
+    INSERT INTO attendance (
+        employee_id, date, day, action, status, hours, updated_at
+    )
+    VALUES (
+        e_emp_id,
+        e_date,
+        trim(to_char(e_date, 'Day')),
+        e_action,
+        e_action,
+        e_hours,
+        NOW()
+    )
+    ON CONFLICT (employee_id, date)
+    DO UPDATE SET
+        day = trim(to_char(EXCLUDED.date, 'Day')),
+        action = EXCLUDED.action,
+        status = EXCLUDED.action,
+        hours = EXCLUDED.hours,
+        updated_at = NOW()
+    RETURNING id INTO v_attendance_id;
+    DELETE FROM attendance_projects
+    WHERE attendance_id = v_attendance_id;
+    IF e_sub_tasks IS NOT NULL AND jsonb_array_length(e_sub_tasks) > 0 THEN
+        FOR v_sub_task IN SELECT jsonb_array_elements(e_sub_tasks)
+        LOOP
+            v_project_id := (v_sub_task->>'project_id')::integer;
+            v_sub_task_text := v_sub_task->>'sub_task';
+            v_sub_task_hours := (v_sub_task->>'hours')::float;
+            IF v_project_id IS NOT NULL AND v_sub_task_text IS NOT NULL AND v_sub_task_hours IS NOT NULL THEN
+                INSERT INTO attendance_projects(attendance_id, project_id, sub_task, hours)
+                VALUES (
+                    v_attendance_id,
+                    v_project_id,
+                    v_sub_task_text,
+                    v_sub_task_hours
+                )
+                ON CONFLICT (attendance_id, project_id, sub_task)
+                DO UPDATE SET
+                    hours = EXCLUDED.hours;
+            END IF;
+        END LOOP;
+    END IF;
+    IF e_project_ids IS NOT NULL AND array_length(e_project_ids, 1) > 0 THEN
+        FOR v_project_id IN SELECT unnest(e_project_ids)
+        LOOP
+            INSERT INTO attendance_projects(attendance_id, project_id, sub_task, hours)
+            VALUES (
+                v_attendance_id,
+                v_project_id,
+                NULL,
+                NULL
+            )
+            ON CONFLICT (attendance_id, project_id, sub_task) DO NOTHING;
+        END LOOP;
+    END IF;
     RETURN 'Attendance Saved Successfully';
-EXCEPTION
-    WHEN OTHERS THEN
-        RETURN 'Error saving attendance: ' || SQLERRM;
 END;
-$$;
+$function$;
 
 -- 9. Save Weekoffs Function
 CREATE OR REPLACE FUNCTION public.save_weekoffs(

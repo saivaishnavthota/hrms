@@ -19,18 +19,7 @@ export const MENU_SIDEBAR_MANAGER = [
   {
     title: 'Leave Management',
     icon: Plane,
-    children: [
-      {
-        title: 'Apply Leave',
-        icon: Plane,
-        path: '/manager/apply-leave',
-      },
-      {
-        title: 'Leave Requests',
-        icon: ClipboardList,
-        path: '/manager/leave-requests',
-      },
-    ],
+    path: '/manager/leave-management',
   },
   {
     title: 'Expense Management',

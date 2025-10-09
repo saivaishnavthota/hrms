@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Eye, Edit, Plus, X, Trash2 } from 'lucide-react';
+import { Eye, Edit, Plus, X } from 'lucide-react';
 import { avatarBg } from '../../lib/avatarColors';
-import { markDeleted, filterListByDeleted } from '../../lib/localDelete';
 import api from '@/lib/api'; 
 import { toast } from 'react-toastify';
 const getCurrentUser = () => {
@@ -24,7 +23,6 @@ const btnGhost = 'px-3 py-1.5 bg-white border border-gray-300 text-gray-700 hove
 const iconBtn = 'w-9 h-9 inline-flex items-center justify-center rounded-full';
 const iconView = 'text-blue-600 hover:bg-blue-100 ';
 const iconEdit = 'text-indigo-600 hover:bg-indigo-100 ';
-const iconDelete ='text-red-600 hover:bg-red-100';
 const tagCls = 'inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-700 border border-gray-200';
 
 const getInitials = (name) => {
@@ -84,7 +82,7 @@ const ManagerEmployees = () => {
           };
         });
 
-        setEmployees(filterListByDeleted('managerEmployees', normalized));
+        setEmployees(normalized);
       } catch (err) {
         setError(err?.message || 'Failed to load manager employees');
       } finally {
@@ -237,20 +235,6 @@ const ManagerEmployees = () => {
                     </button>
                     <button className={`${iconBtn} ${iconEdit}`} onClick={() => openEdit(emp)} title="Edit Projects">
                       <Edit size={16} />
-                    </button>
-                    <button
-                      className={`${iconBtn} ${iconDelete}`}
-                      onClick={() => {
-                        try {
-                          markDeleted('managerEmployees', emp.id);
-                        } catch (e) {
-                          console.error('Error marking employee deleted locally:', e);
-                        }
-                        setEmployees(prev => prev.filter(e => e.id !== emp.id));
-                      }}
-                      title="Delete Employee (local)"
-                    >
-                      <Trash2 size={16} />
                     </button>
                   </div>
                 </td>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { User, Trash2, Eye, X, Search, CheckCircle, Home, CalendarDays } from 'lucide-react';
+import { User, Eye, X, Search, CheckCircle, Home, CalendarDays } from 'lucide-react';
 import { avatarBg } from '../../lib/avatarColors';
 import api from "@/lib/api";
 import { toast } from 'react-toastify';
@@ -90,10 +90,6 @@ const ManagerEmployeeAttendance = () => {
     fetchAttendance();
   }, [userId, year, month]);
 
-  // Handle removing a record (Placeholder)
-  const handleRemoveRecord = (id) => {
-    setAttendanceRecords(attendanceRecords.filter(record => record.id !== id));
-  };
 
   const handleShowProjects = (record) => {
     setSelectedRecord(record);
@@ -358,13 +354,6 @@ const ManagerEmployeeAttendance = () => {
                           title="View Details"
                         >
                           <Eye className="h-4 w-4" />
-                        </button>
-                        <button
-                          onClick={() => handleRemoveRecord(record.id)}
-                          className="text-red-600 hover:text-red-900 p-1 rounded-full hover:bg-red-50"
-                          title="Remove Record"
-                        >
-                          <Trash2 className="h-4 w-4" />
                         </button>
                       </div>
                     </td>

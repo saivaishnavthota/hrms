@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Plus, Edit, Trash2, Eye, X } from 'lucide-react';
+import { Search, Plus, Edit, Eye, X } from 'lucide-react';
 import { markDeleted, filterListByDeleted } from '../../lib/localDelete';
 import { toast } from "react-toastify";
 import api, { calendarAPI, locationsAPI } from "@/lib/api";
@@ -278,19 +278,6 @@ const Holidays = () => {
                       <Eye size={16} />
                     </button>
                     
-                    <button
-                      className="text-red-600 hover:text-red-800"
-                      onClick={() => {
-                        try {
-                          markDeleted('holidays', holiday.id);
-                        } catch (e) {
-                          console.error('Error marking deleted locally:', e);
-                        }
-                        setHolidays(prev => prev.filter(h => h.id !== holiday.id));
-                      }}
-                    >
-                      <Trash2 size={16} />
-                    </button>
                    
                   </div>
                 </td>

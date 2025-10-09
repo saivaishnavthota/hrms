@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { 
   Eye, 
   Edit, 
-  Trash2, 
   Search, 
   Filter, 
   UserPlus,
@@ -457,6 +456,9 @@ const EmployeeManagement = () => {
                       <span className={`px-2 py-1 text-xs font-semibold rounded ${
                         employee.designation === 'HR' ? 'text-purple-700 bg-purple-50' :
                         employee.designation === 'Manager' ? 'text-orange-700 bg-orange-50' :
+                        employee.designation === 'Account Manager' ? 'text-blue-700 bg-blue-50' :
+                        employee.designation === 'Intern' ? 'text-green-700 bg-green-50' :
+                        employee.designation === 'Employee' ? 'text-indigo-700 bg-indigo-50' :
                         'text-gray-700 bg-gray-50'
                       }`}>
                         {employee.designation || 'Employee'}
@@ -493,12 +495,6 @@ const EmployeeManagement = () => {
                               title="Assign/Edit"
                             >
                               <Edit className="h-4 w-4" />
-                            </button>
-                            <button
-                              className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                              title="Delete"
-                            >
-                              <Trash2 className="h-4 w-4" />
                             </button>
                           </>
                         )}
@@ -631,7 +627,7 @@ const EmployeeManagement = () => {
         )}
 
         {isEditModalOpen && selectedEmployee && (
-          <div className="fixed inset-0 bg-black/30 backdrop-blur-md flex items-center justify-center z-50 p-4">
+          <div className="fixed inset-0 bg-transparent backdrop-blur-md flex items-center justify-center z-50 p-4">
             <div className="bg-gradient-to-br from-white via-blue-50 to-indigo-50 rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto border border-blue-200">
               <div className="flex items-center justify-between p-6 border-b border-blue-200 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-t-2xl">
                 <div className="flex items-center gap-3">
@@ -864,10 +860,10 @@ const EmployeeManagement = () => {
         )}
 
         {isViewModalOpen && selectedEmployee && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="fixed inset-0 bg-transparent backdrop-blur-md flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
               <div className="p-6 border-b border-gray-200 flex items-center justify-between">
-                <h2 className="text-2xl font-bold text-gray-900">Employee Details</h2>
+                <h2 className="text-2xl font-bold text-white">Employee Details</h2>
                 <button
                   onClick={() => setIsViewModalOpen(false)}
                   className="p-2 hover:bg-gray-100 rounded-lg transition-colors"

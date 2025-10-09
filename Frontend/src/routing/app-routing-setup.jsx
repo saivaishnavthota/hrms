@@ -42,6 +42,7 @@ import SetPassword from '@/components/Employee/SetPassword';
 import AccountManagerDashboard from '@/components/AccountManager/Dashboard';
 import ManagerEmployees from '@/components/Manager/Employees';
 import ManagerLeaveRequests from '@/components/Manager/LeaveRequests';
+import ManagerLeaveManagement from '@/components/Manager/LeaveManagement';
 import AccountManagerExpenseManagement from '@/components/AccountManager/ExpenseManagement';
 import Projects from '@/components/AccountManager/Projects';
 import ManagerDashboard from '@/components/Manager/Dashboard';
@@ -131,8 +132,9 @@ export const AppRoutingSetup = () => {
         <Route path="add-attendance" element={<ManagerAddAttendance />} />
         <Route path="employees-attendance" element={<ManagerEmployeeAttendance />} />
         <Route path="employees" element={<ManagerEmployees />} />
-        <Route path="apply-leave" element={<ApplyLeave />} />
-        <Route path="leave-requests" element={<ManagerLeaveRequests />} />
+        <Route path="leave-management" element={<ManagerLeaveManagement />} />
+        <Route path="apply-leave" element={<ManagerLeaveManagement />} />
+        <Route path="leave-requests" element={<ManagerLeaveManagement />} />
         <Route path="expense-management" element={<ManagerExpenseManagement />} />
         <Route path="upload-documents" element={<UploadDocuments />} />
         <Route path="change-password" element={<SetPassword />} />

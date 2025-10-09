@@ -108,7 +108,7 @@ const AssignLeaves = () => {
         const mapped = list.map(e => ({
           id: e.employeeId,
           employee: e.name,
-          email: e.to_email || e.email || '',
+          email: e.email || e.to_email || '',
           avatar: e.avatar || null,
           type: e.type || 'Full-time',
           role: e.role || 'Employee',

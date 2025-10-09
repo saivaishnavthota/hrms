@@ -368,7 +368,7 @@ const [policies, setPolicies] = useState([]); // policies grouped by cat
 
         {/* Category Management Modal */}
         {showCategoryForm && (
-          <div className="fixed inset-0 bg-black/30 backdrop-blur-md flex items-center justify-center z-50 p-4">
+          <div className="fixed inset-0 bg-transparent backdrop-blur-md flex items-center justify-center z-50 p-4">
             <div className="bg-gradient-to-br from-white via-green-50 to-emerald-50 rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto border border-green-200">
               <div className="flex items-center justify-between p-6 border-b border-green-200 bg-gradient-to-r from-green-600 to-emerald-600 rounded-t-2xl">
                 <div className="flex items-center gap-3">
@@ -693,10 +693,10 @@ const [policies, setPolicies] = useState([]); // policies grouped by cat
 
         {/* View Policy Modal */}
         {viewingPolicy && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-transparent backdrop-blur-md">
             <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto m-4">
               <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
-                <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
+                <h2 className="text-2xl font-bold text-white">
                   {viewingPolicy.title}
                 </h2>
                 <button

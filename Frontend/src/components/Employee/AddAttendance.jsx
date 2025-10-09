@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect } from 'react';
 import api from '@/lib/api';
-import { Calendar, Clock, Plus, X, Save, ChevronLeft, ChevronRight, Trash2, Edit3, Search, Filter, Eye, Briefcase } from 'lucide-react';
+import { Calendar, Clock, Plus, X, Save, ChevronLeft, ChevronRight, Edit3, Search, Filter, Eye, Briefcase } from 'lucide-react';
 import { useUser } from '../../contexts/UserContext';
 import { toast } from 'react-toastify';
 import { useNavigate } from 'react-router-dom';
@@ -641,7 +641,7 @@ const AddAttendance = () => {
                     onClick={() => removeProject(projectIndex)}
                     className="text-red-500 hover:text-red-700 p-1"
                   >
-                    <Trash2 size={18} />
+                    <X size={18} />
                   </button>
                 </div>
 

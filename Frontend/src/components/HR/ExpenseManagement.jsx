@@ -209,7 +209,7 @@ const ExpenseManagement = () => {
         headers: { Authorization: `Bearer ${token}` },
       });
       const mapped = (response.data || []).map(mapExpense);
-      setExpenses(mapped.filter((e) => e.status.toLowerCase() !== 'pending'));
+      setExpenses(mapped);
       setError(null);
     } catch (err) {
       console.error('Error fetching all expenses:', err);

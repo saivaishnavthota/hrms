@@ -249,9 +249,9 @@ export default function NewUserDetails() {
     <div className="h-screen w-full bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 overflow-hidden">
       <OnboardingHeader />
       <div className="pt-16 pb-4 px-4 w-full flex justify-center h-full">
-        <div style={{width: '800px'}} className="my-6 mb-12 p-6 bg-white rounded-xl shadow-xl border border-gray-100 overflow-y-auto max-h-full">
+        <div style={{width: '900px'}} className="my-6 mb-12 p-6 bg-white rounded-xl shadow-xl border border-gray-100 overflow-y-auto max-h-full">
           <div className="mb-4">
-            <h2 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent mb-2">
+            <h2 className="text-2xl font-bold bg-gradient-to-r from-black-600 to-balck-600 bg-clip-text text-transparent mb-2">
               Onboarding Employee Details
             </h2>
             <p className="text-gray-600">Please fill the details below</p>

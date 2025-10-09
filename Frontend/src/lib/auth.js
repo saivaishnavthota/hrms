@@ -86,13 +86,22 @@ export const logout = () => {
  */
 export const getRedirectPath = (userType) => {
   const norm = (userType || '').toLowerCase().replace(/[^a-z]/g, '');
+  // Detect Super HR from stored userData
+  let isSuperHR = false;
+  try {
+    const raw = localStorage.getItem('userData');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      isSuperHR = parsed?.super_hr === true && ((parsed?.role || parsed?.type || '').toLowerCase() === 'hr');
+    }
+  } catch {}
   switch (norm) {
     case 'employee':
       return '/employee';
     case 'intern':
       return '/intern';
     case 'hr':
-      return '/hr/dashboard';
+      return isSuperHR ? '/super-hr/dashboard' : '/hr/dashboard';
     case 'accountmanager':
       return '/account-manager';
     case 'manager':

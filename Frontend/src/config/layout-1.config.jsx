@@ -96,18 +96,12 @@ export const MENU_SIDEBAR = [
   {
     title: 'Leave Management',
     icon: Plane,
-    children: [
-      {
-        title: 'Assign Leaves',
-        icon: AssignIcon,
-        path: '/hr/assign-leaves',
-      },
-      {
-        title: 'Leave Requests',
-        icon: RequestIcon,
-        path: '/hr/leave-requests',
-      },
-    ],
+    path: '/hr/leave-requests',
+  },
+  {
+    title: 'Assign Leaves',
+    icon: AssignIcon,
+    path: '/hr/assign-leaves',
   },
   {
     title: 'Expense Management',

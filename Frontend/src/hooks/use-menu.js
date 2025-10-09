@@ -1,10 +1,21 @@
 export const useMenu = (pathname) => {
   const isActive = (path) => {
-    if (path && path === '/') {
-      return path === pathname;
-    } else {
-      return !!path && pathname.startsWith(path);
+    // Normalize and guard
+    if (!path) return false;
+    const basePath = path.split('?')[0].split('#')[0];
+
+    if (basePath === '/') {
+      return pathname === '/';
     }
+
+    // Prevent root dashboard paths from being active on all sub-routes
+    const rootPaths = ['/manager', '/employee', '/account-manager', '/intern'];
+    if (rootPaths.includes(basePath)) {
+      return pathname === basePath || pathname === `${basePath}/dashboard`;
+    }
+
+    // For other items, match exact or nested routes under the path
+    return pathname === basePath || pathname.startsWith(`${basePath}/`);
   };
 
   const hasActiveChild = (children) => {
@@ -74,11 +85,7 @@ export const useMenu = (pathname) => {
     const hasActiveChildAtLevel = (items) => {
       for (const item of items) {
         if (
-          (item.path &&
-            (item.path === pathname ||
-              (item.path !== '/' &&
-                item.path !== '' &&
-                pathname.startsWith(item.path)))) ||
+          (item.path && isActive(item.path)) ||
           (item.children && hasActiveChildAtLevel(item.children))
         ) {
           return true;
@@ -104,14 +111,7 @@ export const useMenu = (pathname) => {
           if (children) {
             return children;
           }
-        } else if (
-          targetLevel === currentLevel &&
-          item.path &&
-          (item.path === pathname ||
-            (item.path !== '/' &&
-              item.path !== '' &&
-              pathname.startsWith(item.path)))
-        ) {
+        } else if (targetLevel === currentLevel && item.path && isActive(item.path)) {
           return items;
         }
       }

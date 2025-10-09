@@ -1,236 +1,458 @@
-from datetime import datetime, timedelta
-from typing import List, Optional
-from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException
-from sqlmodel import Session, select
-from database import get_session
-from models.policy_model import CompanyPolicy
-from auth import get_current_user
-from models.user_model import User
-from azure.storage.blob import BlobServiceClient, ContentSettings, generate_blob_sas, BlobSasPermissions
 import os
-from dotenv import load_dotenv
+import uuid
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Query, Form
+from sqlalchemy.orm import Session
+from sqlalchemy import select, insert, update, delete, func, text
+from models.policy_model import PolicyCategory, Policy
+from schemas.policy_schema import (
+    PolicyCategoryWithCount, PolicyCategoryUpdate, PolicyCategoryOut, PolicyCategoryCreate,
+    PolicyOut, PolicyUpdate, PolicyCreate, PoliciesByLocation
+)
+from typing import List
+from database import get_session
+from fastapi.responses import FileResponse
+from models.user_model import User
 
 router = APIRouter(prefix="/policies", tags=["Policies"])
 
-load_dotenv()
-AZURE_CONNECTION_STRING = os.getenv("AZURE_CONNECTION_STRING", "DefaultEndpointsProtocol=https;AccountName=hrmsnxzen;AccountKey=Jug56pLmeZIJplobcV+f20v7IXnh6PWuih0hxRYpvRXpGh6tnJrzALqtqL/hRR3lpZK0ZTKIs2Pv+AStDvBH4w==;EndpointSuffix=core.windows.net")
-AZURE_CONTAINER_NAME = os.getenv("AZURE_CONTAINER_NAME", "con-hrms")
-ACCOUNT_NAME = os.getenv("ACCOUNT_NAME", "hrmsnxzen")
-ACCOUNT_KEY = os.getenv("ACCOUNT_KEY", "Jug56pLmeZIJplobcV+f20v7IXnh6PWuih0hxRYpvRXpGh6tnJrzALqtqL/hRR3lpZK0ZTKIs2Pv+AStDvBH4w==")
+# Directory for file uploads
+UPLOAD_DIR = "uploads"
+os.makedirs(UPLOAD_DIR, exist_ok=True)
 
-blob_service_client = BlobServiceClient.from_connection_string(AZURE_CONNECTION_STRING)
-container_client = blob_service_client.get_container_client(AZURE_CONTAINER_NAME)
 
-def generate_blob_url_with_sas(location_id: int, file_name: str) -> str:
-    """Generate Azure Blob URL with SAS token for policy document"""
-    blob_name = f"policies/location_{location_id}/{file_name}"
-    
-    # Generate SAS token valid for 10 years (policies are long-term)
-    sas_token = generate_blob_sas(
-        account_name=ACCOUNT_NAME,
-        container_name=AZURE_CONTAINER_NAME,
-        blob_name=blob_name,
-        account_key=ACCOUNT_KEY,
-        permission=BlobSasPermissions(read=True),
-        expiry=datetime.utcnow() + timedelta(days=3650)  # 10 years
+
+@router.get("/by_user_location", response_model=List[PolicyOut])
+def get_policies_by_user_and_location(
+    location_id: int = Query(...),
+    db: Session = Depends(get_session),
+    employee_id: int = Query(None),
+    manager_id: int = Query(None),
+    hr_id: int = Query(None)
+):
+    if not (employee_id or manager_id or hr_id):
+        raise HTTPException(status_code=401, detail="Authentication required")
+
+    result = db.execute(
+        text("SELECT * FROM policies_with_details WHERE location_id = :loc_id"),
+        {"loc_id": location_id}
+    ).fetchall()
+
+    if not result:
+        raise HTTPException(status_code=404, detail="No policies found for this location")
+
+    return [PolicyOut(**row._asdict()) for row in result]
+
+
+def check_hr(hr_id: int, db: Session) -> bool:
+    if not hr_id:
+        return False
+
+    # Query the User table to get the HR’s role
+    employee = db.query(User).filter(User.id == hr_id).first()
+
+    if not employee:
+        raise HTTPException(status_code=401, detail="HR not found")
+
+    return employee.role == "HR"
+
+@router.get("/categories", response_model=List[PolicyCategoryWithCount])
+def get_categories(
+    db: Session = Depends(get_session),
+    employee_id: int = Query(None),
+    manager_id: int = Query(None),
+    hr_id: int = Query(None)
+):
+    query = text("""
+        SELECT id, name, color, icon, created_at, updated_at, policy_count
+        FROM categories_with_policy_count
+        ORDER BY name
+    """)
+    try:
+        result = db.execute(query).fetchall()
+        return [PolicyCategoryWithCount(**row._asdict()) for row in result]
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch categories: {str(e)}")
+
+@router.post("/categories", response_model=PolicyCategoryOut, status_code=status.HTTP_201_CREATED)
+def create_category(
+    category: PolicyCategoryCreate,
+    db: Session = Depends(get_session),
+    hr_id: int = Query(..., description="ID of the HR creating the category")
+):
+    # Ensure HR exists
+    if not check_hr(hr_id, db):
+        raise HTTPException(status_code=403, detail="HR access required")
+
+    # Insert with created_by
+    new_category = PolicyCategory(
+        name=category.name,
+        color=category.color,
+        icon=category.icon,
+        created_by=hr_id
     )
-    
-    return f"https://{ACCOUNT_NAME}.blob.core.windows.net/{AZURE_CONTAINER_NAME}/{blob_name}?{sas_token}"
-
-@router.post("/upload")
-async def upload_policy(
-    file: UploadFile = File(...),
-    location_id: int = Form(...),
-    session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)
-):
-    """Upload a new company policy document"""
     try:
-        # Validate file
-        if not file.filename:
-            raise HTTPException(status_code=400, detail="No file provided")
-        
-        # Allowed file types
-        allowed_extensions = ['.pdf', '.doc', '.docx', '.txt']
-        file_ext = os.path.splitext(file.filename)[1].lower()
-        if file_ext not in allowed_extensions:
-            raise HTTPException(
-                status_code=400,
-                detail=f"File type {file_ext} not allowed. Allowed types: {', '.join(allowed_extensions)}"
-            )
-        
-        # Read file data
-        file_data = await file.read()
-        if not file_data:
-            raise HTTPException(status_code=400, detail="Empty file")
-        
-        # Check file size (max 10MB)
-        if len(file_data) > 10 * 1024 * 1024:
-            raise HTTPException(status_code=400, detail="File size exceeds 10MB limit")
-        
-        # Upload to Azure Blob Storage
-        blob_name = f"policies/location_{location_id}/{file.filename}"
-        blob_client = container_client.get_blob_client(blob_name)
-        content_settings = ContentSettings(content_type=file.content_type)
-        blob_client.upload_blob(file_data, overwrite=True, content_settings=content_settings)
-        
-        # Generate URL with SAS token
-        file_url = generate_blob_url_with_sas(location_id, file.filename)
-        
-        # Create policy record
-        policy = CompanyPolicy(
-            location_id=location_id,
-            file_name=file.filename,
-            file_url=file_url,
-            uploaded_by=current_user.id,
-            sections_json=[]  # Empty initially, can be edited later
-        )
-        
-        session.add(policy)
-        session.commit()
-        session.refresh(policy)
-        
-        return {
-            "message": "Policy uploaded successfully",
-            "policy_id": policy.id,
-            "file_name": policy.file_name,
-            "file_url": policy.file_url
-        }
-    
+        db.add(new_category)
+        db.commit()
+        db.refresh(new_category)
+        return new_category
     except Exception as e:
-        session.rollback()
-        print(f"Error uploading policy: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Failed to upload policy: {str(e)}")
+        db.rollback()
+        raise HTTPException(status_code=400, detail=f"Failed to create category: {str(e)}")
 
-@router.get("/list")
-def list_policies(
-    location_id: Optional[int] = None,
-    session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+
+@router.put("/categories/{category_id}", response_model=PolicyCategoryOut)
+def update_category(
+    category_id: int,
+    category: PolicyCategoryUpdate,
+    db: Session = Depends(get_session),
+    employee_id: int = Query(None),
+    manager_id: int = Query(None),
+    hr_id: int = Query(None)
 ):
-    """List all policies, optionally filtered by location"""
+    if not check_hr(hr_id, db):
+        raise HTTPException(status_code=403, detail="HR access required")
+    stmt = update(PolicyCategory).where(PolicyCategory.id == category_id).values(**category.dict(exclude_unset=True))
     try:
-        query = select(CompanyPolicy).where(CompanyPolicy.deleted_at.is_(None))
-        
-        if location_id:
-            query = query.where(CompanyPolicy.location_id == location_id)
-        
-        policies = session.exec(query.order_by(CompanyPolicy.created_at.desc())).all()
-        
-        result = []
-        for policy in policies:
-            result.append({
-                "id": policy.id,
-                "location_id": policy.location_id,
-                "file_name": policy.file_name,
-                "file_url": policy.file_url,
-                "sections_json": policy.sections_json or [],
-                "uploaded_by": policy.uploaded_by,
-                "created_at": policy.created_at,
-                "updated_at": policy.updated_at
-            })
-        
-        return result
-    
+        result = db.execute(stmt)
+        db.commit()
+        if result.rowcount == 0:
+            raise HTTPException(status_code=404, detail="Category not found")
+        updated_category = db.query(PolicyCategory).filter(PolicyCategory.id == category_id).first()
+        return updated_category
     except Exception as e:
-        print(f"Error listing policies: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Failed to list policies: {str(e)}")
+        db.rollback()
+        raise HTTPException(status_code=400, detail=f"Failed to update category: {str(e)}")
 
-@router.put("/edit/{policy_id}")
-async def edit_policy(
-    policy_id: int,
-    sections_json: str = Form(...),  # JSON string from frontend
-    session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+@router.delete("/categories/{category_id}", status_code=status.HTTP_200_OK)
+def delete_category(
+    category_id: int,
+    db: Session = Depends(get_session),
+    hr_id: int = Query(None)
 ):
-    """Edit policy sections"""
+    if not check_hr(hr_id, db):
+        raise HTTPException(status_code=403, detail="HR access required")
+
+    count = db.execute(
+        select(func.count(Policy.id)).where(Policy.category_id == category_id)
+    ).scalar()
+
+    if count > 0:
+        raise HTTPException(status_code=400, detail="Cannot delete category with policies")
+
+    stmt = delete(PolicyCategory).where(PolicyCategory.id == category_id)
+    result = db.execute(stmt)
+    db.commit()
+
+    if result.rowcount == 0:
+        raise HTTPException(status_code=404, detail="Category not found")
+
+    return {"detail": f"Category {category_id} deleted successfully"}
+
+
+@router.get("/{location_id}", response_model=PoliciesByLocation)
+def get_policies_by_location(
+    location_id: int,
+    db: Session = Depends(get_session),
+    employee_id: int = Query(None),
+    manager_id: int = Query(None),
+    hr_id: int = Query(None)
+):
+    if not (employee_id or manager_id or hr_id):
+        raise HTTPException(status_code=401, detail="Authentication required")
+
+    query = text("""
+        SELECT 
+            pc.id AS category_id,
+            pc.name AS category_name,
+            pc.icon AS category_icon,
+            pc.color AS category_color,
+            COALESCE(COUNT(p.id), 0) AS count,
+            COALESCE(
+                json_agg(
+                    DISTINCT jsonb_build_object(
+                        'id', p.id,
+                        'title', p.title,
+                        'description', p.description,
+                        'attachment_url', p.attachment_url,
+                        'attachment_type', p.attachment_type,
+                        'created_at', p.created_at,
+                        'updated_at', p.updated_at,
+                        'uploader_name', e.name,
+                        'location_id', p.location_id,
+                        'category_id', p.category_id,
+                        'uploader_id', p.uploader_id,
+                        'location_name', l.name,
+                        'category_name', pc.name,
+                        'category_icon', pc.icon,
+                        'category_color', pc.color
+                    )
+                ) FILTER (WHERE p.id IS NOT NULL), '[]'
+            ) AS policies
+        FROM policy_categories pc
+        LEFT JOIN policies p 
+            ON pc.id = p.category_id AND p.location_id = :location_id
+        LEFT JOIN employees e ON p.uploader_id = e.id
+        LEFT JOIN locations l ON p.location_id = l.id
+        GROUP BY pc.id, pc.name, pc.icon, pc.color
+        ORDER BY pc.name
+    """)
+
     try:
-        import json
-        
-        policy = session.get(CompanyPolicy, policy_id)
-        if not policy or policy.deleted_at:
-            raise HTTPException(status_code=404, detail="Policy not found")
-        
-        # Parse JSON string
-        sections = json.loads(sections_json)
-        
-        # Update policy
-        policy.sections_json = sections
-        policy.updated_at = datetime.utcnow()
-        
-        session.add(policy)
-        session.commit()
-        session.refresh(policy)
-        
-        return {
-            "message": "Policy updated successfully",
-            "policy": {
-                "id": policy.id,
-                "file_name": policy.file_name,
-                "sections_json": policy.sections_json
+        result = db.execute(query, {"location_id": location_id}).fetchall()
+        categories = [
+            {
+                "category_id": row.category_id,
+                "category_name": row.category_name,
+                "category_icon": row.category_icon,
+                "category_color": row.category_color,
+                "count": row.count,
+                "policies": row.policies
             }
-        }
-    
-    except json.JSONDecodeError:
-        raise HTTPException(status_code=400, detail="Invalid JSON format")
+            for row in result
+        ]
+        return {"categories": categories}
     except Exception as e:
-        session.rollback()
-        print(f"Error editing policy: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Failed to edit policy: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to fetch policies: {str(e)}")
 
-@router.delete("/delete/{policy_id}")
+# @router.post("/", response_model=PolicyOut, status_code=status.HTTP_201_CREATED)
+# def create_policy(
+#     category_id: int,
+#     title: str,
+#     description: str,
+#     location_id: int,
+#     file: UploadFile = File(None),
+#     db: Session = Depends(get_session),
+#     employee_id: int = Query(None),
+#     manager_id: int = Query(None),
+#     hr_id: int = Query(None)
+# ):
+#     if not check_hr(hr_id, db):
+#         raise HTTPException(status_code=403, detail="HR access required")
+#     attachment_url = None
+#     attachment_type = None
+#     if file:
+#         try:
+#             file_extension = file.filename.split('.')[-1].lower()
+#             if file_extension not in ['pdf', 'png', 'jpg', 'jpeg', 'doc', 'docx']:
+#                 raise HTTPException(status_code=400, detail="Unsupported file format")
+#             unique_filename = f"{uuid.uuid4()}.{file_extension}"
+#             file_path = os.path.join(UPLOAD_DIR, unique_filename)
+#             with open(file_path, "wb") as f:
+#                 f.write(file.file.read())
+#             attachment_url = file_path
+#             attachment_type = file_extension
+#         except Exception as e:
+#             raise HTTPException(status_code=500, detail=f"File upload failed: {str(e)}")
+    
+#     new_policy = Policy(
+#         location_id=location_id,
+#         category_id=category_id,
+#         title=title,
+#         description=description,
+#         attachment_url=attachment_url,
+#         attachment_type=attachment_type,
+#         uploader_id=hr_id
+#     )
+#     try:
+#         db.add(new_policy)
+#         db.commit()
+#         db.refresh(new_policy)
+#         enriched = db.execute(
+#     text("SELECT * FROM policies_with_details WHERE id = :id"),
+#     {"id": new_policy.id}
+# ).first()
+#         return PolicyOut(**enriched._asdict())
+#     except Exception as e:
+#         db.rollback()
+#         raise HTTPException(status_code=400, detail=f"Failed to create policy: {str(e)}")
+
+
+@router.post("/", response_model=PolicyOut, status_code=status.HTTP_201_CREATED)
+def create_policy(
+    category_id: int = Form(...),
+    title: str = Form(...),
+    description: str = Form(...),
+    location_id: int = Form(...),
+    file: UploadFile = File(None),
+    db: Session = Depends(get_session),
+    employee_id: int = Query(None),
+    manager_id: int = Query(None),
+    hr_id: int = Query(None)
+):
+    if not check_hr(hr_id, db):
+        raise HTTPException(status_code=403, detail="HR access required")
+
+    attachment_url = None
+    attachment_type = None
+
+    if file:
+        try:
+            file_extension = file.filename.split('.')[-1].lower()
+            if file_extension not in ['pdf', 'png', 'jpg', 'jpeg', 'doc', 'docx']:
+                raise HTTPException(status_code=400, detail="Unsupported file format")
+
+            unique_filename = f"{uuid.uuid4()}.{file_extension}"
+            file_path = os.path.join(UPLOAD_DIR, unique_filename)
+
+            with open(file_path, "wb") as f:
+                f.write(file.file.read())
+
+            attachment_url = file_path
+            attachment_type = file_extension
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"File upload failed: {str(e)}")
+
+    new_policy = Policy(
+        location_id=location_id,
+        category_id=category_id,
+        title=title,
+        description=description,
+        attachment_url=attachment_url,
+        attachment_type=attachment_type,
+        uploader_id=hr_id
+    )
+
+    try:
+        db.add(new_policy)
+        db.commit()
+        db.refresh(new_policy)
+
+        enriched = db.execute(
+            text("SELECT * FROM policies_with_details WHERE id = :id"),
+            {"id": new_policy.id}
+        ).first()
+
+        return PolicyOut(**enriched._asdict())
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=f"Failed to create policy: {str(e)}")
+
+
+@router.put("/{policy_id}", response_model=PolicyOut)
+def update_policy(
+    policy_id: int,
+    title: str = Form(...),
+    description: str = Form(...),
+    category_id: int = Form(...),
+    file: UploadFile = File(None),
+    db: Session = Depends(get_session),
+    employee_id: int = Query(None),
+    manager_id: int = Query(None),
+    hr_id: int = Query(None)
+):
+    # Check HR access
+    if not check_hr(hr_id, db):
+        raise HTTPException(status_code=403, detail="HR access required")
+
+    # Prepare update data
+    update_data = {
+        "title": title,
+        "description": description,
+        "category_id": category_id
+    }
+
+    # Handle file upload
+    if file:
+        try:
+            file_extension = file.filename.split('.')[-1].lower()
+            if file_extension not in ['pdf', 'png', 'jpg', 'jpeg', 'doc', 'docx']:
+                raise HTTPException(status_code=400, detail="Unsupported file format")
+
+            unique_filename = f"{uuid.uuid4()}.{file_extension}"
+            file_path = os.path.join(UPLOAD_DIR, unique_filename)
+            with open(file_path, "wb") as f:
+                f.write(file.file.read())
+            
+            update_data['attachment_url'] = file_path
+            update_data['attachment_type'] = file_extension
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"File upload failed: {str(e)}")
+
+    # Execute update
+    stmt = update(Policy).where(Policy.id == policy_id).values(**update_data)
+    try:
+        result = db.execute(stmt)
+        db.commit()
+        if result.rowcount == 0:
+            raise HTTPException(status_code=404, detail="Policy not found")
+
+        # Fetch updated policy
+        enriched = db.execute(
+            text("SELECT * FROM policies_with_details WHERE id = :id"),
+            {"id": policy_id}
+        ).first()
+        return PolicyOut(**enriched._asdict())
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=f"Failed to update policy: {str(e)}")
+
+@router.delete("/{policy_id}", status_code=status.HTTP_200_OK)
 def delete_policy(
     policy_id: int,
-    session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    db: Session = Depends(get_session),
+    hr_id: int = Query(None)
 ):
-    """Soft delete a policy"""
-    try:
-        policy = session.get(CompanyPolicy, policy_id)
-        if not policy or policy.deleted_at:
-            raise HTTPException(status_code=404, detail="Policy not found")
-        
-        # Soft delete
-        policy.deleted_at = datetime.utcnow()
-        session.add(policy)
-        session.commit()
-        
-        return {"message": "Policy deleted successfully"}
-    
-    except Exception as e:
-        session.rollback()
-        print(f"Error deleting policy: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Failed to delete policy: {str(e)}")
+    if not check_hr(hr_id, db):
+        raise HTTPException(status_code=403, detail="HR access required")
 
-@router.get("/my-policies")
-def get_my_policies(
-    session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    policy = db.execute(
+        select(Policy.attachment_url).where(Policy.id == policy_id)
+    ).first()
+
+    if policy and policy.attachment_url and os.path.exists(policy.attachment_url):
+        try:
+            os.remove(policy.attachment_url)
+        except Exception:
+            pass
+
+    stmt = delete(Policy).where(Policy.id == policy_id)
+    result = db.execute(stmt)
+    db.commit()
+
+    if result.rowcount == 0:
+        raise HTTPException(status_code=404, detail="Policy not found")
+
+    return {"detail": f"Policy {policy_id} deleted successfully"}
+
+
+@router.get("/view/{policy_id}", response_model=PolicyOut)
+def view_policy(
+    policy_id: int,
+    db: Session = Depends(get_session),
+    employee_id: int = Query(None),
+    manager_id: int = Query(None),
+    hr_id: int = Query(None)
 ):
-    """Get policies for the current user's location"""
-    try:
-        if not current_user.location_id:
-            return []
-        
-        policies = session.exec(
-            select(CompanyPolicy).where(
-                CompanyPolicy.location_id == current_user.location_id,
-                CompanyPolicy.deleted_at.is_(None)
-            ).order_by(CompanyPolicy.created_at.desc())
-        ).all()
-        
-        result = []
-        for policy in policies:
-            result.append({
-                "id": policy.id,
-                "file_name": policy.file_name,
-                "file_url": policy.file_url,
-                "sections_json": policy.sections_json or [],
-                "created_at": policy.created_at
-            })
-        
-        return result
+    if not (employee_id or manager_id or hr_id):
+        raise HTTPException(status_code=401, detail="Authentication required")
     
-    except Exception as e:
-        print(f"Error fetching my policies: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Failed to fetch policies: {str(e)}")
+    query = text("SELECT * FROM policies_with_details WHERE id = :id")
+    enriched = db.execute(query, {"id": policy_id}).first()
+
+    if not enriched:
+        raise HTTPException(status_code=404, detail="Policy not found")
+
+    return PolicyOut(**enriched._asdict())
+
+@router.get("/download/{policy_id}")
+def download_policy(
+    policy_id: int,
+    db: Session = Depends(get_session),
+    employee_id: int = Query(None),
+    manager_id: int = Query(None),
+    hr_id: int = Query(None)
+):
+    if not (employee_id or manager_id or hr_id):
+        raise HTTPException(status_code=401, detail="Authentication required")
+    policy = db.execute(
+        select(Policy.attachment_url, Policy.attachment_type).where(Policy.id == policy_id)
+    ).first()
+    if not policy or not policy.attachment_url:
+        raise HTTPException(status_code=404, detail="Policy or attachment not found")
+    if not os.path.exists(policy.attachment_url):
+        raise HTTPException(status_code=404, detail="File not found on server")
+    return FileResponse(
+        path=policy.attachment_url,
+        filename=f"policy_{policy_id}.{policy.attachment_type}",
+        media_type='application/octet-stream'
+    )

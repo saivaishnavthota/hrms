@@ -178,9 +178,7 @@ const Holidays = () => {
       {/* Header */}
       <div className="flex justify-between items-center mb-6">
         <div>
-          <nav className="text-sm text-gray-500 mb-2">
-            <span>Employee</span> / <span className="text-blue-600">Holidays</span>
-          </nav>
+          
           {selectedLocation && (
             <h2 className="text-lg font-semibold text-gray-800 mb-2">
               Public Holidays for {getSelectedLocationName()}

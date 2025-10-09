@@ -12,7 +12,8 @@ import {
   UserCheck,
   Loader2,
   AlertCircle,
-  ArrowLeft
+  ArrowLeft,
+  KeyRound
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -32,6 +33,24 @@ const MyProfile = () => {
   useEffect(() => {
     fetchEmployeeProfile();
   }, [user]);
+
+  const getChangePasswordPath = (role) => {
+    const r = (role || '').toLowerCase();
+    switch (r) {
+      case 'hr':
+        return '/hr/change-password';
+      case 'manager':
+        return '/manager/change-password';
+      case 'account manager':
+        return '/account-manager/change-password';
+      case 'employee':
+        return '/employee/set-password';
+      case 'intern':
+        return '/intern/set-password';
+      default:
+        return '/hr/change-password';
+    }
+  };
 
 const fetchEmployeeProfile = async () => {
   try {
@@ -133,17 +152,29 @@ const fetchEmployeeProfile = async () => {
             {user?.name ? `Welcome back, ${user.name}!` : 'View and manage your personal information'}
           </p>
         </div>
-        <Button
-          variant="outline"
-          className="gap-2"
-          onClick={() => {
-            const path = getDashboardPath(user?.role);
-            navigate(path || '/');
-          }}
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Back to Dashboard
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            className="gap-2"
+            onClick={() => {
+              const path = getDashboardPath(user?.role);
+              navigate(path || '/');
+            }}
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Back to Dashboard
+          </Button>
+          <Button
+            className="gap-2"
+            onClick={() => {
+              const path = getChangePasswordPath(user?.role);
+              navigate(path);
+            }}
+          >
+            <KeyRound className="h-4 w-4" />
+            Change Password
+          </Button>
+        </div>
       </div>
 
       <div className="grid gap-6 md:grid-cols-2">

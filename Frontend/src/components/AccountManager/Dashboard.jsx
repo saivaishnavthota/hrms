@@ -11,6 +11,11 @@ import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer } from 'recharts';
 import { useUser } from '@/contexts/UserContext';
 import useLivePoll from '@/hooks/useLivePoll';
 import api from '@/lib/api';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import AddAttendance from '@/components/Employee/AddAttendance'
+import UploadDocuments from '@/components/Employee/UploadDocuments'
+import ApplyLeave from '@/components/Employee/ApplyLeave'
+import HRExpenseForm from '@/components/HR/HRExpenseForm'
 
 const Dashboard = () => {
   const { user } = useUser();
@@ -78,48 +83,49 @@ const Dashboard = () => {
 
   return (
     <div className="p-6 space-y-6">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>Expense Requests (This Month)</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {loading ? (
-              <div className="py-10 text-center text-sm text-muted-foreground">Loading...</div>
-            ) : error ? (
-              <div className="py-10 text-center text-sm text-red-500">{error}</div>
-            ) : (
-              <ChartContainer config={chartConfig} className="h-64">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={data}>
-                    <XAxis dataKey="label" tickLine={false} axisLine={false} />
-                    <YAxis allowDecimals={false} />
-                    <ChartTooltip content={<ChartTooltipContent />} />
-                    <Bar dataKey="value" fill="var(--color-Pending)" name="Pending" />
-                  </BarChart>
-                </ResponsiveContainer>
-                <ChartLegend content={<ChartLegendContent />} />
-              </ChartContainer>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Quick Summary</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-3 gap-4">
-              {data.map((d) => (
-                <div key={d.label} className="rounded-md border p-4 text-center">
-                  <div className="text-sm text-muted-foreground">{d.label}</div>
-                  <div className="mt-2 text-2xl font-semibold">{d.value}</div>
+  
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Expense Requests (This Month)</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {loading ? (
+                  <div className="py-10 text-center text-sm text-muted-foreground">Loading...</div>
+                ) : error ? (
+                  <div className="py-10 text-center text-sm text-red-500">{error}</div>
+                ) : (
+                  <ChartContainer config={chartConfig} className="h-64">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={data}>
+                        <XAxis dataKey="label" tickLine={false} axisLine={false} />
+                        <YAxis allowDecimals={false} />
+                        <ChartTooltip content={<ChartTooltipContent />} />
+                        <Bar dataKey="value" fill="var(--color-Pending)" name="Pending" />
+                      </BarChart>
+                    </ResponsiveContainer>
+                    <ChartLegend content={<ChartLegendContent />} />
+                  </ChartContainer>
+                )}
+              </CardContent>
+            </Card>
+  
+            <Card>
+              <CardHeader>
+                <CardTitle>Quick Summary</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-3 gap-4">
+                  {data.map((d) => (
+                    <div key={d.label} className="rounded-md border p-4 text-center">
+                      <div className="text-sm text-muted-foreground">{d.label}</div>
+                      <div className="mt-2 text-2xl font-semibold">{d.value}</div>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+              </CardContent>
+            </Card>
+          </div>
     </div>
   );
 };

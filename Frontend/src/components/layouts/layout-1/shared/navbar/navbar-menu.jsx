@@ -1,112 +1,82 @@
-import { ChevronDown } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { useMenu } from '@/hooks/use-menu';
 import {
   Menubar,
-  MenubarContent,
   MenubarItem,
   MenubarMenu,
-  MenubarSub,
-  MenubarSubContent,
-  MenubarSubTrigger,
   MenubarTrigger,
 } from '@/components/ui/menubar';
 
-const NavbarMenu = ({ items }) => {
+const NavbarMenu = ({ items, onItemWithChildrenClick = () => {} }) => {
   const { pathname } = useLocation();
   const { isActive, hasActiveChild } = useMenu(pathname);
 
-  const buildMenu = (items) => {
-    return items.map((item, index) => {
-      if (item.children) {
-        return (
-          <MenubarMenu key={index}>
-            <MenubarTrigger
-              className={cn(
-                'flex items-center gap-1.5 px-3 py-3.5 text-sm text-secondary-foreground',
-                'rounded-none border-b-2 border-transparent bg-transparent!',
-                'hover:text-primary hover:bg-transparent',
-                'focus:text-primary focus:bg-transparent',
-                'data-[state=open]:bg-transparent data-[state=open]:text-primary',
-                'data-[here=true]:text-primary data-[here=true]:border-primary',
-              )}
-              data-active={isActive(item.path) || undefined}
-              data-here={hasActiveChild(item.children) || undefined}
-            >
-              {item.title}
-              <ChevronDown className="ms-auto size-3.5" />
-            </MenubarTrigger>
-            <MenubarContent className="min-w-[175px]">
-              {buildSubMenu(item.children)}
-            </MenubarContent>
-          </MenubarMenu>
-        );
-      } else {
-        return (
-          <MenubarMenu key={index}>
-            <MenubarTrigger
-              asChild
-              className={cn(
-                'flex items-center py-3.5 text-sm text-secondary-foreground px-3',
-                'rounded-none border-b-2 border-transparent bg-transparent!',
-                'hover:text-primary hover:bg-transparent',
-                'focus:text-primary focus:bg-transparent',
-                'data-[active=true]:text-primary data-[active=true]:border-primary',
-              )}
-            >
-              <Link
-                to={item.path || ''}
-                data-active={isActive(item.path) || undefined}
-                data-here={hasActiveChild(item.children) || undefined}
-              >
-                {item.title}
-              </Link>
-            </MenubarTrigger>
-          </MenubarMenu>
-        );
-      }
-    });
+  const buildRow = (rowItems, isFirstRow = false) => {
+    return (
+      <Menubar className="flex w-full justify-center flex-nowrap items-center gap-4 border-none bg-transparent p-0 h-auto">
+        {rowItems.map((item, index) => {
+          const active = isActive(item.path) || hasActiveChild(item.children);
+          // remove defaultActive behavior across groups; only highlight real active items
+
+          if (item.children) {
+            return (
+              <MenubarMenu key={index}>
+                <MenubarTrigger
+                  className={cn(
+                    'flex items-center gap-1.5 px-3 py-3.5 text-sm text-gray-400',
+                    'rounded-none border-b-[2px] border-transparent bg-transparent!',
+                    'hover:text-blue-600 hover:bg-transparent',
+                    'focus-visible:text-gray-400 focus-visible:bg-transparent',
+                    'data-[state=open]:text-gray-400 data-[state=open]:bg-transparent',
+                    'data-[active=true]:text-blue-600 data-[active=true]:border-blue-600',
+                  )}
+                  data-active={active || undefined}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    onItemWithChildrenClick(item);
+                  }}
+                >
+                  {item.icon && <item.icon className="size-4 text-current" />}
+                  <span>{item.title}</span>
+                </MenubarTrigger>
+              </MenubarMenu>
+            );
+          } else {
+            return (
+              <MenubarMenu key={index}>
+                <MenubarTrigger
+                  asChild
+                  className={cn(
+                    'flex items-center py-3.5 text-sm text-gray-400 px-3 gap-1.5',
+                    'rounded-none border-b-[2px] border-transparent bg-transparent!',
+                    'hover:text-blue-600 hover:bg-transparent',
+                    'focus-visible:text-gray-400 focus-visible:bg-transparent',
+                    'data-[state=open]:text-gray-400 data-[state=open]:bg-transparent',
+                    'data-[active=true]:text-blue-600 data-[active=true]:border-blue-600',
+                  )}
+                >
+                  <Link
+                    to={item.path || ''}
+                    data-active={active || undefined}
+                    className="flex items-center gap-1.5 text-gray-400 hover:text-blue-600 focus-visible:text-gray-400"
+                  >
+                    {item.icon && <item.icon className="size-4 text-current" />}
+                    <span>{item.title}</span>
+                  </Link>
+                </MenubarTrigger>
+              </MenubarMenu>
+            );
+          }
+        })}
+      </Menubar>
+    );
   };
 
-  const buildSubMenu = (items) => {
-    return items.map((item, index) => {
-      if (item.children) {
-        return (
-          <MenubarSub key={index}>
-            <MenubarSubTrigger
-              data-active={isActive(item.path) || undefined}
-              data-here={hasActiveChild(item.children) || undefined}
-            >
-              <span>{item.title}</span>
-            </MenubarSubTrigger>
-            <MenubarSubContent className="min-w-[175px]">
-              {buildSubMenu(item.children)}
-            </MenubarSubContent>
-          </MenubarSub>
-        );
-      } else {
-        return (
-          <MenubarItem
-            key={index}
-            asChild
-            data-active={isActive(item.path) || undefined}
-            data-here={hasActiveChild(item.children) || undefined}
-          >
-            <Link to={item.path || ''}>{item.title}</Link>
-          </MenubarItem>
-        );
-      }
-    });
-  };
-
+  // Single row per group (no internal second row)
   return (
-    <div className="grid">
-      <div className="kt-scrollable-x-auto">
-        <Menubar className="flex items-stretch gap-3 border-none bg-transparent p-0 h-auto">
-          {buildMenu(items)}
-        </Menubar>
-      </div>
+    <div className="kt-scrollable-x-auto">
+      {buildRow(items || [], true)}
     </div>
   );
 };

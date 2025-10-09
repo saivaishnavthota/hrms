@@ -15,7 +15,7 @@ const LeaveRequests = () => {
     return user?.employeeId || JSON.parse(localStorage.getItem('userData') || '{}')?.employeeId || 1; // fallback for dev
   }, [user]);
 
-  const [activeTab, setActiveTab] = useState('pending');
+  const [activeTab, setActiveTab] = useState('leave-requests');
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedLeave, setSelectedLeave] = useState(null);

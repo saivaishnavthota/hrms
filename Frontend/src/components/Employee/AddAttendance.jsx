@@ -730,10 +730,10 @@ const AddAttendance = () => {
   }
 
   return (
-    <div className="max-w-6xl mx-auto p-6 bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen">
+    <div className="max-w-6xl mx-auto p-6 min-h-screen">
       <div className="bg-white rounded-2xl shadow-xl overflow-hidden">
         <div className="bg-gradient-to-r from-blue-500 to-indigo-600 text-white p-6">
-          <h1 className="text-xl font-bold flex items-center gap-3">
+          <h1 className="text-medium font-bold flex items-center gap-3">
             <Calendar className="text-blue-200" />
             Attendance Management
           </h1>
@@ -745,7 +745,7 @@ const AddAttendance = () => {
         </div>
 
         <div className="border-b border-gray-200 bg-gray-50">
-          <nav className="flex space-x-8 px-6">
+          <nav className="grid grid-cols-3 gap-2 px-6">
             {[
               { id: 'add', label: 'Add Attendance', icon: Plus },
               { id: 'calendar', label: 'Calendar View', icon: Calendar },
@@ -754,7 +754,7 @@ const AddAttendance = () => {
               <button
                 key={id}
                 onClick={() => setActiveTab(id)}
-                className={`py-4 px-2 border-b-2 font-medium text-sm flex items-center gap-2 transition-colors ${activeTab === id
+                className={`w-full justify-center py-4 px-2 border-b-2 font-medium text-sm flex items-center gap-2 transition-colors ${activeTab === id
                   ? 'border-blue-500 text-blue-600'
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                   }`}
@@ -868,24 +868,18 @@ const AddAttendance = () => {
                           </td>
                           <td className="px-4 py-4">
                             {weekOffDays.includes(row.day) ? (
-                              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800 border border-gray-200">
-                                Week-off
-                              </span>
-                            ) : row.status ? (
-                              <span
-                                className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${row.status === 'Present'
-                                  ? 'bg-green-100 text-green-800 border border-green-200'
-                                  : row.status === 'WFH' || row.status === 'Work From Home'
-                                    ? 'bg-blue-100 text-blue-800 border border-blue-200'
-                                    : row.status === 'Leave'
-                                      ? 'bg-red-100 text-red-800 border border-red-200'
-                                      : 'bg-gray-100 text-gray-800 border border-gray-200'
-                                  }`}
-                              >
-                                {row.status}
-                              </span>
+                              <span className="text-gray-400 text-sm">Week-off</span>
                             ) : (
-                              <span className="text-gray-400 text-sm">No Action</span>
+                              <select
+                                value={row.status}
+                                onChange={(e) => handleStatusChange(index, e.target.value)}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
+                              >
+                                <option value="">Select Status</option>
+                                <option value="Present">Present</option>
+                                <option value="Leave">Leave</option>
+                                <option value="WFH">Work From Home</option>
+                              </select>
                             )}
                           </td>
                           <td className="px-4 py-4">

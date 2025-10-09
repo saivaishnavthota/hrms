@@ -358,7 +358,7 @@ const [policies, setPolicies] = useState([]); // policies grouped by cat
             </button>
             <button
               onClick={() => setShowCategoryForm(true)}
-              className="flex items-center gap-2 bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors"
+              className="flex items-center gap-2 bg-gradient-to-r from-green-500 to-emerald-600 text-white px-6 py-3 rounded-lg hover:from-green-600 hover:to-emerald-700 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
             >
               <Settings className="h-5 w-5" />
               Manage Categories
@@ -368,17 +368,20 @@ const [policies, setPolicies] = useState([]); // policies grouped by cat
 
         {/* Category Management Modal */}
         {showCategoryForm && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto m-4">
-              <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
-                <h2 className="text-2xl font-semibold text-gray-900 dark:text-white">
-                  {editingCategory ? 'Edit Category' : 'Add New Category'}
-                </h2>
+          <div className="fixed inset-0 bg-black/30 backdrop-blur-md flex items-center justify-center z-50 p-4">
+            <div className="bg-gradient-to-br from-white via-green-50 to-emerald-50 rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto border border-green-200">
+              <div className="flex items-center justify-between p-6 border-b border-green-200 bg-gradient-to-r from-green-600 to-emerald-600 rounded-t-2xl">
+                <div className="flex items-center gap-3">
+                  <div className="w-3 h-3 bg-white rounded-full animate-pulse"></div>
+                  <h2 className="text-xl font-bold text-white">
+                    {editingCategory ? 'Edit Category' : 'Manage Categories'}
+                  </h2>
+                </div>
                 <button
                   onClick={resetCategoryForm}
-                  className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+                  className="p-2 hover:bg-white/20 rounded-lg transition-colors"
                 >
-                  <X className="h-6 w-6" />
+                  <X className="h-6 w-6 text-white" />
                 </button>
               </div>
               <div className="p-6">

@@ -78,9 +78,10 @@ export function Main({ menu }) {
 
   const EMPLOYEE_OPERATIONS = [
     { title: 'Employees', path: (isSuperHRPath ? '/super-hr/employee-management' : '/hr/employee-management'), icon: Users },
-     { title: 'Onboarding Employees', path: (isSuperHRPath ? '/super-hr/onboarding-employees' : '/hr/onboarding-employees'), icon: UserCheck },
+    // Only Super HR can see Onboarding Employees
+    ...(isSuperHRPath ? [{ title: 'Onboarding Employees', path: '/super-hr/onboarding-employees', icon: UserCheck }] : []),
     { title: 'Document Collection', path: (isSuperHRPath ? '/super-hr/document-collection' : '/hr/document-collection'), icon: Upload },
-     { title: 'Assign Leaves', path: (isSuperHRPath ? '/super-hr/assign-leaves' : '/hr/assign-leaves'), icon: CalendarCheck },
+    { title: 'Assign Leaves', path: (isSuperHRPath ? '/super-hr/assign-leaves' : '/hr/assign-leaves'), icon: CalendarCheck },
     { title: 'Company Policies', path: (isSuperHRPath ? '/super-hr/add-policies' : '/hr/add-policies'), icon: FileText },
   ];
 

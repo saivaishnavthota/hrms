@@ -11,25 +11,71 @@ const CompanyPolicies = () => {
   const [loading, setLoading] = useState(true);
   const [viewPolicy, setViewPolicy] = useState(null);
   const [viewModalOpen, setViewModalOpen] = useState(false);
+  const [error, setError] = useState(null);
   const { user } = useUser();
 
   useEffect(() => {
     fetchPoliciesByLocation();
-  }, []);
+  }, [user]);
 
   const fetchPoliciesByLocation = async () => {
     setLoading(true);
+    setError(null);
     try {
-      const locationId = user?.location_id;
-      const employeeId = user?.employeeId;
+      // Get location_id and employeeId with fallback to localStorage
+      let locationId = user?.location_id;
+      let employeeId = user?.employeeId;
+
+      // Fallback to localStorage if user context is not loaded yet
       if (!locationId || !employeeId) {
-        throw new Error("Missing location or employee id");
+        try {
+          const storedUser = localStorage.getItem('userData');
+          const userData = storedUser ? JSON.parse(storedUser) : null;
+          locationId = locationId || userData?.location_id;
+          employeeId = employeeId || userData?.employeeId;
+        } catch (e) {
+          console.error('Error parsing stored user data:', e);
+        }
       }
+
+      // Also try legacy storage for employeeId
+      if (!employeeId) {
+        employeeId = localStorage.getItem('userId');
+      }
+
+      // Handle missing employeeId
+      if (!employeeId) {
+        console.error("Missing employeeId");
+        setError("Unable to identify your account. Please log in again.");
+        return;
+      }
+
+      // Handle missing location_id
+      if (!locationId) {
+        console.error("Missing location_id for user:", employeeId);
+        setError("no_location");
+        return;
+      }
+
       const query = new URLSearchParams({ employee_id: employeeId }).toString();
       const res = await api.get(`/policies/${locationId}?${query}`);
-      setCategories(res.data?.categories || []);
+      
+      console.log('API Response:', res.data);
+      console.log('Categories:', res.data?.categories);
+      
+      // Parse policies if they come as JSON strings
+      const categories = (res.data?.categories || []).map(cat => ({
+        ...cat,
+        policies: Array.isArray(cat.policies) 
+          ? cat.policies 
+          : (typeof cat.policies === 'string' ? JSON.parse(cat.policies) : [])
+      }));
+      
+      console.log('Processed categories:', categories);
+      setCategories(categories);
     } catch (err) {
-      console.error(err);
+      console.error("Error fetching policies:", err);
+      setError("Failed to fetch company policies. Please try again later.");
       toast.error("Failed to fetch company policies.");
     } finally {
       setLoading(false);
@@ -42,8 +88,24 @@ const CompanyPolicies = () => {
   };
 
   const handleDownload = (policy) => {
-    const locationId = user?.location_id;
-    const employeeId = user?.employeeId;
+    let employeeId = user?.employeeId;
+    
+    // Fallback to localStorage
+    if (!employeeId) {
+      try {
+        const storedUser = localStorage.getItem('userData');
+        const userData = storedUser ? JSON.parse(storedUser) : null;
+        employeeId = userData?.employeeId || localStorage.getItem('userId');
+      } catch (e) {
+        console.error('Error getting employee ID:', e);
+      }
+    }
+    
+    if (!employeeId) {
+      toast.error("Unable to download. Missing employee information.");
+      return;
+    }
+    
     const query = new URLSearchParams({ employee_id: employeeId }).toString();
     window.open(`/policies/download/${policy.id}?${query}`);
   };
@@ -68,12 +130,38 @@ const CompanyPolicies = () => {
             Company Policies
           </h1>
           <p className="text-gray-600 dark:text-gray-400">
-            Review important company policies and guidelines
+            Review important company policies and guidelines for your location
           </p>
         </div>
 
-        {/* Policies Accordion by Category */}
-        {(!categories || categories.length === 0) ? (
+        {/* Error or No Location Message */}
+        {error === "no_location" ? (
+          <div className="text-center py-16 bg-white dark:bg-gray-800 rounded-xl shadow-lg border-2 border-yellow-400">
+            <FileText className="h-20 w-20 text-yellow-500 mx-auto mb-4" />
+            <h3 className="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-2">
+              Location Not Assigned
+            </h3>
+            <p className="text-gray-600 dark:text-gray-400 max-w-md mx-auto">
+              You haven't been assigned to a location yet. Please contact your HR department to assign you to a location so you can access company policies.
+            </p>
+          </div>
+        ) : error ? (
+          <div className="text-center py-16 bg-white dark:bg-gray-800 rounded-xl shadow-lg border-2 border-red-400">
+            <FileText className="h-20 w-20 text-red-500 mx-auto mb-4" />
+            <h3 className="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-2">
+              Error Loading Policies
+            </h3>
+            <p className="text-gray-600 dark:text-gray-400 max-w-md mx-auto mb-4">
+              {error}
+            </p>
+            <button
+              onClick={fetchPoliciesByLocation}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              Try Again
+            </button>
+          </div>
+        ) : (!categories || categories.length === 0) ? (
           <div className="text-center py-16 bg-white dark:bg-gray-800 rounded-xl shadow-lg">
             <FileText className="h-20 w-20 text-gray-400 mx-auto mb-4" />
             <h3 className="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-2">

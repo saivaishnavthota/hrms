@@ -319,17 +319,16 @@ const EmployeeManagement = () => {
       <div className="max-w-7xl mx-auto space-y-6">
         <div className="flex items-center justify-between">
           <h1 className="text-3xl font-bold text-gray-900">Employee Management</h1>
-          {user?.role?.toLowerCase() === 'hr' && (
+          {isSuperHR && (
             <button 
               onClick={() => setIsModalOpen(true)}
-              className="flex items-center gap-2 bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg transition-colors"
+              className="flex items-center gap-2 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white px-6 py-3 rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
             >
               <UserPlus className="h-5 w-5" />
               Add Employee
             </button>
           )}
         </div>
-
         <div className="bg-white rounded-lg shadow p-4 space-y-4">
           <div className="flex items-center gap-4">
             <div className="relative flex-1 max-w-md">
@@ -632,17 +631,20 @@ const EmployeeManagement = () => {
         )}
 
         {isEditModalOpen && selectedEmployee && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-              <div className="p-6 border-b border-gray-200 flex items-center justify-between bg-blue-50">
-                <h2 className="text-2xl font-bold text-blue-900">
-                  {selectedEmployee.reassignment ? 'Reassign Employee' : 'Assign Employee'}
-                </h2>
+          <div className="fixed inset-0 bg-black/30 backdrop-blur-md flex items-center justify-center z-50 p-4">
+            <div className="bg-gradient-to-br from-white via-blue-50 to-indigo-50 rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto border border-blue-200">
+              <div className="flex items-center justify-between p-6 border-b border-blue-200 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-t-2xl">
+                <div className="flex items-center gap-3">
+                  <div className="w-3 h-3 bg-white rounded-full animate-pulse"></div>
+                  <h2 className="text-xl font-bold text-white">
+                    {selectedEmployee.reassignment ? 'Reassign Employee' : 'Assign Employee'}
+                  </h2>
+                </div>
                 <button
                   onClick={() => setIsEditModalOpen(false)}
-                  className="p-2 hover:bg-blue-100 rounded-lg transition-colors"
+                  className="p-2 hover:bg-white/20 rounded-lg transition-colors"
                 >
-                  <X className="h-5 w-5" />
+                  <X className="h-5 w-5 text-white" />
                 </button>
               </div>
               <form onSubmit={handleEditSubmit} className="p-6 space-y-4">
@@ -847,7 +849,7 @@ const EmployeeManagement = () => {
                   </button>
                   <button 
                     type="submit"
-                    className="flex-1 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors disabled:opacity-50"
+                    className="flex-1 px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg hover:from-blue-700 hover:to-indigo-700 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none font-medium"
                     disabled={isSubmitting}
                   >
                     {isSubmitting 

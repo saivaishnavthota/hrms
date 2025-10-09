@@ -83,11 +83,11 @@ export const MENU_SIDEBAR = [
     icon: FormIcon,
     path: '/hr/employees-form',
   },
-  {
-    title: 'Onboarding Employees',
-    icon: UserCheck,
-    path: '/hr/onboarding-employees',
-  },
+  // {
+  //   title: 'Onboarding Employees',
+  //   icon: UserCheck,
+  //   path: '/hr/onboarding-employees',
+  // },
   {
     title: 'Documents Collection',
     icon: Upload,

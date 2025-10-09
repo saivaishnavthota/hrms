@@ -9,12 +9,14 @@ import { Label } from '@/components/ui/label';
 import { toast } from 'react-toastify';
 import { useUser } from '@/contexts/UserContext';
 import { Trash2, Plus, Edit2, Save, X } from 'lucide-react';
+import api from '@/lib/api';
 
 const HRConfig = () => {
   const { user } = useUser();
   const isSuperHR = user?.role === 'HR' && user?.super_hr === true;
 
   const [saving, setSaving] = useState(false);
+  const [loading, setLoading] = useState(true);
   
   // Leave Categories State
   const [leaveCategories, setLeaveCategories] = useState([]);
@@ -26,26 +28,52 @@ const HRConfig = () => {
   const [newDepartment, setNewDepartment] = useState({ name: '', description: '' });
   const [editingDepartment, setEditingDepartment] = useState(null);
 
-  // Load data from localStorage on component mount
+  // Load data from API on component mount
   useEffect(() => {
-    try {
-      const savedLeaveCategories = localStorage.getItem('hr_leave_categories');
-      const savedDepartments = localStorage.getItem('hr_departments');
-      
-      if (savedLeaveCategories) {
-        setLeaveCategories(JSON.parse(savedLeaveCategories));
-      }
-      
-      if (savedDepartments) {
-        setDepartments(JSON.parse(savedDepartments));
-      }
-    } catch (error) {
-      console.error('Error loading HR config data:', error);
-    }
+    fetchLeaveCategories();
+    fetchDepartments();
   }, []);
 
+  const fetchLeaveCategories = async () => {
+    try {
+      setLoading(true);
+      const response = await api.get('/hr-config/leave-categories', {
+        params: { hr_id: user?.employeeId }
+      });
+      setLeaveCategories(response.data.map(cat => ({
+        id: cat.id,
+        name: cat.name,
+        totalLeaves: cat.default_days,
+        description: cat.description,
+        createdAt: cat.created_at
+      })));
+    } catch (error) {
+      console.error('Error loading leave categories:', error);
+      toast.error('Failed to load leave categories');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchDepartments = async () => {
+    try {
+      const response = await api.get('/hr-config/departments', {
+        params: { hr_id: user?.employeeId }
+      });
+      setDepartments(response.data.map(dept => ({
+        id: dept.id,
+        name: dept.name,
+        description: dept.description,
+        createdAt: dept.created_at
+      })));
+    } catch (error) {
+      console.error('Error loading departments:', error);
+      toast.error('Failed to load departments');
+    }
+  };
+
   // Leave Categories Functions
-  const handleAddLeaveCategory = () => {
+  const handleAddLeaveCategory = async () => {
     if (!newLeaveCategory.name || !newLeaveCategory.totalLeaves) {
       toast.error('Please fill in all fields');
       return;
@@ -56,19 +84,25 @@ const HRConfig = () => {
       return;
     }
 
-    const category = {
-      id: Date.now(),
-      name: newLeaveCategory.name.trim(),
-      totalLeaves: parseInt(newLeaveCategory.totalLeaves),
-      createdAt: new Date().toISOString()
-    };
-
-    const updatedCategories = [...leaveCategories, category];
-    setLeaveCategories(updatedCategories);
-    localStorage.setItem('hr_leave_categories', JSON.stringify(updatedCategories));
-    
-    setNewLeaveCategory({ name: '', totalLeaves: '' });
-    toast.success('Leave category added successfully');
+    try {
+      setSaving(true);
+      await api.post('/hr-config/leave-categories', {
+        name: newLeaveCategory.name.trim(),
+        default_days: parseInt(newLeaveCategory.totalLeaves),
+        description: null
+      }, {
+        params: { hr_id: user?.employeeId }
+      });
+      
+      setNewLeaveCategory({ name: '', totalLeaves: '' });
+      toast.success('Leave category added successfully');
+      await fetchLeaveCategories();
+    } catch (error) {
+      console.error('Error adding leave category:', error);
+      toast.error(error.response?.data?.detail || 'Failed to add leave category');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleEditLeaveCategory = (category) => {
@@ -78,7 +112,7 @@ const HRConfig = () => {
     });
   };
 
-  const handleSaveLeaveCategory = () => {
+  const handleSaveLeaveCategory = async () => {
     if (!editingLeave.name || !editingLeave.totalLeaves) {
       toast.error('Please fill in all fields');
       return;
@@ -89,74 +123,124 @@ const HRConfig = () => {
       return;
     }
 
-    const updatedCategories = leaveCategories.map(cat => 
-      cat.id === editingLeave.id 
-        ? { ...cat, name: editingLeave.name.trim(), totalLeaves: parseInt(editingLeave.totalLeaves) }
-        : cat
-    );
+    try {
+      setSaving(true);
+      await api.put(`/hr-config/leave-categories/${editingLeave.id}`, {
+        name: editingLeave.name.trim(),
+        default_days: parseInt(editingLeave.totalLeaves),
+        description: editingLeave.description
+      }, {
+        params: { hr_id: user?.employeeId }
+      });
 
-    setLeaveCategories(updatedCategories);
-    localStorage.setItem('hr_leave_categories', JSON.stringify(updatedCategories));
-    setEditingLeave(null);
-    toast.success('Leave category updated successfully');
+      setEditingLeave(null);
+      toast.success('Leave category updated successfully');
+      await fetchLeaveCategories();
+    } catch (error) {
+      console.error('Error updating leave category:', error);
+      toast.error(error.response?.data?.detail || 'Failed to update leave category');
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const handleDeleteLeaveCategory = (id) => {
-    const updatedCategories = leaveCategories.filter(cat => cat.id !== id);
-    setLeaveCategories(updatedCategories);
-    localStorage.setItem('hr_leave_categories', JSON.stringify(updatedCategories));
-    toast.success('Leave category deleted successfully');
+  const handleDeleteLeaveCategory = async (id) => {
+    if (!window.confirm('Are you sure you want to delete this leave category?')) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+      await api.delete(`/hr-config/leave-categories/${id}`, {
+        params: { hr_id: user?.employeeId }
+      });
+      
+      toast.success('Leave category deleted successfully');
+      await fetchLeaveCategories();
+    } catch (error) {
+      console.error('Error deleting leave category:', error);
+      toast.error(error.response?.data?.detail || 'Failed to delete leave category');
+    } finally {
+      setSaving(false);
+    }
   };
 
   // Departments Functions
-  const handleAddDepartment = () => {
+  const handleAddDepartment = async () => {
     if (!newDepartment.name) {
       toast.error('Please enter department name');
       return;
     }
 
-    const department = {
-      id: Date.now(),
-      name: newDepartment.name.trim(),
-      description: newDepartment.description.trim(),
-      createdAt: new Date().toISOString()
-    };
-
-    const updatedDepartments = [...departments, department];
-    setDepartments(updatedDepartments);
-    localStorage.setItem('hr_departments', JSON.stringify(updatedDepartments));
-    
-    setNewDepartment({ name: '', description: '' });
-    toast.success('Department added successfully');
+    try {
+      setSaving(true);
+      await api.post('/hr-config/departments', {
+        name: newDepartment.name.trim(),
+        description: newDepartment.description.trim()
+      }, {
+        params: { hr_id: user?.employeeId }
+      });
+      
+      setNewDepartment({ name: '', description: '' });
+      toast.success('Department added successfully');
+      await fetchDepartments();
+    } catch (error) {
+      console.error('Error adding department:', error);
+      toast.error(error.response?.data?.detail || 'Failed to add department');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleEditDepartment = (department) => {
     setEditingDepartment({ ...department });
   };
 
-  const handleSaveDepartment = () => {
+  const handleSaveDepartment = async () => {
     if (!editingDepartment.name) {
       toast.error('Please enter department name');
       return;
     }
 
-    const updatedDepartments = departments.map(dept => 
-      dept.id === editingDepartment.id 
-        ? { ...dept, name: editingDepartment.name.trim(), description: editingDepartment.description.trim() }
-        : dept
-    );
+    try {
+      setSaving(true);
+      await api.put(`/hr-config/departments/${editingDepartment.id}`, {
+        name: editingDepartment.name.trim(),
+        description: editingDepartment.description.trim()
+      }, {
+        params: { hr_id: user?.employeeId }
+      });
 
-    setDepartments(updatedDepartments);
-    localStorage.setItem('hr_departments', JSON.stringify(updatedDepartments));
-    setEditingDepartment(null);
-    toast.success('Department updated successfully');
+      setEditingDepartment(null);
+      toast.success('Department updated successfully');
+      await fetchDepartments();
+    } catch (error) {
+      console.error('Error updating department:', error);
+      toast.error(error.response?.data?.detail || 'Failed to update department');
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const handleDeleteDepartment = (id) => {
-    const updatedDepartments = departments.filter(dept => dept.id !== id);
-    setDepartments(updatedDepartments);
-    localStorage.setItem('hr_departments', JSON.stringify(updatedDepartments));
-    toast.success('Department deleted successfully');
+  const handleDeleteDepartment = async (id) => {
+    if (!window.confirm('Are you sure you want to delete this department?')) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+      await api.delete(`/hr-config/departments/${id}`, {
+        params: { hr_id: user?.employeeId }
+      });
+      
+      toast.success('Department deleted successfully');
+      await fetchDepartments();
+    } catch (error) {
+      console.error('Error deleting department:', error);
+      toast.error(error.response?.data?.detail || 'Failed to delete department');
+    } finally {
+      setSaving(false);
+    }
   };
 
   if (!isSuperHR) {
@@ -213,8 +297,8 @@ const HRConfig = () => {
                       onChange={(e) => setNewLeaveCategory(prev => ({ ...prev, totalLeaves: e.target.value }))}
                     />
                   </div>
-                  <Button onClick={handleAddLeaveCategory} className="w-full">
-                    Add Leave Category
+                  <Button onClick={handleAddLeaveCategory} className="w-full" disabled={saving}>
+                    {saving ? 'Adding...' : 'Add Leave Category'}
                   </Button>
                 </CardContent>
               </Card>
@@ -225,7 +309,11 @@ const HRConfig = () => {
                   <CardTitle>Existing Leave Categories</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  {leaveCategories.length === 0 ? (
+                  {loading ? (
+                    <p className="text-sm text-muted-foreground text-center py-8">
+                      Loading leave categories...
+                    </p>
+                  ) : leaveCategories.length === 0 ? (
                     <p className="text-sm text-muted-foreground text-center py-8">
                       No leave categories created yet. Add your first category to get started.
                     </p>
@@ -310,8 +398,8 @@ const HRConfig = () => {
                       onChange={(e) => setNewDepartment(prev => ({ ...prev, description: e.target.value }))}
                     />
                   </div>
-                  <Button onClick={handleAddDepartment} className="w-full">
-                    Add Department
+                  <Button onClick={handleAddDepartment} className="w-full" disabled={saving}>
+                    {saving ? 'Adding...' : 'Add Department'}
                   </Button>
                 </CardContent>
               </Card>
@@ -322,7 +410,11 @@ const HRConfig = () => {
                   <CardTitle>Existing Departments</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  {departments.length === 0 ? (
+                  {loading ? (
+                    <p className="text-sm text-muted-foreground text-center py-8">
+                      Loading departments...
+                    </p>
+                  ) : departments.length === 0 ? (
                     <p className="text-sm text-muted-foreground text-center py-8">
                       No departments created yet. Add your first department to get started.
                     </p>

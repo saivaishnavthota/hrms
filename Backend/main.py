@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from contextlib import asynccontextmanager
 from database import create_tables_database
-from routes import user_routes, document_routes,locations_routes, attendance_routes,leave_routes,onboarding_routes, calendar_routes,expenses_routes, project_routes, weekoff_routes, expense_management_routes, policy_routes
+from routes import user_routes, document_routes,locations_routes, attendance_routes,leave_routes,onboarding_routes, calendar_routes,expenses_routes, project_routes, weekoff_routes, expense_management_routes, policy_routes, hr_config_routes
 from middleware.cors import add_cors_middleware
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -10,7 +10,7 @@ from fastapi import FastAPI
 import os
 from dotenv import load_dotenv
 load_dotenv()
-PORT=os.getenv("PORT")
+PORT=int(os.getenv("PORT", 8000))
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -23,6 +23,8 @@ app = FastAPI(lifespan=lifespan, redirect_slashes=False)
 origins = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
+    "http://localhost:2343",
+    "http://127.0.0.1:2343",
     # Include alternate dev ports to avoid CORS during local testing
     "http://localhost:3000",
     "http://127.0.0.1:3000",
@@ -53,6 +55,7 @@ app.include_router(expenses_routes.router)
 app.include_router(project_routes.router)
 app.include_router(weekoff_routes.router)
 app.include_router(policy_routes.router)
+app.include_router(hr_config_routes.router)
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=PORT, reload=True)

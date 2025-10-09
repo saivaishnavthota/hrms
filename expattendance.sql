@@ -681,24 +681,10 @@ END;
 $$;
 
 -- 11. Add Expense Attachment Function
-CREATE OR REPLACE FUNCTION public.add_expense_attachment(
-    p_request_id INTEGER, 
-    p_file_name VARCHAR, 
-    p_file_url TEXT, 
-    p_file_type VARCHAR, 
-    p_file_size NUMERIC
-) 
-RETURNS TABLE(
-    attachment_id INTEGER, 
-    request_id INTEGER, 
-    file_name VARCHAR, 
-    file_url TEXT,
-    file_type VARCHAR,
-    file_size NUMERIC,
-    uploaded_at TIMESTAMP
-)
-LANGUAGE plpgsql
-AS $$
+CREATE OR REPLACE FUNCTION public.add_expense_attachment(p_request_id integer, p_file_name character varying, p_file_url text, p_file_type character varying, p_file_size numeric)
+ RETURNS TABLE(attachment_id integer, request_id integer, file_name character varying, file_url text, file_type character varying, file_size numeric, uploaded_at timestamp without time zone)
+ LANGUAGE plpgsql
+AS $function$
 DECLARE
     new_id INT;
 BEGIN
@@ -707,9 +693,9 @@ BEGIN
     ) VALUES (
         p_request_id, p_file_name, p_file_url, p_file_type, p_file_size, NOW()
     ) RETURNING expense_attachments.attachment_id INTO new_id;
-    
+
     RETURN QUERY
-    SELECT 
+    SELECT
         ea.attachment_id,
         ea.request_id,
         ea.file_name,
@@ -720,7 +706,8 @@ BEGIN
     FROM expense_attachments ea
     WHERE ea.attachment_id = new_id;
 END;
-$$;
+$function$;
+
 
 -- 12. Manager Update Expense Function
 CREATE OR REPLACE FUNCTION public.manager_update_expense(
@@ -884,105 +871,110 @@ $$;
 -- =====================================================
 
 -- 1. Approve Employee Procedure
-CREATE OR REPLACE PROCEDURE public.approve_employee(
-    IN p_onboarding_id INTEGER,
-    OUT new_emp_id INTEGER
-)
-LANGUAGE plpgsql
-AS $$
+CREATE OR REPLACE PROCEDURE public.approve_employee(IN p_onboarding_id integer, OUT new_emp_id integer)
+ LANGUAGE plpgsql
+AS $procedure$
 BEGIN
     -- Insert into employees
     INSERT INTO employees (name, email, role, employment_type, o_status, created_at)
-    SELECT name, email, role, type, TRUE, NOW()
+    SELECT name,
+           email,
+           role,
+           CASE type  -- normalize employment_type to match constraint
+               WHEN 'Full-time' THEN 'full_time'
+               WHEN 'Part-time' THEN 'part_time'
+               WHEN 'Contractor' THEN 'contractor'
+               ELSE type
+           END,
+           TRUE,
+           now()
     FROM onboarding_employees
     WHERE id = p_onboarding_id
     RETURNING id INTO new_emp_id;
-    
+
     -- Insert into employee_details
     INSERT INTO employee_details (
-        employee_id, full_name, contact_no, personal_email, dob, address, gender,
-        graduation_year, work_experience_years, emergency_contact_name,
-        emergency_contact_number, emergency_contact_relation, created_at, updated_at
+        employee_id, full_name, contact_no, personal_email,
+        dob, address, gender, graduation_year,
+        work_experience_years, emergency_contact_name,
+        emergency_contact_number, emergency_contact_relation,
+        created_at
     )
-    SELECT new_emp_id, full_name, contact_no, personal_email, dob, address, gender,
-           graduation_year, work_experience_years, emergency_contact_name,
-           emergency_contact_number, emergency_contact_relation, NOW(), NOW()
+    SELECT new_emp_id,
+           full_name, contact_no, personal_email,
+           dob, address, gender, graduation_year,
+           work_experience_years, emergency_contact_name,
+           emergency_contact_number, emergency_contact_relation,
+           now()
     FROM onboarding_emp_details
     WHERE employee_id = p_onboarding_id;
-    
-    -- Copy documents from onboarding to employee_documents
+
+    -- Insert into employee_documents (new normalized schema)
     INSERT INTO employee_documents (
         employee_id, doc_type, file_id, file_name, file_url, uploaded_at
     )
-    SELECT 
-        new_emp_id,
-        doc_type,
-        COALESCE(file_name, doc_type || '_' || new_emp_id::text) as file_id,
-        COALESCE(file_name, doc_type || '.pdf') as file_name,
-        file_url,
-        uploaded_at
+    SELECT new_emp_id,
+           doc_type,
+           gen_random_uuid()::text,  -- PostgreSQL pgcrypto extension
+           file_name,
+           file_url,
+           uploaded_at
     FROM onboarding_emp_docs
     WHERE employee_id = p_onboarding_id;
-    
-    -- Delete from onboarding tables
+
+    -- Cleanup onboarding records
     DELETE FROM onboarding_employees WHERE id = p_onboarding_id;
-    DELETE FROM onboarding_emp_docs WHERE employee_id = p_onboarding_id;
     DELETE FROM onboarding_emp_details WHERE employee_id = p_onboarding_id;
+    DELETE FROM onboarding_emp_docs WHERE employee_id = p_onboarding_id;
 END;
-$$;
+$procedure$;
 
 -- 2. Assign Employee Procedure
-CREATE OR REPLACE PROCEDURE public.assign_employee(
-    IN p_employee_id INTEGER, 
-    IN p_location_id INTEGER, 
-    IN p_doj DATE, 
-    IN p_company_email TEXT, 
-    IN p_managers INTEGER[], 
-    IN p_hrs INTEGER[], 
-    IN p_role TEXT DEFAULT NULL, 
-    IN p_company_employee_id TEXT DEFAULT NULL, 
-    IN p_is_reassignment BOOLEAN DEFAULT FALSE
-)
-LANGUAGE plpgsql
-AS $$
+CREATE OR REPLACE PROCEDURE public.assign_employee(IN p_employee_id integer, IN p_location_id integer, IN p_doj date, IN p_company_email text, IN p_managers integer[] DEFAULT '{}'::integer[], IN p_hrs integer[] DEFAULT '{}'::integer[], IN p_role text DEFAULT NULL::text, IN p_company_employee_id text DEFAULT NULL::text)
+ LANGUAGE plpgsql
+AS $procedure$
 BEGIN
     -- Ensure employee exists
     IF NOT EXISTS (SELECT 1 FROM employees WHERE id = p_employee_id) THEN
         RAISE EXCEPTION 'Employee with id % not found', p_employee_id;
     END IF;
-    
-    -- Update employee details
-    UPDATE employees
-    SET doj = CASE WHEN p_is_reassignment THEN doj ELSE p_doj END,
-        location_id = p_location_id,
-        company_email = CASE WHEN p_is_reassignment THEN company_email ELSE p_company_email END,
-        role = COALESCE(p_role, role),
-        company_employee_id = CASE WHEN p_is_reassignment THEN company_employee_id ELSE COALESCE(p_company_employee_id, company_employee_id) END
-    WHERE id = p_employee_id;
-    
-    -- Update employee_details table with company_email only for initial assignment
-    IF NOT p_is_reassignment THEN
-        UPDATE employee_details
-        SET company_email = p_company_email
-        WHERE employee_id = p_employee_id;
-    END IF;
-    
-    -- Insert managers (ignoring NULLs)
-    DELETE FROM employee_managers WHERE employee_id = p_employee_id;
-    INSERT INTO employee_managers (employee_id, manager_id, created_at)
-    SELECT p_employee_id, mgr, NOW()
-    FROM unnest(p_managers) AS mgr
-    WHERE mgr IS NOT NULL;
-    
-    -- Insert HRs (ignoring NULLs)
-    DELETE FROM employee_hrs WHERE employee_id = p_employee_id;
-    INSERT INTO employee_hrs (employee_id, hr_id, created_at)
-    SELECT p_employee_id, hr, NOW()
-    FROM unnest(p_hrs) AS hr
-    WHERE hr IS NOT NULL;
-END;
-$$;
 
+    -- Update employee details safely
+    UPDATE employees
+    SET doj = COALESCE(p_doj, doj),
+        location_id = COALESCE(p_location_id, location_id),
+        company_email = COALESCE(p_company_email, company_email),
+        role = COALESCE(p_role, role),
+        company_employee_id = COALESCE(p_company_employee_id, company_employee_id)
+    WHERE id = p_employee_id;
+
+    -- Update employee_details table safely
+    UPDATE employee_details
+    SET company_email = COALESCE(p_company_email, company_email)
+    WHERE employee_id = p_employee_id;
+
+    -- Delete old managers and insert new ones, ignore NULLs
+    DELETE FROM employee_managers WHERE employee_id = p_employee_id;
+
+    IF p_managers IS NOT NULL THEN
+        INSERT INTO employee_managers (employee_id, manager_id, created_at)
+        SELECT p_employee_id, mgr, now()
+        FROM unnest(p_managers) AS mgr
+        WHERE mgr IS NOT NULL;
+    END IF;
+
+    -- Delete old HRs and insert new ones, ignore NULLs
+    DELETE FROM employee_hrs WHERE employee_id = p_employee_id;
+
+    IF p_hrs IS NOT NULL THEN
+        INSERT INTO employee_hrs (employee_id, hr_id, created_at)
+        SELECT p_employee_id, hr, now()
+        FROM unnest(p_hrs) AS hr
+        WHERE hr IS NOT NULL;
+    END IF;
+
+END;
+$procedure$;
 -- =====================================================
 -- TRIGGERS
 -- =====================================================
@@ -1000,6 +992,71 @@ CREATE TRIGGER trg_update_leave_balance
 AFTER INSERT OR UPDATE ON public.leave_management 
 FOR EACH ROW 
 EXECUTE FUNCTION public.update_leave_balance();
+
+
+CREATE TABLE IF NOT EXISTS policy_categories (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(255) NOT NULL UNIQUE,
+    color VARCHAR(7) DEFAULT '#3B82F6',
+    icon VARCHAR(10) DEFAULT '📄',
+    created_by INTEGER NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
+    created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+
+CREATE TABLE IF NOT EXISTS policies (
+    id SERIAL PRIMARY KEY,
+    location_id INTEGER NOT NULL REFERENCES locations(id) ON DELETE CASCADE,
+    category_id INTEGER NOT NULL REFERENCES policy_categories(id) ON DELETE RESTRICT,
+    title VARCHAR(255) NOT NULL,
+    description TEXT NOT NULL,
+    attachment_url VARCHAR(512),
+    attachment_type VARCHAR(10),
+    uploader_id INTEGER REFERENCES employees(id) ON DELETE SET NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
+);
+ 
+CREATE INDEX idx_policies_location_id ON policies(location_id);
+CREATE INDEX idx_policies_category_id ON policies(category_id);
+
+
+CREATE OR REPLACE VIEW categories_with_policy_count AS
+SELECT
+    pc.id,
+    pc.name,
+    pc.color,
+    pc.icon,
+    pc.created_at,
+    pc.updated_at,
+    COUNT(p.id) AS policy_count
+FROM policy_categories pc
+LEFT JOIN policies p ON pc.id = p.category_id
+GROUP BY pc.id;
+
+CREATE OR REPLACE VIEW policies_with_details AS
+SELECT
+    p.id,
+    p.title,
+    p.description,
+    p.attachment_url,
+    p.attachment_type,
+    p.created_at,
+    p.updated_at,
+    p.location_id,
+    l.name AS location_name,
+    p.category_id,
+    pc.name AS category_name,
+    pc.icon AS category_icon,
+    pc.color AS category_color,
+    p.uploader_id,
+    e.name AS uploader_name
+FROM policies p
+LEFT JOIN locations l ON p.location_id = l.id
+LEFT JOIN policy_categories pc ON p.category_id = pc.id
+LEFT JOIN employees e ON p.uploader_id = e.id;
+
 
 -- =====================================================
 -- END OF SCHEMA

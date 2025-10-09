@@ -1,4 +1,4 @@
-import { LayoutGrid, ClipboardList, UserPlus, Users, Plane, DollarSign, KeyRound } from 'lucide-react';
+import { LayoutGrid, ClipboardList, UserPlus, Users, Plane, DollarSign, KeyRound, Upload } from 'lucide-react';
 
 export const MENU_SIDEBAR_MANAGER = [
   {
@@ -9,18 +9,7 @@ export const MENU_SIDEBAR_MANAGER = [
   {
     title: 'Attendance',
     icon: ClipboardList,
-    children: [
-      {
-        title: 'Add Attendance',
-        icon: UserPlus,
-        path: '/manager/add-attendance',
-      },
-      {
-        title: 'Employee Attendance',
-        icon: ClipboardList,
-        path: '/manager/employees-attendance',
-      },
-    ],
+    path: '/manager/attendance',
   },
   {
     title: 'Employees',
@@ -47,6 +36,11 @@ export const MENU_SIDEBAR_MANAGER = [
     title: 'Expense Management',
     icon: DollarSign,
     path: '/manager/expense-management',
+  },
+  {
+    title: 'Upload Documents',
+    icon: Upload,
+    path: '/manager/upload-documents',
   },
   {
     title: 'Change Password',

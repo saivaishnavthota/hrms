@@ -1,17 +1,26 @@
 from sqlmodel import SQLModel, Field
 from typing import Optional
 from datetime import datetime
-from sqlalchemy import Column, JSON
 
-class CompanyPolicy(SQLModel, table=True):
-    __tablename__ = "company_policies"
-    
+class PolicyCategory(SQLModel, table=True):
+    __tablename__ = "policy_categories"
+    id: Optional[int] = Field(default=None, primary_key=True)
+    name: str
+    color: Optional[str] = Field(default="#3B82F6")
+    icon: Optional[str] = Field(default="📄")
+    created_by: int = Field(foreign_key="employees.id")
+    created_at: datetime = Field(default_factory=datetime.now)
+    updated_at: datetime = Field(default_factory=datetime.now)
+
+class Policy(SQLModel, table=True):
+    __tablename__ = "policies"
     id: Optional[int] = Field(default=None, primary_key=True)
     location_id: int = Field(foreign_key="locations.id")
-    file_name: str = Field(max_length=255)
-    file_url: str  # Azure Blob Storage URL with SAS token
-    uploaded_by: int = Field(foreign_key="employees.id")
-    sections_json: Optional[dict] = Field(default=None, sa_column=Column(JSON))
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
-    deleted_at: Optional[datetime] = None  # Soft delete
+    category_id: int = Field(foreign_key="policy_categories.id")
+    title: str
+    description: str
+    attachment_url: Optional[str] = None
+    attachment_type: Optional[str] = None
+    uploader_id: Optional[int] = Field(default=None, foreign_key="employees.id")
+    created_at: datetime = Field(default_factory=datetime.now)
+    updated_at: datetime = Field(default_factory=datetime.now)

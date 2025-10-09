@@ -30,6 +30,7 @@ import NewUserDetails from '@/components/Onboarding/NewUserDetails';
 import NewUserUploadDocs from '@/components/Onboarding/NewUserUploadDocs';
 import ChangePasswordOnboarding from '@/components/auth/ChangePasswordOnboarding';
 import MyProfile from '@/components/Profile/MyProfile';
+import MyActivity from '@/components/HR/MyActivity';
 // Employee components
 import EmployeeAddAttendance from '@/components/Employee/AddAttendance';
 import HRAddAttendance from '@/components/Employee/AddAttendance';
@@ -47,6 +48,9 @@ import Projects from '@/components/AccountManager/Projects';
 import ManagerDashboard from '@/components/Manager/Dashboard';
 import ManagerExpenseManagement from '@/components/Manager/ExpenseManagement';
 import ManagerEmployeeAttendance from '@/components/Manager/EmployeesAttendance';
+import ManagerAttendance from '@/components/Manager/Attendance';
+// Super HR components
+import HRConfig from '@/components/HR/HRConfig';
 
 export const AppRoutingSetup = () => {
   return (
@@ -75,9 +79,26 @@ export const AppRoutingSetup = () => {
         <Route path="add-attendance" element={<HRAddAttendance />} />
         <Route path="employees-attendance" element={<EmployeeAttendance />} />
         <Route path="holidays" element={<Holidays />} />
-        {/* <Route path="company-policies" element={<AddCompanyPolicy />} /> */}
+        <Route path="add-policies" element={<AddCompanyPolicy />} />
          <Route path="reset-password" element={< ChangePassword/>} />
-        
+        <Route path="my-activity" element={<MyActivity />} />
+      </Route>
+
+      {/* Protected Super-HR routes */}
+      <Route path="/super-hr" element={<ProtectedRoute allowedRoles={["Hr"]} requireSuperHR={true}><HRLayoutWrapper /></ProtectedRoute>}>
+        <Route index element={<Dashboard />} />
+        <Route path="dashboard" element={<Dashboard />} />
+        <Route path="employee-management" element={<EmployeeManagement />} />
+        <Route path="onboarding-employees" element={<OnboardingEmployees />} />
+        <Route path="expense-management" element={<ExpenseManagement />} />
+        <Route path="view-projects" element={<Projects viewOnly />} />
+        <Route path="document-collection" element={<DocumentCollection />} />
+        <Route path="leave-requests" element={<LeaveRequests />} />
+        <Route path="assign-leaves" element={<AssignLeaves />} />
+        <Route path="employees-attendance" element={<EmployeeAttendance />} />
+        <Route path="holidays" element={<Holidays />} />
+        <Route path="add-policies" element={<AddCompanyPolicy />} />
+        <Route path="hr-config" element={<HRConfig />} />
       </Route>
       
       {/* Protected Employee routes using Layout1 with employee menu */}
@@ -108,12 +129,14 @@ export const AppRoutingSetup = () => {
       <Route path="/manager" element={<ProtectedRoute allowedRoles={["Manager"]}><Layout1 menu={MENU_SIDEBAR_MANAGER} /></ProtectedRoute>}>
         <Route index element={<ManagerDashboard />} />
         <Route path="dashboard" element={<ManagerDashboard />} />
+        <Route path="attendance" element={<ManagerAttendance />} />
         <Route path="add-attendance" element={<ManagerAddAttendance />} />
         <Route path="employees-attendance" element={<ManagerEmployeeAttendance />} />
         <Route path="employees" element={<ManagerEmployees />} />
         <Route path="apply-leave" element={<ApplyLeave />} />
         <Route path="leave-requests" element={<ManagerLeaveRequests />} />
         <Route path="expense-management" element={<ManagerExpenseManagement />} />
+        <Route path="upload-documents" element={<UploadDocuments />} />
         <Route path="change-password" element={<SetPassword />} />
       </Route>
 
@@ -122,6 +145,9 @@ export const AppRoutingSetup = () => {
         <Route index element={<AccountManagerDashboard />} />
         <Route path="dashboard" element={<AccountManagerDashboard />} />
         <Route path="expense-management" element={<AccountManagerExpenseManagement />} />
+        <Route path="upload-documents" element={<UploadDocuments />} />
+        <Route path="add-attendance" element={<EmployeeAddAttendance />} />
+        <Route path="apply-leave" element={<ApplyLeave />} />
         <Route path="projects" element={<Projects />} />
         <Route path="change-password" element={<SetPassword />} />
         {/* <Route path="my-profile" element={<MyProfile />} /> */}

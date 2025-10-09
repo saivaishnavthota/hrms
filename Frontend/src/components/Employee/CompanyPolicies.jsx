@@ -3,22 +3,31 @@ import { toast } from "react-toastify";
 import api from "@/lib/api";
 import { FileText, Download, Calendar, Eye } from "lucide-react";
 import ViewPolicyModal from "../HR/ViewPolicyModal";
+import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion";
+import { useUser } from "@/contexts/UserContext";
 
 const CompanyPolicies = () => {
-  const [policies, setPolicies] = useState([]);
+  const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [viewPolicy, setViewPolicy] = useState(null);
   const [viewModalOpen, setViewModalOpen] = useState(false);
+  const { user } = useUser();
 
   useEffect(() => {
-    fetchMyPolicies();
+    fetchPoliciesByLocation();
   }, []);
 
-  const fetchMyPolicies = async () => {
+  const fetchPoliciesByLocation = async () => {
     setLoading(true);
     try {
-      const res = await api.get("/policies/my-policies");
-      setPolicies(res.data || []);
+      const locationId = user?.location_id;
+      const employeeId = user?.employeeId;
+      if (!locationId || !employeeId) {
+        throw new Error("Missing location or employee id");
+      }
+      const query = new URLSearchParams({ employee_id: employeeId }).toString();
+      const res = await api.get(`/policies/${locationId}?${query}`);
+      setCategories(res.data?.categories || []);
     } catch (err) {
       console.error(err);
       toast.error("Failed to fetch company policies.");
@@ -32,8 +41,11 @@ const CompanyPolicies = () => {
     setViewModalOpen(true);
   };
 
-  const handleDownload = (fileUrl) => {
-    window.open(fileUrl, "_blank");
+  const handleDownload = (policy) => {
+    const locationId = user?.location_id;
+    const employeeId = user?.employeeId;
+    const query = new URLSearchParams({ employee_id: employeeId }).toString();
+    window.open(`/policies/download/${policy.id}?${query}`);
   };
 
   if (loading) {
@@ -60,8 +72,8 @@ const CompanyPolicies = () => {
           </p>
         </div>
 
-        {/* Policies Grid */}
-        {policies.length === 0 ? (
+        {/* Policies Accordion by Category */}
+        {(!categories || categories.length === 0) ? (
           <div className="text-center py-16 bg-white dark:bg-gray-800 rounded-xl shadow-lg">
             <FileText className="h-20 w-20 text-gray-400 mx-auto mb-4" />
             <h3 className="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-2">
@@ -72,72 +84,62 @@ const CompanyPolicies = () => {
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {policies.map((policy) => (
-              <div
-                key={policy.id}
-                className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 hover:shadow-xl transition-shadow duration-300 overflow-hidden"
-              >
-                {/* Card Header */}
-                <div className="bg-gradient-to-r from-blue-500 to-purple-600 p-4">
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="bg-white/20 p-2 rounded-lg">
-                        <FileText className="h-6 w-6 text-white" />
-                      </div>
-                      <h3 className="text-lg font-semibold text-white line-clamp-2">
-                        {policy.file_name}
-                      </h3>
-                    </div>
+          <Accordion type="single" collapsible className="space-y-4">
+            {categories.map((cat) => (
+              <AccordionItem key={cat.category_id} value={String(cat.category_id)}>
+                <AccordionTrigger>
+                  <div className="flex items-center gap-3">
+                    <span className="text-2xl">{cat.category_icon}</span>
+                    <span className="text-lg font-semibold">{cat.category_name}</span>
+                    <span className="ml-2 text-sm text-gray-500">({cat.count} policies)</span>
                   </div>
-                </div>
-
-                {/* Card Body */}
-                <div className="p-4 space-y-3">
-                  {/* Policy Info */}
-                  <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-                    <Calendar className="h-4 w-4" />
-                    <span>
-                      {new Date(policy.created_at).toLocaleDateString('en-US', {
-                        year: 'numeric',
-                        month: 'short',
-                        day: 'numeric'
-                      })}
-                    </span>
-                  </div>
-
-                  {/* Sections Preview */}
-                  {policy.sections_json && policy.sections_json.length > 0 ? (
-                    <div className="text-sm text-gray-600 dark:text-gray-400">
-                      <span className="font-medium">{policy.sections_json.length}</span>{" "}
-                      {policy.sections_json.length === 1 ? "section" : "sections"} available
-                    </div>
+                </AccordionTrigger>
+                <AccordionContent>
+                  {(!cat.policies || cat.policies.length === 0) ? (
+                    <p className="text-gray-500 dark:text-gray-400">No policies in this category</p>
                   ) : (
-                    <div className="text-sm text-gray-500 dark:text-gray-500">
-                      No sections added yet
+                    <div className="space-y-3">
+                      {cat.policies.map((policy) => (
+                        <div key={policy.id} className="p-4 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 flex items-start justify-between">
+                          <div className="flex-1 pr-4">
+                            <h4 className="font-medium text-gray-900 dark:text-white">{policy.title}</h4>
+                            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{policy.description}</p>
+                            <div className="flex items-center gap-4 mt-2 text-xs text-gray-500 dark:text-gray-400">
+                              <span>Created: {new Date(policy.created_at).toLocaleDateString()}</span>
+                              {policy.attachment_type && (
+                                <span className="flex items-center gap-1">
+                                  <FileText className="h-3 w-3" />
+                                  {policy.attachment_type.toUpperCase()}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => handleViewClick(policy)}
+                              className="p-2 text-blue-600 hover:bg-blue-100 dark:hover:bg-blue-900 rounded-lg transition-colors"
+                              title="View Policy"
+                            >
+                              <Eye className="h-4 w-4" />
+                            </button>
+                            {policy.attachment_type && (
+                              <button
+                                onClick={() => handleDownload(policy)}
+                                className="p-2 text-green-600 hover:bg-green-100 dark:hover:bg-green-900 rounded-lg transition-colors"
+                                title="Download Attachment"
+                              >
+                                <Download className="h-4 w-4" />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   )}
-                </div>
-
-                {/* Card Footer - Actions */}
-                <div className="p-4 bg-gray-50 dark:bg-gray-750 border-t border-gray-200 dark:border-gray-700 flex gap-2">
-                  <button
-                    onClick={() => handleViewClick(policy)}
-                    className="flex-1 flex items-center justify-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
-                  >
-                    <Eye className="h-4 w-4" />
-                    View
-                  </button>
-                  <button
-                    onClick={() => handleDownload(policy.file_url)}
-                    className="flex items-center justify-center gap-2 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors"
-                  >
-                    <Download className="h-4 w-4" />
-                  </button>
-                </div>
-              </div>
+                </AccordionContent>
+              </AccordionItem>
             ))}
-          </div>
+          </Accordion>
         )}
       </div>
 

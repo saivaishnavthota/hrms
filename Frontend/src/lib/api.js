@@ -442,46 +442,87 @@ export const calendarAPI = {
   }
 };
 
-// Company Policies API endpoints
+// Policy API endpoints
 export const policiesAPI = {
-  // POST /policies/upload - Upload new policy document
-  uploadPolicy: async (formData) => {
-    const response = await api.post('/policies/upload', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
+  // POST /policies/ - Create a policy
+  createPolicy: async (formData, hrId) => {
+    try {
+      const response = await api.post(`/policies/?hr_id=${hrId}`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Create Policy Error:', {
+        status: error.response?.status,
+        data: error.response?.data,
+        message: error.message,
+      });
+      throw error;}},
+ 
+  // GET /policies/{location_id} - Get policies by location
+  getPoliciesByLocation: async (locationId, userIdObj) => {
+    const query = new URLSearchParams(userIdObj).toString();
+    const response = await api.get(`/policies/${locationId}?${query}`);
+    return response.data;
+  },
+ 
+  // GET /policies/view/{policy_id} - Get single policy details
+  getPolicy: async (policyId, userIdObj) => {
+    const query = new URLSearchParams(userIdObj).toString();
+    const response = await api.get(`/policies/view/${policyId}?${query}`);
+    return response.data;
+  },
+ 
+  // PUT /policies/{policy_id} - Update a policy
+  updatePolicy: async (policyId, formData, hrId) => {
+    const response = await api.put(`/policies/${policyId}?hr_id=${hrId}`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
     });
     return response.data;
   },
-
-  // GET /policies/list - List all policies (optionally filtered by location)
-  listPolicies: async (locationId = null) => {
-    const params = locationId ? { location_id: locationId } : {};
-    const response = await api.get('/policies/list', { params });
+ 
+  // DELETE /policies/{policy_id} - Delete a policy
+  deletePolicy: async (policyId, hrId) => {
+    const response = await api.delete(`/policies/${policyId}?hr_id=${hrId}`);
     return response.data;
   },
-
-  // PUT /policies/edit/{policy_id} - Edit policy sections
-  editPolicy: async (policyId, formData) => {
-    const response = await api.put(`/policies/edit/${policyId}`, formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
+ 
+  // GET /policies/download/{policy_id} - Download a policy file
+  downloadPolicy: async (policyId, userIdObj) => {
+    const query = new URLSearchParams(userIdObj).toString();
+    const response = await api.get(`/policies/download/${policyId}?${query}`, {
+      responseType: 'blob'
     });
     return response.data;
   },
-
-  // DELETE /policies/delete/{policy_id} - Delete policy (soft delete)
-  deletePolicy: async (policyId) => {
-    const response = await api.delete(`/policies/delete/${policyId}`);
+};
+ 
+// Policy Categories API endpoints
+export const categoriesAPI = {
+  // GET /policies/categories - Get all categories
+  getCategories: async (userIdObj = {}) => {
+    const query = new URLSearchParams(userIdObj).toString();
+    const response = await api.get(`/policies/categories?${query}`);
     return response.data;
   },
-
-  // GET /policies/my-policies - Get policies for current user's location
-  getMyPolicies: async () => {
-    const response = await api.get('/policies/my-policies');
+ 
+  // POST /policies/categories - Create a category
+  createCategory: async (categoryData, hrId) => {
+    const response = await api.post(`/policies/categories?hr_id=${hrId}`, categoryData);
     return response.data;
-  }
+  },
+ 
+  // PUT /policies/categories/{category_id} - Update a category
+  updateCategory: async (categoryId, categoryData, hrId) => {
+    const response = await api.put(`/policies/categories/${categoryId}?hr_id=${hrId}`, categoryData);
+    return response.data;
+  },
+ 
+  // DELETE /policies/categories/{category_id} - Delete a category
+  deleteCategory: async (categoryId, hrId) => {
+    const response = await api.delete(`/policies/categories/${categoryId}?hr_id=${hrId}`);
+    return response.data;
+  },
 };
 
 // Export the axios instance for custom requests

@@ -126,7 +126,7 @@ const ChangePassword = () => {
   };
 
   return (
-    <div className="p-4 bg-gray-50 min-h-screen flex items-center justify-center">
+    <div className="p-4  min-h-screen flex items-center justify-center">
       <div className="max-w-lg mx-auto w-full">
         {/* Header */}
         <div className="mb-6">

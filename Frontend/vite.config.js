@@ -14,4 +14,20 @@ export default defineConfig({
   build: {
     chunkSizeWarningLimit: 3000,
   },
+
+  server: {
+    proxy: {
+      '/users': ' http://127.0.0.1:8000 ',
+      '/leave': ' http://127.0.0.1:8000',
+      '/onboarding': ' http://127.0.0.1:8000',
+      '/attendance': 'http://localhost:8000',
+      '/expenses': 'http://localhost:8000',
+      '/projects': 'http://localhost:8000',
+      '/weekoffs': 'http://localhost:8000',
+      '/locations': ' http://127.0.0.1:8000',
+      '/calendar': ' http://127.0.0.1:8000',
+      '/policies': ' http://127.0.0.1:8000',
+    },
+  },
+ 
 });

@@ -9,7 +9,7 @@ export default function Login() {
   const { loginUser } = useUser();
   
   // Helper function to calculate redirect path from login response
-  const calculateRedirectPath = (onboarding_status, login_status, role) => {
+  const calculateRedirectPath = (onboarding_status, login_status, role, isSuperHR = false) => {
     // Case 1: onboarding false, login_status false -> change password -> new user details
     if (!onboarding_status && !login_status) {
       return '/change-password-onboarding';
@@ -25,27 +25,27 @@ export default function Login() {
       return '/change-password-onboarding';
     }
 
-    // Case 4: onboarding true, login_status true -> dashboard based on role
+    // Case 4: onboarding true, login_status true -> dashboard based on role (consider Super HR)
     if (onboarding_status && login_status) {
-      return getDashboardPath(role);
+      return getDashboardPath(role, isSuperHR === true);
     }
 
     return '/login';
   };
 
   // Helper function to get dashboard path based on role
-  const getDashboardPath = (role) => {
+  const getDashboardPath = (role, isSuperHR = false) => {
     switch (role?.toLowerCase()) {
       case 'employee':
         return '/employee';
       case 'hr':
-        return '/hr/dashboard';
+        return isSuperHR ? '/super-hr/dashboard' : '/hr/dashboard';
       case 'account manager':
         return '/account-manager';
       case 'manager':
         return '/manager';
       default:
-        return '/hr/dashboard';
+        return isSuperHR ? '/super-hr/dashboard' : '/hr/dashboard';
     }
   };
   
@@ -126,7 +126,12 @@ export default function Login() {
       loginUser(response);
       
       // Calculate redirect path directly from response data since state update is async
-      const redirectPath = calculateRedirectPath(response.onboarding_status, response.login_status, response.type);
+      const redirectPath = calculateRedirectPath(
+        response.onboarding_status,
+        response.login_status,
+        response.type,
+        response.super_hr === true
+      );
       console.log('Calculated redirect path:', redirectPath);
       
       // Navigate to the appropriate page

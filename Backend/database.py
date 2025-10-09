@@ -4,7 +4,7 @@ from contextlib import contextmanager
 import os
 from dotenv import load_dotenv
 
-DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:root@localhost:5432/sql")  
+DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://admin:rishitha@localhost:5432/hrm")  
 
 engine = create_engine(DATABASE_URL, echo=True)
 

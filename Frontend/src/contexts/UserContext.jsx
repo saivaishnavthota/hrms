@@ -138,17 +138,18 @@ export const UserProvider = ({ children }) => {
 
   // Get dashboard path based on role
   const getDashboardPath = (role) => {
+    const isSuperHR = user?.super_hr === true;
     switch (role?.toLowerCase()) {
       case 'employee':
         return '/employee';
       case 'hr':
-        return '/hr/dashboard';
+        return isSuperHR ? '/super-hr/dashboard' : '/hr/dashboard';
       case 'account manager':
         return '/account-manager';
       case 'manager':
         return '/manager';
       default:
-        return '/hr/dashboard';
+        return isSuperHR ? '/super-hr/dashboard' : '/hr/dashboard';
     }
   };
 

@@ -112,16 +112,31 @@ const AccountManagerExpenseManagement = () => {
   };
 
   const mapStatus = (status) => {
-    const s = (status || '').toLowerCase();
+    const s = String(status || '').toLowerCase();
     switch (s) {
+      case 'pending':
+      case 'pending_manager_approval':
+        return 'Pending Manager Approval';
+      case 'pending_hr_approval':
+        return 'Pending HR Approval';
       case 'pending_account_mgr_approval':
-        return 'Pending';
+      case 'pending_account_manager_approval':
+        return 'Pending Account Manager Approval';
       case 'approved':
         return 'Approved';
+      case 'mgr_rejected':
+      case 'manager_rejected':
+        return 'Manager Rejected';
+      case 'hr_rejected':
+        return 'HR Rejected';
       case 'acc_mgr_rejected':
+      case 'account_manager_rejected':
+        return 'Account Manager Rejected';
+      case 'rejected':
         return 'Rejected';
       default:
-        return status || 'Pending';
+        // Convert underscores to spaces and capitalize words
+        return status ? status.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) : 'Pending';
     }
   };
 

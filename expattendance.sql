@@ -1,7 +1,8 @@
 --
 -- PostgreSQL Database Schema for HRMS
--- Generated from Alembic migrations: 001-007
+-- Generated from Alembic migrations: 001-009
 -- Clean schema with no data - only tables, views, functions, procedures, and triggers
+-- Last updated: 2025-01-30
 --
 
 -- Extensions
@@ -36,7 +37,8 @@ CREATE TABLE public.employees (
     login_status BOOLEAN DEFAULT FALSE,
     location_id INTEGER REFERENCES locations(id),
     employment_type VARCHAR(50) DEFAULT 'Full-Time',
-    doj TIMESTAMP
+    doj TIMESTAMP,
+    super_hr BOOLEAN DEFAULT FALSE
 );
 
 -- Employee Master Table
@@ -212,6 +214,10 @@ CREATE TABLE public.expense_requests (
     expense_date TIMESTAMP NOT NULL,
     tax_included BOOLEAN NOT NULL,
     status VARCHAR NOT NULL,
+    discount_percentage FLOAT,
+    cgst_percentage FLOAT,
+    sgst_percentage FLOAT,
+    final_amount FLOAT,
     created_at TIMESTAMP NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
     deleted_at TIMESTAMP

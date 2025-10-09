@@ -17,6 +17,9 @@ const NewExpenseForm = ({ employeeIdOverride, onSuccess, onCancel }) => {
     date: new Date().toISOString().split('T')[0],
     description: '',
     tax_included: false,
+    cgst: 0,
+    sgst: 0,
+    discount: 0,
   });
   const [receiptFile, setReceiptFile] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -70,6 +73,11 @@ const NewExpenseForm = ({ employeeIdOverride, onSuccess, onCancel }) => {
       form.append('description', expenseData.description || expenseData.title || '');
       form.append('expense_date', expenseData.date);
       form.append('tax_included', expenseData.tax_included);
+      if (expenseData.tax_included) {
+        form.append('cgst', parseFloat(expenseData.cgst || 0));
+        form.append('sgst', parseFloat(expenseData.sgst || 0));
+        form.append('discount', parseFloat(expenseData.discount || 0));
+      }
       if (receiptFile) form.append('files', receiptFile); // Changed 'file' to 'files'
 
       const res = await api.post('/expenses/submit-exp', form, {
@@ -92,6 +100,9 @@ const NewExpenseForm = ({ employeeIdOverride, onSuccess, onCancel }) => {
         date: new Date().toISOString().split('T')[0],
         description: '',
         tax_included: false,
+        cgst: 0,
+        sgst: 0,
+        discount: 0,
       });
       setReceiptFile(null);
       setMessage('');
@@ -173,7 +184,66 @@ const NewExpenseForm = ({ employeeIdOverride, onSuccess, onCancel }) => {
         />
       </div>
 
-      {/* Row 4: Attachment */}
+      {/* Row 4: Tax Checkbox */}
+      <div className="flex items-center">
+        <input
+          type="checkbox"
+          id="tax_included"
+          checked={expenseData.tax_included}
+          onChange={(e) => setExpenseData((p) => ({ ...p, tax_included: e.target.checked }))}
+          className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+        />
+        <label htmlFor="tax_included" className="ml-2 block text-sm text-gray-700">
+          Include tax & discount calculations
+        </label>
+      </div>
+
+      {/* Row 5: Tax and Discount Fields (conditional) */}
+      {expenseData.tax_included && (
+        <div className="bg-blue-50 p-4 rounded-lg border border-blue-200 space-y-4">
+          <h4 className="text-sm font-semibold text-blue-900">Tax & Discount Details</h4>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Discount (%)</label>
+              <Input
+                type="number"
+                step="0.01"
+                min="0"
+                max="100"
+                placeholder="0.00"
+                value={expenseData.discount}
+                onChange={(e) => setExpenseData((p) => ({ ...p, discount: e.target.value }))}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">CGST (%)</label>
+              <Input
+                type="number"
+                step="0.01"
+                min="0"
+                max="100"
+                placeholder="0.00"
+                value={expenseData.cgst}
+                onChange={(e) => setExpenseData((p) => ({ ...p, cgst: e.target.value }))}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">SGST (%)</label>
+              <Input
+                type="number"
+                step="0.01"
+                min="0"
+                max="100"
+                placeholder="0.00"
+                value={expenseData.sgst}
+                onChange={(e) => setExpenseData((p) => ({ ...p, sgst: e.target.value }))}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Row 6: Attachment */}
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">Receipt (optional)</label>
         <Input type="file" accept="image/*,.pdf" onChange={handleFileChange} />
@@ -199,6 +269,9 @@ const NewExpenseForm = ({ employeeIdOverride, onSuccess, onCancel }) => {
               date: new Date().toISOString().split('T')[0],
               description: '',
               tax_included: false,
+              cgst: 0,
+              sgst: 0,
+              discount: 0,
             });
             setReceiptFile(null);
             setMessage('');

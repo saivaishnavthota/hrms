@@ -43,24 +43,29 @@ def build_blob_url_with_sas(employee_id: int, file_name: str) -> str:
     return f"https://{ACCOUNT_NAME}.blob.core.windows.net/{AZURE_CONTAINER_NAME}/{blob_name}?{sas_token}"
  
 def calculate_final_amount(amount, discount_percentage=None, cgst_percentage=None, sgst_percentage=None):
+
     discount_percentage = discount_percentage or 0
     cgst_percentage = cgst_percentage or 0
     sgst_percentage = sgst_percentage or 0
+
+    gross_amount = ((amount)/(sgst_percentage + cgst_percentage + 100))*100
  
     # Apply discount
-    discounted_amount = amount - (amount * discount_percentage / 100)
+    discount = (gross_amount * discount_percentage / 100)
+
+    final_amount = gross_amount - discount
  
     # Apply taxes
-    cgst_amount = discounted_amount * (cgst_percentage / 100)
-    sgst_amount = discounted_amount * (sgst_percentage / 100)
+    cgst_amount = final_amount * (cgst_percentage / 100)
+    sgst_amount = final_amount * (sgst_percentage / 100)
  
     # Final total
-    final_amount = discounted_amount + cgst_amount + sgst_amount
+    final_amount = (final_amount + cgst_amount + sgst_amount)
  
     print(f"\n--- Expense Calculation ---")
     print(f"Base amount: {amount}")
     print(f"Discount ({discount_percentage}%): {amount * discount_percentage / 100}")
-    print(f"Discounted amount: {discounted_amount}")
+    print(f"Discounted amount: {discount}")
     print(f"CGST ({cgst_percentage}%): {cgst_amount}")
     print(f"SGST ({sgst_percentage}%): {sgst_amount}")
     print(f"Final amount: {final_amount}")

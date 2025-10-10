@@ -177,6 +177,13 @@ const SubmitExpense = () => {
           ? item.history.filter(h => ['Manager', 'HR', 'Account Manager'].includes(h.action_role))
             .map(h => ({ name: h.action_by_name || h.action_role, role: h.action_role, reason: h.reason || '-', status: h.action }))
           : [];
+            // ✅ Compute gross, discount, and final amounts here
+  const gross_amount = (item.amount / (item.sgst_percentage + item.cgst_percentage + 100)) * 100;
+  const discount = (gross_amount * (item.discount_percentage || 0)) / 100;
+  const after_discount = gross_amount - discount;
+  const cgst_amount = after_discount * ((item.cgst_percentage || 0) / 100);
+  const sgst_amount = after_discount * ((item.sgst_percentage || 0) / 100);
+  const final_amount = after_discount + cgst_amount + sgst_amount;
         return {
           id: item.request_id,
           date: (item.expense_date || '').slice(0, 10),
@@ -190,7 +197,11 @@ const SubmitExpense = () => {
           cgst: item.cgst_percentage || 0,
           sgst: item.sgst_percentage || 0,
           discount: item.discount_percentage || 0,
-          final_amount: item.final_amount || item.amount // Fallback to amount if final_amount is not available
+          final_amount, // ✅ updated computed value
+    gross_amount,
+    discount_amount: discount,
+    cgst_amount,
+    sgst_amount,// Fallback to amount if final_amount is not available
         };
       });
  
@@ -208,12 +219,15 @@ const SubmitExpense = () => {
     const employeeId = user?.employeeId || JSON.parse(localStorage.getItem('userData') || '{}')?.employeeId;
     if (employeeId) loadExpenseHistory(employeeId, selectedYear, selectedMonth);
   };
+
+ 
  
   useEffect(() => {
     const employeeId = user?.employeeId || JSON.parse(localStorage.getItem('userData') || '{}')?.employeeId;
     if (employeeId) loadExpenseHistory(employeeId, selectedYear, selectedMonth);
   }, [user, selectedYear, selectedMonth]);
  
+
   return (
     <div className="max-w-4xl mx-auto">
       {/* --- Popup Card for Eye button (Icon View) --- */}
@@ -255,21 +269,27 @@ const SubmitExpense = () => {
                 {selectedRecord.tax_included && (
                   <>
                     <div className="rounded-lg p-4 bg-white">
-                      <div className="text-gray-500">Discount (%)</div>
-                      <div className="font-medium text-gray-800">{selectedRecord.discount}</div>
+                      <div className="text-gray-500">Discount Amount</div>
+                      <div className="font-medium text-gray-800">
+                        {selectedRecord.discount_amount?.toFixed(2)} {selectedRecord.currency}
+                      </div>
                     </div>
                     <div className="rounded-lg p-4 bg-white">
-                      <div className="text-gray-500">CGST (%)</div>
-                      <div className="font-medium text-gray-800">{selectedRecord.cgst}</div>
+                      <div className="text-gray-500">CGST Amount ({selectedRecord.cgst}%)</div>
+                      <div className="font-medium text-gray-800">
+                        {selectedRecord.cgst_amount?.toFixed(2)} {selectedRecord.currency}
+                      </div>
                     </div>
                     <div className="rounded-lg p-4 bg-white">
-                      <div className="text-gray-500">SGST (%)</div>
-                      <div className="font-medium text-gray-800">{selectedRecord.sgst}</div>
+                      <div className="text-gray-500">SGST Amount ({selectedRecord.sgst}%)</div>
+                      <div className="font-medium text-gray-800">
+                        {selectedRecord.sgst_amount?.toFixed(2)} {selectedRecord.currency}
+                      </div>
                     </div>
                     <div className="rounded-lg p-4 bg-white">
                       <div className="text-gray-500">Final Amount (after discount & taxes)</div>
                       <div className="font-medium text-gray-800">
-                        {selectedRecord.final_amount} {selectedRecord.currency}
+                        {selectedRecord.final_amount?.toFixed(2)} {selectedRecord.currency}
                       </div>
                     </div>
                   </>

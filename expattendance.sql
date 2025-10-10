@@ -898,14 +898,14 @@ BEGIN
         dob, address, gender, graduation_year,
         work_experience_years, emergency_contact_name,
         emergency_contact_number, emergency_contact_relation,
-        created_at
+        created_at,updated_at
     )
     SELECT new_emp_id,
            full_name, contact_no, personal_email,
            dob, address, gender, graduation_year,
            work_experience_years, emergency_contact_name,
            emergency_contact_number, emergency_contact_relation,
-           now()
+           now(),now()
     FROM onboarding_emp_details
     WHERE employee_id = p_onboarding_id;
 

@@ -19,6 +19,8 @@ import {
   CreditCard,
   CalendarSearch,
   FileIcon,
+  LayoutGrid,
+  Coins
 } from 'lucide-react';
 
 export function Main({ menu }) {
@@ -86,13 +88,14 @@ export function Main({ menu }) {
   ];
 
   const MANAGEMENT_ANALYTICS = [
+    { title: 'Dashboard', path: (isSuperHRPath ? '/super-hr/dashboard' : '/hr/dashboard'), icon: LayoutGrid },
     {
       title: 'Leave Management',
       icon: CalendarCheck,
       path: (isSuperHRPath ? '/super-hr/leave-requests' : '/hr/leave-requests'),
     },
     
-    { title: 'Expense Management', path: (isSuperHRPath ? '/super-hr/expense-management' : '/hr/expense-management'), icon: DollarSign },
+    { title: 'Expense Management', path: (isSuperHRPath ? '/super-hr/expense-management' : '/hr/expense-management'), icon: Coins },
     { title: 'Attendance', path: (isSuperHRPath ? '/super-hr/employees-attendance' : '/hr/employees-attendance'), icon: CalendarCheck },
     { title: 'Holidays', path: (isSuperHRPath ? '/super-hr/holidays' : '/hr/holidays'), icon: CalendarSearch },
     { title: 'View Projects', path: (isSuperHRPath ? '/super-hr/view-projects' : '/hr/view-projects'), icon: FileIcon },
@@ -126,7 +129,7 @@ export function Main({ menu }) {
 
         {/* HR Top Navbar with labels */}
         {(isHR || isSuperHRPath) && (
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="max-w-8xl mx-auto px-4 sm:px-6 lg:px-8">
             <Navbar>
               <div className="flex flex-col gap-1">
                 {GROUPS.map((group, idx) => (

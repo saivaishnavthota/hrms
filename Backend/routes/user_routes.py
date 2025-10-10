@@ -274,6 +274,7 @@ async def display_employees(
         e.company_email,
         e.email,
         e.role,
+        e.employment_type,
         e.company_employee_id,
         e.reassignment,
         e.doj,
@@ -304,7 +305,7 @@ async def display_employees(
 
         base_query += """
             GROUP BY e.id, e.name, e.email, e.role, e.company_email, e.company_employee_id,
-                     e.reassignment, e.doj, l.id, l.name
+                     e.reassignment, e.doj, l.id, l.name, e.employment_type
             ORDER BY e.name
         """
 
@@ -319,6 +320,7 @@ async def display_employees(
                 "to_email": row.email,
                 "email": row.company_email,
                 "role": row.role,
+                "employment_type": row.employment_type,
                 "company_employee_id": row.company_employee_id,
                 "reassignment": row.reassignment,
                 "hr": row.hr,

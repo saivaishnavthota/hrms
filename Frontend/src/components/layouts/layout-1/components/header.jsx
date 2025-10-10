@@ -67,14 +67,14 @@ export function Header({ menu }) {
       <div className="container-fluid flex justify-between items-stretch lg:gap-4">
         {/* Left: Brand + Title */}
         <div className="flex items-center gap-4">
-          <Link to="/" className="shrink-0 flex items-center gap-2">
+          
             <img
               src={toAbsoluteUrl('/media/images/Nxzen_logo.jpg')}
               className="h-[32px] w-auto"
               alt="Nxzen Logo"
             />
             <span className="text-xl font-semibold text-gray-800 lowercase">nxzen</span>
-          </Link>
+         
           <span className="h-6 w-px bg-border" />
           <h1 className="text-lg font-semibold text-gray-900">
             {headingText}

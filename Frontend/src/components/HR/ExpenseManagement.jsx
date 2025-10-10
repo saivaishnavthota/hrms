@@ -82,7 +82,7 @@ const ExpenseManagement = () => {
 
   // Fallback implementation for avatarBg
   const getAvatarColor = (name) => {
-    const colors = ['bg-blue-500', 'bg-green-500', 'bg-purple-500', 'bg-red-500', 'bg-indigo-500'];
+    const colors = [ 'bg-[rgb(141,233,113)]', 'bg-[rgb(173,150,220)]', 'bg-black'];
     const index = name ? name.length % colors.length : 0;
     return colors[index];
   };

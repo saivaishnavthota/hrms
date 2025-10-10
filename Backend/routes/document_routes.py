@@ -413,6 +413,8 @@ def get_all_documents(
                     name=employee.name,
                     email=employee.company_email or employee.email or "",
                     role=employee.role,
+                    type=employee.employment_type or "Full-time",
+                    
                     documents=doc_list
                 )
             )

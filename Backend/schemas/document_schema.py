@@ -13,6 +13,7 @@ class EmployeeDocuments(SQLModel):
     name: str
     email: str
     role: str
+    type:str
     documents: List[DocumentStatus]
 
 class DraftResponse(SQLModel):

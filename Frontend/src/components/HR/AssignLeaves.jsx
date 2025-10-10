@@ -110,7 +110,7 @@ const AssignLeaves = () => {
           employee: e.name,
           email: e.email || e.to_email || '',
           avatar: e.avatar || null,
-          type: e.type || 'Full-time',
+          type: e.employment_type ,
           role: e.role || 'Employee',
           sickLeave: 0,
           casualLeave: 0,
@@ -448,7 +448,7 @@ const AssignLeaves = () => {
                   </div>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
-                  <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${emp.type === 'Full-time' ? 'bg-green-100 text-green-800' : emp.type === 'Part-time' ? 'bg-yellow-100 text-yellow-800' : 'bg-blue-100 text-blue-800'}`}>{emp.type}</span>
+                  <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${emp.type === 'full_time' ? 'bg-green-100 text-green-800' : emp.type === 'Contract' ? 'bg-yellow-100 text-yellow-800' : 'bg-blue-100 text-blue-800'}`}>{emp.type}</span>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{emp.role}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-center"><span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">{emp.sickLeave}</span></td>

@@ -15,12 +15,9 @@ import { useUser } from '@/contexts/UserContext';
 
 const getAvatarColor = (name) => {
   const colors = [
-    'bg-blue-500',
-    'bg-green-500',
-    'bg-purple-500',
-    'bg-pink-500',
-    'bg-indigo-500',
-    'bg-red-500'
+    'bg-[rgb(141,233,113)]', // R141 G233 B113
+    'bg-[rgb(173,150,220)]', // R173 G150 B220
+    'bg-black'
   ];
   const index = name.length % colors.length;
   return colors[index];
@@ -107,7 +104,7 @@ const EmployeeManagement = () => {
         company_email: emp.email ?? emp.company_email,
         company_employee_id: emp.company_employee_id,
         reassignment: emp.reassignment === true,
-        type: emp.type || 'Full-time',
+        type: emp.employment_type ,
         designation: emp.role || 'Employee',
         status: emp.status || 'Active',
         location: emp.location_name || emp.location || '',
@@ -456,17 +453,17 @@ const EmployeeManagement = () => {
                       <span className={`px-2 py-1 text-xs font-semibold rounded ${
                         employee.designation === 'HR' ? 'text-purple-700 bg-purple-50' :
                         employee.designation === 'Manager' ? 'text-orange-700 bg-orange-50' :
-                        employee.designation === 'Account Manager' ? 'text-blue-700 bg-blue-50' :
+                        employee.designation === 'Account Manager' ? 'text-pink-700 bg-pink-50' :
                         employee.designation === 'Intern' ? 'text-green-700 bg-green-50' :
-                        employee.designation === 'Employee' ? 'text-indigo-700 bg-indigo-50' :
+                        employee.designation === 'Employee' ? 'text-yellow-700 bg-yellow-50' :
                         'text-gray-700 bg-gray-50'
                       }`}>
                         {employee.designation || 'Employee'}
                       </span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {employee.type}
-                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                  <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${employee.type === 'full_time' ? 'bg-green-100 text-green-800' : employee.type === 'Contract' ? 'bg-yellow-100 text-yellow-800' : 'bg-blue-100 text-blue-800'}`}>{employee.type}</span>
+                </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
                         {employee.status}

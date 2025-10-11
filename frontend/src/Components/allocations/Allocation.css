@@ -1,0 +1,124 @@
+/* Allocation-specific styles aligned with App.css, Asset.css, Vendor.css, and Employee.css */
+.allocation-list {
+  background-color: #fff;
+  padding: 20px;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.app-container.dark .allocation-list {
+  background-color: #2d3748;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.allocation-list h2 {
+  font-size: 24px;
+  margin-bottom: 15px;
+  color: #2d3748;
+}
+
+.app-container.dark .allocation-list h2 {
+  color: #e2e8f0;
+}
+
+.allocation-form {
+  max-width: 100%;
+  overflow-x: auto;
+  margin-bottom: 20px;
+  padding: 15px;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.app-container.dark .allocation-form {
+  background: #2d3748;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.allocation-form form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 15px;
+}
+
+.allocation-form input,
+.allocation-form select {
+  padding: 10px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 14px;
+  transition: border-color 0.3s, box-shadow 0.3s;
+}
+
+.app-container.dark .allocation-form input,
+.app-container.dark .allocation-form select {
+  background: #4a5568;
+  border-color: #718096;
+  color: #e2e8f0;
+}
+
+.allocation-form input:focus,
+.allocation-form select:focus {
+  border-color: #3b82f6;
+  outline: none;
+  box-shadow: 0 0 5px rgba(59, 130, 246, 0.3);
+}
+
+.allocation-form input.error,
+.allocation-form select.error {
+  border-color: #ef4444;
+}
+
+.allocation-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 500px;
+}
+
+.allocation-table th,
+.allocation-table td {
+  padding: 12px;
+  text-align: left;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.app-container.dark .allocation-table th,
+.app-container.dark .allocation-table td {
+  border-bottom: 1px solid #4a5568;
+}
+
+.allocation-table th {
+  background-color: #f9fafb;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.app-container.dark .allocation-table th {
+  background-color: #2d3748;
+  color: #e2e8f0;
+}
+
+.allocation-table tr:hover {
+  background-color: #f8fafc;
+}
+
+.app-container.dark .allocation-table tr:hover {
+  background-color: #4a5568;
+}
+
+@media (max-width: 768px) {
+  .allocation-list {
+    padding: 15px;
+  }
+
+  .allocation-form {
+    padding: 10px;
+  }
+
+  .allocation-form form {
+    grid-template-columns: 1fr;
+  }
+}

@@ -7,6 +7,7 @@ import { MENU_SIDEBAR_EMPLOYEE } from '@/config/employee-layout.config';
 import { MENU_SIDEBAR_INTERN } from '@/config/intern-layout.config';
 import { MENU_SIDEBAR_MANAGER } from '@/config/manager-layout.config';
 import { MENU_SIDEBAR_ACCOUNT_MANAGER } from '@/config/account-manager-layout.config';
+import { MENU_SIDEBAR_IT_SUPPORTER } from '@/config/it-supporter-layout.config';
 import EmployeeManagement from '@/components/HR/EmployeeManagement';
 import Dashboard from '@/components/HR/Dashboard';
 import ChangePassword from '@/components/HR/ChangePassword';
@@ -51,6 +52,13 @@ import ManagerEmployeeAttendance from '@/components/Manager/EmployeesAttendance'
 import ManagerAttendance from '@/components/Manager/Attendance';
 // Super HR components
 import HRConfig from '@/components/HR/HRConfig';
+import ITSupporterDashboard from '@/components/ITSupporter/Dashboard';
+import ITSupporterAssets from '@/components/ITSupporter/Assets';
+import ITSupporterVendors from '@/components/ITSupporter/Vendors';
+import ITSupporterEmployees from '@/components/ITSupporter/Employees';
+import ITSupporterAllocations from '@/components/ITSupporter/Allocations';
+import ITSupporterMaintanance from '@/components/ITSupporter/Maintanance';
+import ITSupporterMyActivity from '@/components/ITSupporter/MyActivity';
 
 export const AppRoutingSetup = () => {
   return (
@@ -73,14 +81,14 @@ export const AppRoutingSetup = () => {
         <Route path="document-collection" element={<DocumentCollection />} />
         <Route path="pending-requests" element={<PendingRequests />} />
         <Route path="view-leave-application" element={<ViewLeaveApplication />} />
-         <Route path="change-password" element={< ChangePassword/>} />
+        <Route path="change-password" element={< ChangePassword/>} />
         <Route path="leave-requests" element={<LeaveRequests />} />
         <Route path="assign-leaves" element={<AssignLeaves />} />
         <Route path="add-attendance" element={<HRAddAttendance />} />
         <Route path="employees-attendance" element={<EmployeeAttendance />} />
         <Route path="holidays" element={<Holidays />} />
         <Route path="add-policies" element={<AddCompanyPolicy />} />
-         <Route path="reset-password" element={< ChangePassword/>} />
+        <Route path="reset-password" element={< ChangePassword/>} />
         <Route path="my-activity" element={<MyActivity />} />
       </Route>
 
@@ -158,6 +166,18 @@ export const AppRoutingSetup = () => {
       
       {/* Default route - redirect to login */}
       <Route path="/" element={<Navigate to="/login" replace />} />
+
+      {/* Public IT Supporter demo routes using Layout1 with IT menu (no auth) */}
+      <Route path="/it-supporter-demo" element={<Layout1 menu={MENU_SIDEBAR_IT_SUPPORTER.map(item => ({ ...item, path: item.path.replace('/it-supporter', '/it-supporter-demo') }))} />}>
+        <Route index element={<ITSupporterDashboard />} />
+        <Route path="dashboard" element={<ITSupporterDashboard />} />
+        <Route path="assets" element={<ITSupporterAssets />} />
+        <Route path="vendors" element={<ITSupporterVendors />} />
+        <Route path="employees" element={<ITSupporterEmployees />} />
+        <Route path="allocations" element={<ITSupporterAllocations />} />
+        <Route path="maintanance" element={<ITSupporterMaintanance />} />
+        <Route path="my-activity" element={<ITSupporterMyActivity />} />
+      </Route>
     </Routes>
   );
 };

@@ -50,7 +50,7 @@ export function Header({ menu }) {
     ? 'Welcome to Super HR Portal'
     : isHR
     ? 'Welcome to HR Portal'
-    : 'Welcome to Nxzen Portal';
+    : 'Welcome to IT Supporter Portal';
 
   // Close sheet when route changes
   useEffect(() => {

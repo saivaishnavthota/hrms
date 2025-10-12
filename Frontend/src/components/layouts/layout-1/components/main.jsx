@@ -34,8 +34,9 @@ export function Main({ menu }) {
   const isManager = pathname.startsWith('/manager');
   const isAccountManager = pathname.startsWith('/account-manager');
   const isSuperHRPath = pathname.startsWith('/super-hr');
-  const showTopNavbar = isHR || isSuperHRPath || isEmployee || isIntern || isManager || isAccountManager;
-  const showSidebar = !showTopNavbar && !isMobile; // remove sidebar for HR + other roles
+  const isITSupporter = pathname.startsWith('/it-supporter') || pathname.startsWith('/it-supporter-demo');
+  const showTopNavbar = isHR || isSuperHRPath || isEmployee || isIntern || isManager || isAccountManager || isITSupporter;
+  const showSidebar = !showTopNavbar && !isMobile; // remove sidebar for HR + other roles including IT Supporter
   const [activeParent, setActiveParent] = useState(null);
 
   useEffect(() => {
@@ -156,7 +157,7 @@ export function Main({ menu }) {
         )}
 
         {/* Non-HR roles top navbar: single line, no labels */}
-        {!isHR && (isEmployee || isIntern || isManager || isAccountManager) && (
+        {!isHR && (isEmployee || isIntern || isManager || isAccountManager || isITSupporter) && (
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <Navbar>
               <div className="flex space-x-6 overflow-x-auto scrollbar-hide py-2 border-b border-gray-100 w-full">

@@ -106,6 +106,8 @@ export const getRedirectPath = (userType) => {
       return '/account-manager';
     case 'manager':
       return '/manager';
+    case 'itsupporter':
+      return '/it-supporter';
     default:
       return '/login';
   }

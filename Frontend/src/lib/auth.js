@@ -27,7 +27,9 @@ export const getCurrentUser = () => {
     isEmployee: userType === 'Employee',
     isHR: userType === 'Hr',
     isManager: userType === 'Manager',
-    isIntern: userType === 'Intern'
+    isIntern: userType === 'Intern',
+    isAccountManager: userType === 'AccountManager',
+    isITSupporter: userType === 'ITSupporter'
   };
 };
 

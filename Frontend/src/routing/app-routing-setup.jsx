@@ -55,6 +55,8 @@ import HRConfig from '@/components/HR/HRConfig';
 import ITSupporterDashboard from '@/components/ITSupporter/Dashboard';
 import ITSupporterAssets from '@/components/ITSupporter/Assets';
 import ITSupporterVendors from '@/components/ITSupporter/Vendors';
+import ITSupporterAllocations from '@/components/ITSupporter/Allocations';
+
 
 import ITSupporterMaintanance from '@/components/ITSupporter/Maintanance';
 import ITSupporterMyActivity from '@/components/ITSupporter/MyActivity';
@@ -172,6 +174,7 @@ export const AppRoutingSetup = () => {
         <Route path="dashboard" element={<ITSupporterDashboard />} />
         <Route path="assets" element={<ITSupporterAssets />} />
         <Route path="vendors" element={<ITSupporterVendors />} />
+        <Route path="allocations" element={<ITSupporterAllocations />} />
         <Route path="maintanance" element={<ITSupporterMaintanance />} />
         <Route path="my-activity" element={<ITSupporterMyActivity />} />
       </Route>

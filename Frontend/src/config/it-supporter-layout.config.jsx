@@ -17,6 +17,11 @@ export const MENU_SIDEBAR_IT_SUPPORTER = [
     path: '/it-supporter/vendors',
   },
   {
+    title: 'Allocations',
+    icon: ListChecks,
+    path: '/it-supporter/allocations',
+  },
+  {
     title: 'Maintanance',
     icon: Wrench,
     path: '/it-supporter/maintanance',

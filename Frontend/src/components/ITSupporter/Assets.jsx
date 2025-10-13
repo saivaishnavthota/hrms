@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
-import { Eye, Edit, Plus, X } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Eye, Edit, Plus, Trash2, X } from 'lucide-react';
+import { getAssets, getAssetById, createAsset, updateAsset, deleteAsset, getVendors } from '../../lib/api';
 
 const statusBadgeClasses = (status) => {
   switch (status) {
@@ -14,259 +15,278 @@ const statusBadgeClasses = (status) => {
   }
 };
 
-const mockVendors = ['Dell Technologies', 'HP Inc.', 'Microsoft', 'Logitech'];
-
-const mockAssets = [
-  {
-    id: 1,
-    name: 'Dell Latitude 7420',
-    tag: 'ASSET-00123',
-    type: 'Laptop',
-    status: 'Active',
-    condition: 'Good',
-    serialNumber: 'DL7420-SN-001',
-    brand: 'Dell',
-    model: 'Latitude 7420',
-    modelNo: 'DL-7420',
-    purchaseDate: '2024-02-10',
-    eolDate: '2027-02-10',
-    amcStartDate: '2024-02-11',
-    amcEndDate: '2025-02-11',
-    purchasePrice: 125000,
-    rentalCost: '',
-    vendor: 'Dell Technologies',
-    vendorId: '902',
-    operatingSystem: 'Windows 11 Pro',
-    ram: '16 GB',
-    hddCapacity: '512 GB SSD',
-    processor: 'Intel Core i7',
-    administrator: 'IT Support Team',
-    additionalNotes: 'Assigned to engineering team.'
-  },
-  {
-    id: 2,
-    name: 'HP Z24i Monitor',
-    tag: 'ASSET-00456',
-    type: 'Monitor',
-    status: 'In Repair',
-    condition: 'Used',
-    serialNumber: 'HPZ24i-SN-0456',
-    brand: 'HP',
-    model: 'Z24i',
-    modelNo: 'HP-Z24i',
-    purchaseDate: '2023-09-18',
-    eolDate: '',
-    amcStartDate: '',
-    amcEndDate: '',
-    purchasePrice: 26000,
-    rentalCost: '',
-    vendor: 'HP Inc.',
-    vendorId: '523',
-    operatingSystem: '',
-    ram: '',
-    hddCapacity: '',
-    processor: '',
-    administrator: '',
-    additionalNotes: 'Under repair - backlight issue.'
-  },
-  {
-    id: 3,
-    name: 'Office 365 E3 License',
-    tag: 'LIC-00089',
-    type: 'Software',
-    status: 'Active',
-    condition: 'New',
-    serialNumber: 'O365-E3-00089',
-    brand: 'Microsoft',
-    model: 'Office 365 E3',
-    modelNo: 'MS-O365E3',
-    purchaseDate: '2024-01-02',
-    eolDate: '2025-01-02',
-    amcStartDate: '2024-01-02',
-    amcEndDate: '2025-01-02',
-    purchasePrice: 1350,
-    rentalCost: '',
-    vendor: 'Microsoft',
-    vendorId: '771',
-    operatingSystem: '',
-    ram: '',
-    hddCapacity: '',
-    processor: '',
-    administrator: 'Admin Portal',
-    additionalNotes: 'Annual subscription.'
-  },
-  {
-    id: 4,
-    name: 'Logitech MX Keys Keyboard',
-    tag: 'ASSET-00891',
-    type: 'Peripheral',
-    status: 'Inactive',
-    condition: 'Used',
-    serialNumber: 'LOGI-MXK-891',
-    brand: 'Logitech',
-    model: 'MX Keys',
-    modelNo: 'LG-MXK',
-    purchaseDate: '',
-    eolDate: '',
-    amcStartDate: '',
-    amcEndDate: '',
-    purchasePrice: 8500,
-    rentalCost: '',
-    vendor: 'Logitech',
-    vendorId: '115',
-    operatingSystem: '',
-    ram: '',
-    hddCapacity: '',
-    processor: '',
-    administrator: '',
-    additionalNotes: ''
-  }
-];
-
 const fieldConfigs = {
   basic: [
-    { key: 'assetName', label: 'ASSET NAME *', type: 'text', required: true, placeholder: 'Enter asset name' },
-    { key: 'assetTag', label: 'ASSET TAG *', type: 'text', required: true, placeholder: 'Enter asset tag' },
-    { key: 'assetType', label: 'ASSET TYPE *', type: 'text', required: true, placeholder: 'Enter asset type' },
-    { key: 'serialNumber', label: 'SERIAL NUMBER *', type: 'text', required: true, placeholder: 'Enter serial number' },
-    { key: 'status', label: 'Status', type: 'select', options: ['In Stock', 'Allocated', 'In Repair', 'Inactive'], placeholder: 'Select status' },
-    { key: 'condition', label: 'Condition *', type: 'select', options: ['New', 'Used', 'Refurbished', 'Good'], required: true, placeholder: 'Select condition' },
+    { key: 'asset_name', label: 'ASSET NAME *', type: 'text', required: true, placeholder: 'Enter asset name' },
+    { key: 'asset_tag', label: 'ASSET TAG *', type: 'text', required: true, placeholder: 'Enter asset tag' },
+    { key: 'asset_type', label: 'ASSET TYPE *', type: 'text', required: true, placeholder: 'Enter asset type' },
+    { key: 'serial_number', label: 'SERIAL NUMBER *', type: 'text', required: true, placeholder: 'Enter serial number' },
+    { key: 'status', label: 'Status', type: 'select', options: ['In Stock', 'Allocated', 'Under Repair', 'Scrapped', 'Returned'], placeholder: 'Select status' },
+    { key: 'condition', label: 'Condition *', type: 'select', options: ['New', 'Fair', 'Damaged', 'Good'], required: true, placeholder: 'Select condition' },
   ],
   purchase: [
     { key: 'brand', label: 'BRAND', type: 'text', placeholder: 'Enter brand' },
     { key: 'model', label: 'MODEL', type: 'text', placeholder: 'Enter model' },
-    { key: 'modelNo', label: 'MODEL NO', type: 'text', placeholder: 'Enter model no' },
-    { key: 'purchaseDate', label: 'PURCHASE DATE', type: 'date' },
-    { key: 'eolDate', label: 'EOL DATE', type: 'date' },
-    { key: 'amcStartDate', label: 'AMC START DATE', type: 'date' },
-    { key: 'amcEndDate', label: 'AMC END DATE', type: 'date' },
-    { key: 'purchasePrice', label: 'PURCHASE PRICE', type: 'number', placeholder: 'Enter purchase price' },
-    { key: 'rentalCost', label: 'RENTAL COST', type: 'number', placeholder: 'Enter rental cost' },
-    { key: 'vendor', label: 'Vendor', type: 'select', options: mockVendors, placeholder: 'Select Vendor' },
-    { key: 'vendorId', label: 'Vendor ID', type: 'text', placeholder: 'Enter vendor ID' },
+    { key: 'model_no', label: 'MODEL NO', type: 'text', placeholder: 'Enter model no' },
+    { key: 'purchase_date', label: 'PURCHASE DATE', type: 'date' },
+    { key: 'eol_date', label: 'EOL DATE', type: 'date' },
+    { key: 'amc_start_date', label: 'AMC START DATE', type: 'date' },
+    { key: 'amc_end_date', label: 'AMC END DATE', type: 'date' },
+    { key: 'purchase_price', label: 'PURCHASE PRICE', type: 'number', placeholder: 'Enter purchase price' },
+    { key: 'rental_cost', label: 'RENTAL COST', type: 'number', placeholder: 'Enter rental cost' },
+    { key: 'vendor_id', label: 'Vendor', type: 'select', options: [], placeholder: 'Select Vendor' },
   ],
   technical: [
-    { key: 'operatingSystem', label: 'OPERATING SYSTEM', type: 'text', placeholder: 'Enter operating system' },
+    { key: 'operating_system', label: 'OPERATING SYSTEM', type: 'text', placeholder: 'Enter operating system' },
     { key: 'ram', label: 'RAM', type: 'text', placeholder: 'Enter ram' },
-    { key: 'hddCapacity', label: 'HDD CAPACITY', type: 'text', placeholder: 'Enter hdd capacity' },
+    { key: 'hdd_capacity', label: 'HDD CAPACITY', type: 'text', placeholder: 'Enter hdd capacity' },
     { key: 'processor', label: 'PROCESSOR', type: 'text', placeholder: 'Enter processor' },
     { key: 'administrator', label: 'ADMINISTRATOR', type: 'text', placeholder: 'Enter administrator' },
-    { key: 'additionalNotes', label: 'ADDITIONAL NOTES', type: 'textarea', placeholder: 'Enter additional notes' },
+    { key: 'additional_notes', label: 'ADDITIONAL NOTES', type: 'textarea', placeholder: 'Enter additional notes' },
   ],
 };
 
 const Assets = () => {
-  const [assets, setAssets] = useState(mockAssets);
+  const [assets, setAssets] = useState([]);
+  const [vendors, setVendors] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
   const [activeTab, setActiveTab] = useState('basic');
-  const [formData, setFormData] = useState({
-    assetName: '', assetTag: '', assetType: '', serialNumber: '', status: 'In Stock', condition: 'Good',
-    brand: '', model: '', modelNo: '', purchaseDate: '', eolDate: '', amcStartDate: '', amcEndDate: '', purchasePrice: '', rentalCost: '', vendor: '', vendorId: '',
-    operatingSystem: '', ram: '', hddCapacity: '', processor: '', administrator: '', additionalNotes: ''
-  });
-  const [isViewOpen, setIsViewOpen] = useState(false);
   const [viewAsset, setViewAsset] = useState(null);
+  const [isViewOpen, setIsViewOpen] = useState(false);
+  const [error, setError] = useState(null);
+  const [loading, setLoading] = useState(false);
 
-  const handleView = (asset) => {
-    setViewAsset(asset);
-    setIsViewOpen(true);
-  };
+  const [formData, setFormData] = useState({
+    asset_name: '',
+    asset_tag: '',
+    asset_type: '',
+    serial_number: '',
+    status: 'In Stock',
+    condition: 'Good',
+    brand: '',
+    model: '',
+    model_no: '',
+    purchase_date: '',
+    eol_date: '',
+    amc_start_date: '',
+    amc_end_date: '',
+    purchase_price: '',
+    rental_cost: '',
+    vendor_id: '',
+    operating_system: '',
+    ram: '',
+    hdd_capacity: '',
+    processor: '',
+    administrator: '',
+    additional_notes: '',
+  });
 
-  const fetchAssetDetailsMock = (id) => {
-    const found = assets.find((a) => a.id === id);
-    if (!found) return null;
-    // Simulate backend expansion of fields for edit
-    return {
-      assetName: found.name || '',
-      assetTag: found.tag || '',
-      assetType: found.type || '',
-      serialNumber: found.serialNumber || '',
-      status: found.status || 'In Stock',
-      condition: found.condition || 'Good',
-      brand: found.brand || '',
-      model: found.model || '',
-      modelNo: found.modelNo || '',
-      purchaseDate: found.purchaseDate || '',
-      eolDate: found.eolDate || '',
-      amcStartDate: found.amcStartDate || '',
-      amcEndDate: found.amcEndDate || '',
-      purchasePrice: String(found.purchasePrice || ''),
-      rentalCost: String(found.rentalCost || ''),
-      vendor: found.vendor || '',
-      vendorId: found.vendorId || '',
-      operatingSystem: found.operatingSystem || '',
-      ram: found.ram || '',
-      hddCapacity: found.hddCapacity || '',
-      processor: found.processor || '',
-      administrator: found.administrator || '',
-      additionalNotes: found.additionalNotes || '',
-    };
-  };
+  useEffect(() => {
+    fetchAssets();
+    fetchVendors();
+  }, []);
 
-  const handleEdit = (asset) => {
-    const data = fetchAssetDetailsMock(asset.id);
-    if (data) {
-      setFormData(data);
-      setActiveTab('basic');
-      setIsModalOpen(true);
-    } else {
-      alert('Failed to load asset details (mock).');
+  const fetchAssets = async () => {
+    setLoading(true);
+    try {
+      const data = await getAssets();
+      setAssets(Array.isArray(data) ? data : []);
+      setError(null);
+    } catch (err) {
+      setError(err.message || 'Failed to fetch assets. Please check if the backend server is running.');
+      setAssets([]);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleAddAsset = () => setIsModalOpen(true);
-  const handleCloseModal = () => setIsModalOpen(false);
-  const handleCloseView = () => setIsViewOpen(false);
-
-  const onChangeField = (key, value) => {
-    setFormData((prev) => ({ ...prev, [key]: value }));
+  const fetchVendors = async () => {
+    try {
+      const data = await getVendors();
+      setVendors(Array.isArray(data) ? data : []);
+    } catch (err) {
+      setError(err.message || 'Failed to fetch vendors');
+    }
   };
 
-  const requiredKeys = ['assetName', 'assetTag', 'assetType', 'serialNumber', 'condition'];
+  const resetForm = () => {
+    setFormData({
+      asset_name: '',
+      asset_tag: '',
+      asset_type: '',
+      serial_number: '',
+      status: 'In Stock',
+      condition: 'Good',
+      brand: '',
+      model: '',
+      model_no: '',
+      purchase_date: '',
+      eol_date: '',
+      amc_start_date: '',
+      amc_end_date: '',
+      purchase_price: '',
+      rental_cost: '',
+      vendor_id: '',
+      operating_system: '',
+      ram: '',
+      hdd_capacity: '',
+      processor: '',
+      administrator: '',
+      additional_notes: '',
+    });
+    setActiveTab('basic');
+  };
 
-  const handleSubmit = (e) => {
+  const handleAddAsset = () => {
+    resetForm();
+    setIsEditing(false);
+    setIsModalOpen(true);
+  };
+
+  const handleView = async (asset) => {
+    try {
+      const assetData = await getAssetById(asset.asset_id);
+      setViewAsset(assetData);
+      setIsViewOpen(true);
+      setError(null);
+    } catch (err) {
+      setError(err.message || 'Failed to fetch asset details');
+    }
+  };
+
+  const handleEdit = async (asset) => {
+    try {
+      const assetData = await getAssetById(asset.asset_id);
+      setFormData({
+        asset_name: assetData.asset_name?.trim() || '',
+        asset_tag: assetData.asset_tag?.trim() || '',
+        asset_type: assetData.asset_type?.trim() || '',
+        serial_number: assetData.serial_number?.trim() || '',
+        status: assetData.status || 'In Stock',
+        condition: assetData.condition || 'Good',
+        brand: assetData.brand?.trim() || '',
+        model: assetData.model?.trim() || '',
+        model_no: assetData.model_no?.trim() || '',
+        purchase_date: assetData.purchase_date || '',
+        eol_date: assetData.eol_date || '',
+        amc_start_date: assetData.amc_start_date || '',
+        amc_end_date: assetData.amc_end_date || '',
+        purchase_price: assetData.purchase_price != null ? String(assetData.purchase_price) : '',
+        rental_cost: assetData.rental_cost != null ? String(assetData.rental_cost) : '',
+        vendor_id: assetData.vendor_id != null ? String(assetData.vendor_id) : '',
+        operating_system: assetData.operating_system?.trim() || '',
+        ram: assetData.ram?.trim() || '',
+        hdd_capacity: assetData.hdd_capacity?.trim() || '',
+        processor: assetData.processor?.trim() || '',
+        administrator: assetData.administrator?.trim() || '',
+        additional_notes: assetData.additional_notes?.trim() || '',
+      });
+      setViewAsset(assetData);
+      setIsEditing(true);
+      setActiveTab('basic');
+      setIsModalOpen(true);
+      setError(null);
+    } catch (err) {
+      setError(err.message || 'Failed to load asset details');
+    }
+  };
+
+
+  const handleDelete = async (assetId) => {
+    if (window.confirm('Are you sure you want to delete this asset?')) {
+      try {
+        await deleteAsset(assetId);
+        fetchAssets();
+        setError(null);
+      } catch (err) {
+        setError(err.message || 'Failed to delete asset');
+      }
+    }
+  };
+
+  const onChangeField = (key, value) => {
+    setFormData((prev) => ({ ...prev, [key]: typeof value === 'string' ? value.trim() : value }));
+  };
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    for (const k of requiredKeys) {
-      if (!formData[k] || String(formData[k]).trim() === '') {
-        alert(`Please fill required field: ${k}`);
+    const requiredKeys = ['asset_name', 'asset_tag', 'asset_type', 'serial_number', 'condition'];
+    for (const key of requiredKeys) {
+      if (!formData[key]?.trim()) {
+        setError(`Please fill required field: ${fieldConfigs.basic.find((f) => f.key === key).label}`);
         return;
       }
     }
 
-    const newAsset = {
-      id: assets.length ? Math.max(...assets.map((a) => a.id)) + 1 : 1,
-      name: formData.assetName,
-      tag: formData.assetTag,
-      type: formData.assetType,
-      status: formData.status || 'Active',
-      condition: formData.condition || 'Good',
-      serialNumber: formData.serialNumber || '',
-      brand: formData.brand || '',
-      model: formData.model || '',
-      modelNo: formData.modelNo || '',
-      purchaseDate: formData.purchaseDate || '',
-      eolDate: formData.eolDate || '',
-      amcStartDate: formData.amcStartDate || '',
-      amcEndDate: formData.amcEndDate || '',
-      purchasePrice: formData.purchasePrice ? Number(formData.purchasePrice) : '',
-      rentalCost: formData.rentalCost ? Number(formData.rentalCost) : '',
-      vendor: formData.vendor || '',
-      vendorId: formData.vendorId || '',
-      operatingSystem: formData.operatingSystem || '',
-      ram: formData.ram || '',
-      hddCapacity: formData.hddCapacity || '',
-      processor: formData.processor || '',
-      administrator: formData.administrator || '',
-      additionalNotes: formData.additionalNotes || '',
-    };
+    // Validate purchase_price and rental_cost
+    if (formData.purchase_price && isNaN(Number(formData.purchase_price))) {
+      setError('Purchase price must be a valid number');
+      return;
+    }
+    if (formData.rental_cost && isNaN(Number(formData.rental_cost))) {
+      setError('Rental cost must be a valid number');
+      return;
+    }
 
-    setAssets((prev) => [newAsset, ...prev]);
+    // Validate date fields
+    const dateFields = ['purchase_date', 'eol_date', 'amc_start_date', 'amc_end_date'];
+    for (const key of dateFields) {
+      if (formData[key] && !/^\d{4}-\d{2}-\d{2}$/.test(formData[key])) {
+        setError(`${fieldConfigs.purchase.find((f) => f.key === key).label} must be a valid date (YYYY-MM-DD)`);
+        return;
+      }
+    }
+
+    try {
+      const payload = {
+        ...formData,
+        asset_name: formData.asset_name.trim(),
+        asset_tag: formData.asset_tag.trim(),
+        asset_type: formData.asset_type.trim(),
+        serial_number: formData.serial_number.trim(),
+        brand: formData.brand?.trim() || null,
+        model: formData.model?.trim() || null,
+        model_no: formData.model_no?.trim() || null,
+        purchase_date: formData.purchase_date || null,
+        eol_date: formData.eol_date || null,
+        amc_start_date: formData.amc_start_date || null,
+        amc_end_date: formData.amc_end_date || null,
+        purchase_price: formData.purchase_price ? Number(formData.purchase_price) : null,
+        rental_cost: formData.rental_cost ? Number(formData.rental_cost) : null,
+        vendor_id: formData.vendor_id ? Number(formData.vendor_id) : null,
+        operating_system: formData.operating_system?.trim() || null,
+        ram: formData.ram?.trim() || null,
+        hdd_capacity: formData.hdd_capacity?.trim() || null,
+        processor: formData.processor?.trim() || null,
+        administrator: formData.administrator?.trim() || null,
+        additional_notes: formData.additional_notes?.trim() || null,
+      };
+      if (isEditing && viewAsset) {
+        await updateAsset(viewAsset.asset_id, payload);
+      } else {
+        await createAsset(payload);
+      }
+      setIsModalOpen(false);
+      setIsEditing(false);
+      setViewAsset(null);
+      resetForm();
+      fetchAssets();
+      setError(null);
+    } catch (err) {
+      setError(err.message || 'Failed to save asset. Please check if the backend server is running.');
+    }
+  };
+
+  const handleCloseModal = () => {
     setIsModalOpen(false);
-    setFormData((prev) => ({
-      ...prev,
-      assetName: '', assetTag: '', assetType: '', serialNumber: '', condition: 'Good', status: 'In Stock', vendor: '', vendorId: ''
-    }));
-    alert('Asset added successfully (mock).');
+    setIsEditing(false);
+    resetForm();
+  };
+
+  const handleCloseView = () => {
+    setIsViewOpen(false);
+    setViewAsset(null);
   };
 
   const display = (val) => (val && String(val).trim() !== '' ? val : '-');
@@ -285,62 +305,89 @@ const Assets = () => {
           </button>
         </div>
 
-        {/* Table */}
-        <div className="bg-white rounded-lg shadow overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50 border-b border-gray-200">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">S.No</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Asset Details</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tag</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                  <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Vendor Action</th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {assets.map((asset, index) => (
-                  <tr key={asset.id} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{index + 1}</td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div>
-                        <div className="font-medium text-gray-900">{asset.name}</div>
-                        <div className="text-sm text-gray-500">Vendor: {display(asset.vendor)}</div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="px-2 py-1 text-sm font-semibold text-blue-700 bg-blue-50 rounded">{asset.tag}</span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="px-2 py-1 text-xs font-semibold rounded bg-indigo-50 text-indigo-700">{asset.type}</span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${statusBadgeClasses(asset.status)}`}>{asset.status}</span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-center">
-                      <div className="flex items-center justify-center gap-2">
-                        <button onClick={() => handleView(asset)} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="View">
-                          <Eye className="h-4 w-4" />
-                        </button>
-                        <button onClick={() => handleEdit(asset)} className="p-2 text-orange-600 hover:bg-orange-50 rounded-lg transition-colors" title="Edit">
-                          <Edit className="h-4 w-4" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
+        {error && <p className="text-red-500">{error}</p>}
+        {loading && <p className="text-gray-500">Loading assets...</p>}
 
-        {/* Modal: Add Asset */}
+        {Array.isArray(assets) && assets.length === 0 && !loading && (
+          <p className="text-gray-500">No assets found.</p>
+        )}
+
+        {Array.isArray(assets) && assets.length > 0 && (
+          <div className="bg-white rounded-lg shadow overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-gray-50 border-b border-gray-200">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">S.No</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Asset Details</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tag</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                    <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {assets.map((asset, index) => (
+                    <tr key={asset.asset_id} className="hover:bg-gray-50 transition-colors">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{index + 1}</td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div>
+                          <div className="font-medium text-gray-900">{asset.asset_name}</div>
+                          <div className="text-sm text-gray-500">
+                            Vendor: {vendors.length > 0 ? (vendors.find((v) => v.vendor_id === asset.vendor_id)?.vendor_name || '-') : '-'}
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className="px-2 py-1 text-sm font-semibold text-blue-700 bg-blue-50 rounded">{asset.asset_tag}</span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className="px-2 py-1 text-xs font-semibold rounded bg-indigo-50 text-indigo-700">{asset.asset_type}</span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${statusBadgeClasses(asset.status)}`}>
+                          {asset.status}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-center">
+                        <div className="flex items-center justify-center gap-2">
+                          <button
+                            onClick={() => handleView(asset)}
+                            className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                            title="View"
+                          >
+                            <Eye className="h-4 w-4" />
+                          </button>
+                          <button
+                            onClick={() => handleEdit(asset)}
+                            className="p-2 text-orange-600 hover:bg-orange-50 rounded-lg transition-colors"
+                            title="Edit"
+                          >
+                            <Edit className="h-4 w-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDelete(asset.asset_id)}
+                            className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                            title="Delete"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* Modal: Add/Edit Asset */}
         {isModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
             <div className="w-full max-w-6xl bg-white rounded-lg shadow-xl">
               <div className="flex items-center justify-between px-6 py-4 border-b">
-                <h2 className="text-xl font-semibold">Add Asset</h2>
+                <h2 className="text-xl font-semibold">{isEditing ? 'Edit Asset' : 'Add Asset'}</h2>
                 <button onClick={handleCloseModal} className="p-2 hover:bg-gray-100 rounded">
                   <X className="h-5 w-5 text-gray-600" />
                 </button>
@@ -356,9 +403,8 @@ const Assets = () => {
                     <button
                       key={t.key}
                       onClick={() => setActiveTab(t.key)}
-                      className={`w-full text-left px-3 py-2 rounded-lg transition-colors ${
-                        activeTab === t.key ? 'bg-blue-50 text-blue-700 border border-blue-200' : 'hover:bg-gray-100 text-gray-700'
-                      }`}
+                      className={`w-full text-left px-3 py-2 rounded-lg transition-colors ${activeTab === t.key ? 'bg-blue-50 text-blue-700 border border-blue-200' : 'hover:bg-gray-100 text-gray-700'
+                        }`}
                     >
                       {t.label}
                     </button>
@@ -378,9 +424,17 @@ const Assets = () => {
                             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                           >
                             <option value="">{f.placeholder || 'Select'}</option>
-                            {f.options?.map((opt) => (
-                              <option key={opt} value={opt}>{opt}</option>
-                            ))}
+                            {f.key === 'vendor_id'
+                              ? vendors.map((vendor) => (
+                                <option key={vendor.vendor_id} value={vendor.vendor_id}>
+                                  {vendor.vendor_name}
+                                </option>
+                              ))
+                              : f.options?.map((opt) => (
+                                <option key={opt} value={opt}>
+                                  {opt}
+                                </option>
+                              ))}
                           </select>
                         ) : f.type === 'textarea' ? (
                           <textarea
@@ -397,6 +451,7 @@ const Assets = () => {
                             onChange={(e) => onChangeField(f.key, e.target.value)}
                             placeholder={f.placeholder}
                             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                            required={f.required}
                           />
                         )}
                       </div>
@@ -404,8 +459,19 @@ const Assets = () => {
                   </div>
 
                   <div className="flex items-center justify-end gap-3 mt-6">
-                    <button type="button" onClick={handleCloseModal} className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-100">Cancel</button>
-                    <button type="submit" className="px-6 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700">Add Asset</button>
+                    <button
+                      type="button"
+                      onClick={handleCloseModal}
+                      className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-100"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      className="px-6 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700"
+                    >
+                      {isEditing ? 'Save Changes' : 'Add Asset'}
+                    </button>
                   </div>
                 </form>
               </div>
@@ -431,31 +497,19 @@ const Assets = () => {
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="text-sm font-medium text-gray-600">Name</label>
-                      <div className="text-gray-900">{display(viewAsset.name)}</div>
+                      <div className="text-gray-900">{display(viewAsset.asset_name)}</div>
                     </div>
                     <div>
                       <label className="text-sm font-medium text-gray-600">Tag</label>
-                      <div className="text-gray-900">{display(viewAsset.tag)}</div>
+                      <div className="text-gray-900">{display(viewAsset.asset_tag)}</div>
                     </div>
                     <div>
                       <label className="text-sm font-medium text-gray-600">Type</label>
-                      <div className="text-gray-900">{display(viewAsset.type)}</div>
+                      <div className="text-gray-900">{display(viewAsset.asset_type)}</div>
                     </div>
                     <div>
                       <label className="text-sm font-medium text-gray-600">Serial Number</label>
-                      <div className="text-gray-900">{display(viewAsset.serialNumber)}</div>
-                    </div>
-                    <div>
-                      <label className="text-sm font-medium text-gray-600">Brand</label>
-                      <div className="text-gray-900">{display(viewAsset.brand)}</div>
-                    </div>
-                    <div>
-                      <label className="text-sm font-medium text-gray-600">Model</label>
-                      <div className="text-gray-900">{display(viewAsset.model)}</div>
-                    </div>
-                    <div>
-                      <label className="text-sm font-medium text-gray-600">Model No</label>
-                      <div className="text-gray-900">{display(viewAsset.modelNo)}</div>
+                      <div className="text-gray-900">{display(viewAsset.serial_number)}</div>
                     </div>
                     <div>
                       <label className="text-sm font-medium text-gray-600">Status</label>
@@ -481,37 +535,51 @@ const Assets = () => {
                   <h3 className="text-lg font-semibold mb-4">Purchase Details</h3>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
+                      <label className="text-sm font-medium text-gray-600">Brand</label>
+                      <div className="text-gray-900">{display(viewAsset.brand)}</div>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-gray-600">Model</label>
+                      <div className="text-gray-900">{display(viewAsset.model)}</div>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-gray-600">Model No</label>
+                      <div className="text-gray-900">{display(viewAsset.model_no)}</div>
+                    </div>
+                    <div>
                       <label className="text-sm font-medium text-gray-600">Purchase Date</label>
-                      <div className="text-gray-900">{display(viewAsset.purchaseDate)}</div>
+                      <div className="text-gray-900">{display(viewAsset.purchase_date)}</div>
                     </div>
                     <div>
                       <label className="text-sm font-medium text-gray-600">EOL Date</label>
-                      <div className="text-gray-900">{display(viewAsset.eolDate)}</div>
+                      <div className="text-gray-900">{display(viewAsset.eol_date)}</div>
                     </div>
                     <div>
                       <label className="text-sm font-medium text-gray-600">AMC Start Date</label>
-                      <div className="text-gray-900">{display(viewAsset.amcStartDate)}</div>
+                      <div className="text-gray-900">{display(viewAsset.amc_start_date)}</div>
                     </div>
                     <div>
                       <label className="text-sm font-medium text-gray-600">AMC End Date</label>
-                      <div className="text-gray-900">{display(viewAsset.amcEndDate)}</div>
+                      <div className="text-gray-900">{display(viewAsset.amc_end_date)}</div>
                     </div>
                     <div>
                       <label className="text-sm font-medium text-gray-600">Purchase Price</label>
-                      <div className="text-gray-900">{display(viewAsset.purchasePrice)}</div>
+                      <div className="text-gray-900">{display(viewAsset.purchase_price)}</div>
                     </div>
                     <div>
                       <label className="text-sm font-medium text-gray-600">Rental Cost</label>
-                      <div className="text-gray-900">{display(viewAsset.rentalCost)}</div>
+                      <div className="text-gray-900">{display(viewAsset.rental_cost)}</div>
                     </div>
                     <div>
                       <label className="text-sm font-medium text-gray-600">Vendor</label>
-                      <div className="text-gray-900">{display(viewAsset.vendor)}</div>
+                      <div className="text-gray-900">
+                        {vendors.length > 0 ? (vendors.find((v) => v.vendor_id === viewAsset.vendor_id)?.vendor_name || '-') : '-'}
+                      </div>
                     </div>
-                    <div>
+                    {/* <div>
                       <label className="text-sm font-medium text-gray-600">Vendor ID</label>
-                      <div className="text-gray-900">{display(viewAsset.vendorId)}</div>
-                    </div>
+                      <div className="text-gray-900">{display(viewAsset.vendor_id)}</div>
+                    </div> */}
                   </div>
                 </div>
 
@@ -521,7 +589,7 @@ const Assets = () => {
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="text-sm font-medium text-gray-600">Operating System</label>
-                      <div className="text-gray-900">{display(viewAsset.operatingSystem)}</div>
+                      <div className="text-gray-900">{display(viewAsset.operating_system)}</div>
                     </div>
                     <div>
                       <label className="text-sm font-medium text-gray-600">RAM</label>
@@ -529,7 +597,7 @@ const Assets = () => {
                     </div>
                     <div>
                       <label className="text-sm font-medium text-gray-600">HDD Capacity</label>
-                      <div className="text-gray-900">{display(viewAsset.hddCapacity)}</div>
+                      <div className="text-gray-900">{display(viewAsset.hdd_capacity)}</div>
                     </div>
                     <div>
                       <label className="text-sm font-medium text-gray-600">Processor</label>
@@ -541,7 +609,7 @@ const Assets = () => {
                     </div>
                     <div className="col-span-2">
                       <label className="text-sm font-medium text-gray-600">Additional Notes</label>
-                      <div className="text-gray-900">{display(viewAsset.additionalNotes)}</div>
+                      <div className="text-gray-900">{display(viewAsset.additional_notes)}</div>
                     </div>
                   </div>
                 </div>

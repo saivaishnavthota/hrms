@@ -1,0 +1,98 @@
+version: "3.9"
+
+services:
+  backend:
+    build:
+      context: ./Backend
+      dockerfile: Dockerfile.dev
+    container_name: hrms_backend_dev
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"
+    volumes:
+      - ./Backend:/app
+      - /app/__pycache__
+      - postgres_data_dev:/var/lib/postgresql/data
+      - ./Backend/init.sql:/docker-entrypoint-initdb.d/init.sql
+    depends_on:
+      - db
+      - redis
+    environment:
+      - NODE_ENV=development
+      - ENVIRONMENT=development
+      - PORT=8000
+      - DATABASE_URL=postgresql://admin:nxzen%40123@db:5432/Nxzen
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - DEBUG=true
+      - RELOAD=true
+      - LOG_LEVEL=DEBUG
+    networks:
+      - hrms-dev-network
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./Frontend
+      dockerfile: Dockerfile.dev
+    container_name: hrms_frontend_dev
+    ports:
+      - "${FRONTEND_PORT:-3000}:3000"
+    volumes:
+      - ./Frontend:/app
+      - /app/node_modules
+    depends_on:
+      - backend
+    environment:
+      - NODE_ENV=development
+      - REACT_APP_API_URL=http://localhost:8000
+      - REACT_APP_ENVIRONMENT=development
+    networks:
+      - hrms-dev-network
+    restart: unless-stopped
+
+  db:
+    image: postgres:15-alpine
+    container_name: hrms_db_dev
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: nxzen@123
+      POSTGRES_DB: Nxzen
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data_dev:/var/lib/postgresql/data
+      - ./Backend/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - hrms-dev-network
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: hrms_redis_dev
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data_dev:/data
+    networks:
+      - hrms-dev-network
+    restart: unless-stopped
+
+  # Development tools
+  adminer:
+    image: adminer:latest
+    container_name: hrms_adminer_dev
+    ports:
+      - "8080:8080"
+    depends_on:
+      - db
+    networks:
+      - hrms-dev-network
+    restart: unless-stopped
+
+volumes:
+  postgres_data_dev:
+  redis_data_dev:
+
+networks:
+  hrms-dev-network:
+    driver: bridge

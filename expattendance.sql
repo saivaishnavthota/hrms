@@ -326,7 +326,76 @@ CREATE TABLE public.master_calendar (
     holiday_name VARCHAR NOT NULL,
     UNIQUE(location_id, holiday_date)
 );
-
+CREATE TABLE vendors (
+   vendor_id SERIAL PRIMARY KEY,
+   vendor_name VARCHAR(255) NOT NULL,
+   vendor_type VARCHAR(20) CHECK (vendor_type IN ('Purchased','Rental')),
+   contact_email VARCHAR(255),
+   contact_phone VARCHAR(20),
+   payment_terms TEXT,
+  contract_start_date DATE,
+   contract_end_date DATE,
+   notes TEXT
+);
+ 
+CREATE TABLE assets (
+   asset_id SERIAL PRIMARY KEY,
+   asset_name VARCHAR(255) NOT NULL,
+   asset_tag VARCHAR(100) UNIQUE NOT NULL,
+   asset_type VARCHAR(50) NOT NULL,
+   brand VARCHAR(100),
+   model VARCHAR(100),
+   model_no VARCHAR(100),
+   serial_number VARCHAR(100) UNIQUE NOT NULL,
+   purchase_date DATE,
+   eol_date DATE,
+   amc_start_date DATE,
+   amc_end_date DATE,
+   purchase_price NUMERIC(12,2),
+   rental_cost NUMERIC(12,2),
+   vendor_id INT REFERENCES vendors(vendor_id) ON DELETE CASCADE,
+   status VARCHAR(20) CHECK (status IN ('In Stock','Allocated','Under Repair','Scrapped','Returned')),
+   condition VARCHAR(20) CHECK (condition IN ('New','Good','Fair','Damaged')),
+   checkout_date DATE,
+   operating_system VARCHAR(100),
+   ram VARCHAR(50),
+   hdd_capacity VARCHAR(50),
+   processor VARCHAR(100),
+   administrator VARCHAR(255),
+   additional_notes TEXT,
+   allocation_history JSONB DEFAULT '[]'
+);
+ 
+CREATE TABLE employees (
+   id SERIAL PRIMARY KEY,
+   name VARCHAR(255) NOT NULL,
+   role VARCHAR(100),
+   email VARCHAR(255)
+);
+ 
+CREATE TABLE asset_allocations (
+   allocation_id SERIAL PRIMARY KEY,
+   asset_id INT REFERENCES assets(asset_id) ON DELETE CASCADE,
+   employee_id INT REFERENCES employees(id) ON DELETE CASCADE,
+   allocation_date DATE NOT NULL DEFAULT CURRENT_DATE,
+  expected_return_date DATE,
+   actual_return_date DATE,
+  condition_at_allocation VARCHAR(20),
+  condition_at_return VARCHAR(20),
+   employee_ack BOOLEAN DEFAULT FALSE,
+   notes TEXT
+);
+ 
+CREATE TABLE asset_maintenance (
+   maintenance_id SERIAL PRIMARY KEY,
+   asset_id INT REFERENCES assets(asset_id) ON DELETE CASCADE,
+   maintenance_type VARCHAR(50) CHECK (maintenance_type IN ('Warranty','AMC','Repair')),
+   start_date DATE NOT NULL,
+   end_date DATE,
+   vendor_id INT REFERENCES vendors(vendor_id) ON DELETE CASCADE,
+   cost NUMERIC(12,2),
+   notes TEXT
+);
 -- Create indexes for better performance
 CREATE INDEX IF NOT EXISTS ix_company_policies_location_id ON public.company_policies(location_id);
 CREATE INDEX IF NOT EXISTS ix_company_policies_deleted_at ON public.company_policies(deleted_at);
@@ -871,16 +940,19 @@ $$;
 -- =====================================================
 
 -- 1. Approve Employee Procedure
-CREATE OR REPLACE PROCEDURE public.approve_employee(IN p_onboarding_id integer, OUT new_emp_id integer)
- LANGUAGE plpgsql
-AS $procedure$
+CREATE OR REPLACE PROCEDURE public.approve_employee(
+    IN p_onboarding_id INTEGER,
+    OUT new_emp_id INTEGER
+)
+LANGUAGE plpgsql
+AS $$
 BEGIN
     -- Insert into employees
     INSERT INTO employees (name, email, role, employment_type, o_status, created_at)
     SELECT name,
            email,
            role,
-           CASE type  -- normalize employment_type to match constraint
+           CASE type
                WHEN 'Full-time' THEN 'full_time'
                WHEN 'Part-time' THEN 'part_time'
                WHEN 'Contractor' THEN 'contractor'
@@ -898,24 +970,24 @@ BEGIN
         dob, address, gender, graduation_year,
         work_experience_years, emergency_contact_name,
         emergency_contact_number, emergency_contact_relation,
-        created_at,updated_at
+        created_at
     )
     SELECT new_emp_id,
            full_name, contact_no, personal_email,
            dob, address, gender, graduation_year,
            work_experience_years, emergency_contact_name,
            emergency_contact_number, emergency_contact_relation,
-           now(),now()
+           now()
     FROM onboarding_emp_details
     WHERE employee_id = p_onboarding_id;
 
-    -- Insert into employee_documents (new normalized schema)
+    -- Insert into employee_documents
     INSERT INTO employee_documents (
         employee_id, doc_type, file_id, file_name, file_url, uploaded_at
     )
     SELECT new_emp_id,
            doc_type,
-           gen_random_uuid()::text,  -- PostgreSQL pgcrypto extension
+           gen_random_uuid()::text,
            file_name,
            file_url,
            uploaded_at
@@ -926,8 +998,59 @@ BEGIN
     DELETE FROM onboarding_employees WHERE id = p_onboarding_id;
     DELETE FROM onboarding_emp_details WHERE employee_id = p_onboarding_id;
     DELETE FROM onboarding_emp_docs WHERE employee_id = p_onboarding_id;
+
+    -- ✅ Call your default weekoffs function here
+    PERFORM set_default_weekoffs_for_employee(new_emp_id);
+
 END;
-$procedure$;
+$$;
+
+CREATE OR REPLACE FUNCTION set_default_weekoffs_for_employee(p_employee_id INTEGER)
+RETURNS TEXT
+LANGUAGE plpgsql
+AS $$
+DECLARE
+    current_year INTEGER;
+    start_date DATE;
+    loop_date DATE;
+    week_start DATE;
+    week_end DATE;
+    default_off_days TEXT[] := ARRAY['Saturday', 'Sunday'];
+    existing_count INTEGER;
+BEGIN
+    current_year := EXTRACT(YEAR FROM CURRENT_DATE);
+    start_date := DATE(current_year || '-01-01');
+    loop_date := start_date;
+    
+    -- Generate weekoffs for the entire year
+    WHILE EXTRACT(YEAR FROM loop_date) = current_year LOOP
+        -- Find the start of the week (Monday)
+        week_start := loop_date - (EXTRACT(DOW FROM loop_date)::INTEGER - 1) * INTERVAL '1 day';
+        week_end := week_start + INTERVAL '6 days';
+        
+        -- Check if weekoff already exists for this week
+        SELECT COUNT(*) INTO existing_count
+        FROM weekoffs 
+        WHERE employee_id = p_employee_id 
+        AND week_start = week_start::DATE;
+        
+        -- Insert default weekoff if it doesn't exist
+        IF existing_count = 0 THEN
+            INSERT INTO weekoffs (employee_id, week_start, week_end, off_days)
+            VALUES (p_employee_id, week_start::DATE, week_end::DATE, default_off_days)
+            ON CONFLICT (employee_id, week_start) DO NOTHING;
+        END IF;
+        
+        -- Move to next week
+        loop_date := week_end + INTERVAL '1 day';
+    END LOOP;
+    
+    RETURN 'Default weekoffs set successfully for employee ' || p_employee_id;
+EXCEPTION
+    WHEN OTHERS THEN
+        RETURN 'Error setting default weekoffs for employee ' || p_employee_id || ': ' || SQLERRM;
+END;
+$$;
 
 -- 2. Assign Employee Procedure
 CREATE OR REPLACE PROCEDURE public.assign_employee(IN p_employee_id integer, IN p_location_id integer, IN p_doj date, IN p_company_email text, IN p_managers integer[] DEFAULT '{}'::integer[], IN p_hrs integer[] DEFAULT '{}'::integer[], IN p_role text DEFAULT NULL::text, IN p_company_employee_id text DEFAULT NULL::text)
@@ -1056,6 +1179,65 @@ FROM policies p
 LEFT JOIN locations l ON p.location_id = l.id
 LEFT JOIN policy_categories pc ON p.category_id = pc.id
 LEFT JOIN employees e ON p.uploader_id = e.id;
+
+
+
+CREATE OR REPLACE FUNCTION update_asset_status()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF NEW.actual_return_date IS NULL THEN
+      UPDATE assets
+      SET status = 'Allocated', checkout_date = NEW.allocation_date
+      WHERE asset_id = NEW.asset_id;
+  ELSE
+      UPDATE assets
+      SET status = 'Returned'
+      WHERE asset_id = NEW.asset_id;
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+ 
+CREATE TRIGGER trg_update_status
+AFTER INSERT OR UPDATE ON asset_allocations
+FOR EACH ROW
+EXECUTE FUNCTION update_asset_status();
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+CREATE OR REPLACE FUNCTION log_allocation_history()
+RETURNS TRIGGER AS $$
+BEGIN
+  UPDATE assets
+  SET allocation_history = allocation_history || jsonb_build_object(
+      'allocation_id', NEW.allocation_id,
+      'employee_id', NEW.employee_id,
+      'allocation_date', NEW.allocation_date,
+      'expected_return_date', NEW.expected_return_date,
+      'actual_return_date', NEW.actual_return_date,
+      'condition_at_allocation', NEW.condition_at_allocation,
+      'condition_at_return', NEW.condition_at_return,
+      'employee_ack', NEW.employee_ack,
+      'notes', NEW.notes
+   )
+  WHERE asset_id = NEW.asset_id;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+ 
+CREATE TRIGGER trg_log_allocation
+AFTER INSERT OR UPDATE ON asset_allocations
+FOR EACH ROW
+EXECUTE FUNCTION log_allocation_history();
 
 
 -- =====================================================

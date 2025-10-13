@@ -722,10 +722,12 @@ const EmployeeManagement = () => {
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                   >
                     <option value="">Select role</option>
+                    <option value="Intern">Intern</option>
                     <option value="Employee">Employee</option>
                     <option value="HR">HR</option>
                     <option value="Manager">Manager</option>
                     <option value="Account Manager">Account Manager</option>
+                    <option value="itadmin">IT Admin</option>
                   </select>
                 </div>
                 <div>

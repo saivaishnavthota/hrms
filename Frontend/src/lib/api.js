@@ -395,6 +395,18 @@ export const weekoffAPI = {
   getEmployeeWeekoffs: async (employeeId) => {
     const response = await api.get(`/weekoffs/${employeeId}`);
     return response.data;
+  },
+
+  // POST /weekoffs/{employee_id}/set-default - Set default weekoffs
+  setDefaultWeekoffs: async (employeeId) => {
+    const response = await api.post(`/weekoffs/${employeeId}/set-default`);
+    return response.data;
+  },
+
+  // GET /weekoffs/{employee_id}/default - Get default weekoffs info
+  getDefaultWeekoffs: async (employeeId) => {
+    const response = await api.get(`/weekoffs/${employeeId}/default`);
+    return response.data;
   }
 };
 
@@ -524,6 +536,128 @@ export const categoriesAPI = {
     return response.data;
   },
 };
+
+export const getAssets = async (filters = {}) => {
+  const params = {};
+  if (filters.status) params.status = filters.status;
+  if (filters.asset_type) params.asset_type = filters.asset_type;
+  const res = await api.get('/api/assets/assets/', { params });
+  return res.data;
+};
+
+export const getAssetById = async (id) => {
+  const res = await api.get(`/api/assets/assets/${id}`);
+  return res.data;
+};
+
+export const createAsset = async (asset) => {
+  const res = await api.post('/api/assets/assets/', asset);
+  return res.data;
+};
+
+export const updateAsset = async (id, asset) => {
+  const res = await api.put(`/api/assets/assets/${id}`, asset);
+  return res.data;
+};
+
+export const deleteAsset = async (id) => {
+  await api.delete(`/api/assets/assets/${id}`);
+};
+
+export const getVendors = async (vendor_type = null) => {
+  try {
+    const params = vendor_type ? { vendor_type } : {};
+    const res = await api.get('/api/assets/vendors/', { params });
+    return res.data;
+  } catch (error) {
+    throw error.response?.data?.detail || 'Error fetching vendors';
+  }
+};
+
+export const getVendorById = async (id) => {
+  try {
+    const res = await api.get(`/api/assets/vendors/${id}`);
+    return res.data;
+  } catch (error) {
+    throw error.response?.data?.detail || 'Error fetching vendor';
+  }
+};
+
+export const createVendor = async (vendor) => {
+  try {
+    const res = await api.post('/api/assets/vendors/', vendor);
+    return res.data;
+  } catch (error) {
+    throw error.response?.data?.detail || 'Error creating vendor';
+  }
+};
+
+export const updateVendor = async (id, vendor) => {
+  try {
+    const res = await api.put(`/api/assets/vendors/${id}`, vendor);
+    return res.data;
+  } catch (error) {
+    throw error.response?.data?.detail || 'Error updating vendor';
+  }
+};
+
+export const deleteVendor = async (id) => {
+  try {
+    await api.delete(`/api/assets/vendors/${id}`);
+  } catch (error) {
+    throw error.response?.data?.detail || 'Error deleting vendor';
+  }
+};
+
+// Allocation Management
+export const getAllocations = async () => {
+  const response = await api.get('/api/assets/allocations/');
+  return response.data;
+};
+
+export const createAllocation = async (allocation) => {
+  const response = await api.post('/api/assets/allocations/', allocation);
+  return response.data;
+};
+
+export const updateAllocation = async (id, allocation) => {
+  const response = await api.put(`/api/assets/allocations/${id}`, allocation);
+  return response.data;
+};
+
+export const deleteAllocation = async (id) => {
+  await api.delete(`/api/assets/allocations/${id}`);
+};
+
+export const getEmployees = async (filters = {}) => {
+  const params = {};
+  if (filters.name) params.name = filters.name;
+  if (filters.id) params.id = filters.id;
+  if (filters.role) params.role = filters.role;
+  const res = await api.get('/api/assets/employees/', { params });
+  return res.data;
+};
+
+export const getMaintenanceRecords = async () => {
+  const response = await api.get('/api/assets/maintenance/');
+  return response.data;
+};
+
+export const createMaintenance = async (record) => {
+  const response = await api.post('/api/assets/maintenance/', record);
+  return response.data;
+};
+
+export const updateMaintenance = async (id, record) => {
+  const response = await api.put(`/api/assets/maintenance/${id}`, record);
+  return response.data;
+};
+
+export const deleteMaintenance = async (id) => {
+  await api.delete(`/api/assets/maintenance/${id}`);
+};
+
+
 
 // Export the axios instance for custom requests
 export default api;

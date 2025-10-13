@@ -1,8 +1,11 @@
 
 
 
+
+
+
 import React, { useState, useEffect } from 'react';
-import api from '@/lib/api';
+import api, { weekoffAPI } from '@/lib/api';
 import { Calendar, Clock, Plus, X, Save, ChevronLeft, ChevronRight, Edit3, Search, Filter, Eye, Briefcase } from 'lucide-react';
 import { useUser } from '../../contexts/UserContext';
 import { toast } from 'react-toastify';
@@ -38,6 +41,8 @@ const AddAttendance = () => {
   const [loading, setLoading] = useState(false);
   const [weekOffDays, setWeekOffDays] = useState([]);
   const [allWeekOffs, setAllWeekOffs] = useState([]);
+  const [defaultWeekoffs, setDefaultWeekoffs] = useState([]);
+  const [hasDefaultWeekoffs, setHasDefaultWeekoffs] = useState(false);
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [searchDate, setSearchDate] = useState('');
@@ -98,6 +103,7 @@ const AddAttendance = () => {
       fetchProjects();
       fetchDailyAttendance();
       fetchWeekOffs();
+      fetchDefaultWeekoffs();
     } else if (user) {
       // If user exists but no employeeId, logout
       toast.error('Employee ID not found. Logging out...');
@@ -146,6 +152,43 @@ const AddAttendance = () => {
         toast.error('Session expired. Logging out...');
         navigate('/login');
       }
+    }
+  };
+
+  const fetchDefaultWeekoffs = async () => {
+    try {
+      if (!user?.employeeId) {
+        return;
+      }
+
+      const response = await weekoffAPI.getDefaultWeekoffs(user.employeeId);
+      setDefaultWeekoffs(response.default_off_days || []);
+      setHasDefaultWeekoffs(true);
+    } catch (error) {
+      console.error('Error fetching default weekoffs:', error);
+      // Set default weekoffs as Saturday and Sunday if API fails
+      setDefaultWeekoffs(['Saturday', 'Sunday']);
+      setHasDefaultWeekoffs(true);
+    }
+  };
+
+  const setDefaultWeekoffsForEmployee = async () => {
+    try {
+      if (!user?.employeeId) {
+        toast.warn('Employee ID not found');
+        return;
+      }
+
+      setLoading(true);
+      await weekoffAPI.setDefaultWeekoffs(user.employeeId);
+      toast.success('Default weekoffs set successfully');
+      await fetchWeekOffs(); // Refresh the weekoffs
+    } catch (error) {
+      console.error('Error setting default weekoffs:', error);
+      const errorMessage = error.response?.data?.detail || 'Error setting default weekoffs';
+      toast.error(errorMessage);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -258,10 +301,13 @@ const AddAttendance = () => {
     try {
       if (!user?.employeeId) return;
    
+   
       setLoading(true);
       const weekDates = getWeekDates(currentWeek);
       const weekStart = formatDateLocal(weekDates[0]);
       const weekEnd = formatDateLocal(weekDates[6]);
+   
+     
    
       const baseData = {};
       weekDates.forEach((date, index) => {
@@ -276,15 +322,19 @@ const AddAttendance = () => {
         };
       });
    
+   
       const response = await api.get('/attendance/weekly', {
         params: {
           employee_id: user.employeeId,
           week_start: weekStart, // Pass week_start
           week_end: weekEnd      // Pass week_end
         }
+       
       });
    
+   
       console.log('Weekly Attendance Response:', response.data);
+   
    
       if (response.data) {
         const updatedData = { ...baseData };
@@ -293,6 +343,7 @@ const AddAttendance = () => {
           const rowIndex = Object.keys(updatedData).find(key =>
             updatedData[key].date === dateStr
           );
+   
    
           if (rowIndex !== undefined) {
             const projects = (attendance.projects || []).map(p => ({
@@ -303,11 +354,14 @@ const AddAttendance = () => {
                 .flatMap(st => (st.subTasks || []).map(sub => ({
                   name: sub.sub_task,
                   hours: parseFloat(sub.hours || 0)
+                 
                 })))
             }));
    
+   
             const totalHours = projects.reduce((sum, project) =>
               sum + (project.subtasks || []).reduce((subSum, subtask) => subSum + parseFloat(subtask.hours || 0), 0), 0);
+   
    
             updatedData[rowIndex] = {
               ...updatedData[rowIndex],
@@ -337,6 +391,7 @@ const AddAttendance = () => {
     }
   };
   
+  
   const handleStatusChange = (index, status) => {
     setAttendanceData(prev => ({
       ...prev,
@@ -358,6 +413,7 @@ const AddAttendance = () => {
       // Calculate total hours from subtasks
       const totalHours = selectedProjects.reduce((sum, project) =>
         sum + (project.subtasks || []).reduce((subSum, subtask) => subSum + (subtask.hours || 0), 0), 0);
+      
 
       setAttendanceData(prev => ({
         ...prev,
@@ -365,6 +421,7 @@ const AddAttendance = () => {
           ...prev[selectedRowIndex],
           projects: selectedProjects,
           hours: totalHours
+         
         }
       }));
     }
@@ -377,6 +434,7 @@ const AddAttendance = () => {
       const updatedProjects = prev[rowIndex].projects.filter((_, i) => i !== projectIndex);
       const totalHours = updatedProjects.reduce((sum, project) =>
         sum + (project.subtasks || []).reduce((subSum, subtask) => subSum + (subtask.hours || 0), 0), 0);
+       
 
       return {
         ...prev,
@@ -384,6 +442,7 @@ const AddAttendance = () => {
           ...prev[rowIndex],
           projects: updatedProjects,
           hours: totalHours
+         
         }
       };
     });
@@ -506,6 +565,7 @@ const AddAttendance = () => {
                 project_id: parseInt(p.projectId, 10),
                 sub_task: subtask.name,
                 hours: subtask.hours
+               
               }))
             )
             .flat()
@@ -582,6 +642,7 @@ const AddAttendance = () => {
           projectId: value,
           projectName: project ? project.project_name : '',
           subtasks: updated[index].subtasks.length > 0 ? updated[index].subtasks : [{ name: '', hours: 0 }]
+         
         };
       } else {
         updated[index][field] = value;
@@ -607,9 +668,7 @@ const AddAttendance = () => {
       setSelectedProjects(updated);
     };
 
-    const removeProject = (index) => {
-      setSelectedProjects(selectedProjects.filter((_, i) => i !== index));
-    };
+   
 
     return (
       <div className="fixed inset-0 bg-transparent backdrop-blur-[2px] flex items-center justify-center z-50">
@@ -730,9 +789,11 @@ const AddAttendance = () => {
   }
 
   return (
+   
     <div className="max-w-6xl mx-auto p-6 min-h-screen">
       <div className="bg-white rounded-2xl shadow-xl overflow-hidden">
         <div className="bg-gradient-to-r from-blue-500 to-indigo-600 text-white p-6">
+         
           <h1 className="text-medium font-bold flex items-center gap-3">
             <Calendar className="text-blue-200" />
             Attendance Management
@@ -745,6 +806,7 @@ const AddAttendance = () => {
         </div>
 
         <div className="border-b border-gray-200 bg-gray-50">
+        
           <nav className="grid grid-cols-3 gap-2 px-6">
             {[
               { id: 'add', label: 'Add Attendance', icon: Plus },
@@ -755,6 +817,7 @@ const AddAttendance = () => {
                 key={id}
                 onClick={() => setActiveTab(id)}
                 className={`w-full justify-center py-4 px-2 border-b-2 font-medium text-sm flex items-center gap-2 transition-colors ${activeTab === id
+            
                   ? 'border-blue-500 text-blue-600'
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                   }`}
@@ -793,34 +856,88 @@ const AddAttendance = () => {
               </div>
 
               <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-4">
-                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                  <div className="md:w-1/4">
-                    <h4 className="text-md font-semibold text-gray-800">Select your week-off's</h4>
-                    <p className="text-xs text-gray-500 mt-1">Choose up to 2 days</p>
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex flex-wrap gap-3">
-                      {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map((day) => (
-                        <label key={day} className="inline-flex items-center gap-2 px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-sm cursor-pointer select-none">
-                          <input
-                            type="checkbox"
-                            checked={weekOffDays.includes(day)}
-                            onChange={() => toggleWeekOff(day)}
-                            disabled={loading}
-                          />
-                          <span className="text-gray-800">{day}</span>
-                        </label>
-                      ))}
+                <div className="space-y-4">
+                  {/* Default Weekoffs Info */}
+                  {hasDefaultWeekoffs && (
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h5 className="text-sm font-semibold text-blue-800">Default Weekoffs</h5>
+                          <p className="text-xs text-blue-600 mt-1">
+                            Default weekoffs are: {defaultWeekoffs.join(', ')}
+                          </p>
+                        </div>
+                        <button
+                          onClick={setDefaultWeekoffsForEmployee}
+                          disabled={loading}
+                          className="px-3 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 transition-colors disabled:opacity-50"
+                        >
+                          Set Default
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                  <div className="md:w-1/4 flex md:justify-end">
-                    <button
-                      onClick={submitWeekOffs}
-                      disabled={loading || weekOffDays.length === 0}
-                      className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors disabled:opacity-50"
-                    >
-                      Save Week-Offs
-                    </button>
+                  )}
+
+                  {/* Weekoff Selection */}
+                  <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                    <div className="md:w-1/4">
+                      <h4 className="text-md font-semibold text-gray-800">Select your week-off's</h4>
+                      <p className="text-xs text-gray-500 mt-1">Choose up to 2 days (Default: Saturday, Sunday)</p>
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex flex-wrap gap-3">
+                        {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map((day) => {
+                          const isDefault = defaultWeekoffs.includes(day);
+                          const isSelected = weekOffDays.includes(day);
+                          return (
+                            <label 
+                              key={day} 
+                              className={`inline-flex items-center gap-2 px-3 py-2 border rounded-lg text-sm cursor-pointer select-none transition-colors ${
+                                isDefault 
+                                  ? 'border-blue-300 bg-blue-50 text-blue-800' 
+                                  : isSelected
+                                  ? 'border-gray-400 bg-gray-100 text-gray-800'
+                                  : 'border-gray-300 bg-gray-50 text-gray-800 hover:bg-gray-100'
+                              }`}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={isSelected}
+                                onChange={() => toggleWeekOff(day)}
+                                disabled={loading}
+                                className="sr-only"
+                              />
+                              <div className={`w-4 h-4 border-2 rounded flex items-center justify-center ${
+                                isSelected 
+                                  ? 'border-blue-600 bg-blue-600' 
+                                  : 'border-gray-400'
+                              }`}>
+                                {isSelected && (
+                                  <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                  </svg>
+                                )}
+                              </div>
+                              <span className="flex items-center gap-1">
+                                {day}
+                                {isDefault && (
+                                  <span className="text-xs text-blue-600 font-medium">(Default)</span>
+                                )}
+                              </span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </div>
+                    <div className="md:w-1/4 flex md:justify-end">
+                      <button
+                        onClick={submitWeekOffs}
+                        disabled={loading || weekOffDays.length === 0}
+                        className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors disabled:opacity-50"
+                      >
+                        Save Week-Offs
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -832,8 +949,8 @@ const AddAttendance = () => {
                       <tr>
                         <th className="px-4 py-4 text-left font-semibold">Day</th>
                         <th className="px-4 py-4 text-left font-semibold">Date</th>
-                        <th className="px-4 py-4 text-left font-semibold">Status</th>
                         <th className="px-4 py-4 text-left font-semibold">Action</th>
+                        <th className="px-4 py-4 text-left font-semibold">Status</th>
                         <th className="px-4 py-4 text-left font-semibold">Hours</th>
                         <th className="px-4 py-4 text-left font-semibold">Projects & Subtasks</th>
                         <th className="px-4 py-4 text-left font-semibold">Actions</th>
@@ -859,7 +976,7 @@ const AddAttendance = () => {
                                 onChange={(e) => handleStatusChange(index, e.target.value)}
                                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
                               >
-                                <option value="">Select Status</option>
+                                <option value="">Select Action</option>
                                 <option value="Present">Present</option>
                                 <option value="Leave">Leave</option>
                                 <option value="WFH">Work From Home</option>
@@ -870,16 +987,7 @@ const AddAttendance = () => {
                             {weekOffDays.includes(row.day) ? (
                               <span className="text-gray-400 text-sm">Week-off</span>
                             ) : (
-                              <select
-                                value={row.status}
-                                onChange={(e) => handleStatusChange(index, e.target.value)}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
-                              >
-                                <option value="">Select Status</option>
-                                <option value="Present">Present</option>
-                                <option value="Leave">Leave</option>
-                                <option value="WFH">Work From Home</option>
-                              </select>
+                              <span className="text-gray-900 text-sm">{row.status || 'Not set'}</span>
                             )}
                           </td>
                           <td className="px-4 py-4">
@@ -1054,6 +1162,7 @@ const AddAttendance = () => {
                                 <div className="text-xs text-gray-600 flex items-center gap-1">
                                   <Clock className="h-3 w-3" />
                                   {attendanceRecord.hours}h
+                                  {attendanceRecord.hours}h
                                 </div>
                               )}
                               {attendanceRecord.projects && attendanceRecord.projects.length > 0 && (
@@ -1222,7 +1331,7 @@ const AddAttendance = () => {
                               : record.status === 'Leave'
                                 ? 'bg-red-100 text-red-800'
                                 : record.status === 'WFH'
-                                  ? 'bg-blue-100 text-blue-800'
+                                  ? 'bg-purple-100 text-purple-800'
                                   : record.status === 'Week-off'
                                     ? 'bg-gray-100 text-gray-800'
                                     : 'bg-gray-100 text-gray-800'
@@ -1232,6 +1341,7 @@ const AddAttendance = () => {
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="text-sm text-gray-900">
+                              {record.hours.toFixed(2)} hrs
                               {record.hours.toFixed(2)} hrs
                             </div>
                           </td>
@@ -1320,6 +1430,7 @@ const AddAttendance = () => {
                             <div key={subIndex} className="flex items-center text-sm text-gray-600">
                               <div className="w-2 h-2 bg-blue-400 rounded-full mr-2"></div>
                               {subtask.name} - {subtask.hours} hours
+                              {subtask.name} - {subtask.hours} hours
                             </div>
                           ))}
                         </div>
@@ -1347,7 +1458,8 @@ const AddAttendance = () => {
           <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
         </div>
       )}
-    </div>
+      </div>
+   
   );
 };
 

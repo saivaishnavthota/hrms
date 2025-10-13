@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta
-from typing import List, Optional
+from typing import List, Optional, Literal
 from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException, Request, Query
 from sqlmodel import Session, select, extract
 from sqlalchemy.sql import text
@@ -12,16 +12,26 @@ from models.employee_master_model import EmployeeMaster
 from models.employee_assignment_model import EmployeeManager, EmployeeHR
 from sqlalchemy import func
 from azure.storage.blob import BlobServiceClient, ContentSettings, generate_blob_sas, BlobSasPermissions
+from utils.email import (
+    send_manager_expense_notification, 
+    send_hr_expense_notification,
+    send_account_manager_expense_notification,
+    send_employee_expense_status
+)
 import os
 from dotenv import load_dotenv
- 
+import logging
+
 router = APIRouter(prefix="/expenses", tags=["Expenses"])
- 
+
 load_dotenv()
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 AZURE_CONNECTION_STRING = os.getenv("AZURE_CONNECTION_STRING", "DefaultEndpointsProtocol=https;AccountName=hrmsnxzen;AccountKey=Jug56pLmeZIJplobcV+f20v7IXnh6PWuih0hxRYpvRXpGh6tnJrzALqtqL/hRR3lpZK0ZTKIs2Pv+AStDvBH4w==;EndpointSuffix=core.windows.net")
 AZURE_CONTAINER_NAME = os.getenv("AZURE_CONTAINER_NAME", "con-hrms")
 ACCOUNT_NAME = os.getenv("ACCOUNT_NAME", "hrmsnxzen")
 ACCOUNT_KEY = os.getenv("ACCOUNT_KEY", "Jug56pLmeZIJplobcV+f20v7IXnh6PWuih0hxRYpvRXpGh6tnJrzALqtqL/hRR3lpZK0ZTKIs2Pv+AStDvBH4w==")
+BASE_URL = os.getenv("BASE_URL", "http://localhost:8000")
  
 blob_service_client = BlobServiceClient.from_connection_string(AZURE_CONNECTION_STRING)
 container_client = blob_service_client.get_container_client(AZURE_CONTAINER_NAME)
@@ -161,6 +171,39 @@ async def submit_expense(
  
         session.commit()
         print(f"Expense submitted: request_id={req.request_id}, request_code={req.request_code}")
+        
+        # Send email notification to manager
+        try:
+            manager_assignment = session.exec(
+                select(EmployeeManager).where(EmployeeManager.employee_id == employee_id)
+            ).first()
+            
+            if manager_assignment:
+                manager = session.get(User, manager_assignment.manager_id)
+                employee = session.get(User, employee_id)
+                if manager and manager.company_email and employee:
+                    approve_url = f"{BASE_URL}/expenses/manager-action/{req.request_id}?action=Approved"
+                    reject_url = f"{BASE_URL}/expenses/manager-action/{req.request_id}?action=Rejected"
+                    
+                    logger.info(f"Sending expense notification to manager {manager.company_email}")
+                    await send_manager_expense_notification(
+                        email=manager.company_email,
+                        employee_name=employee.name,
+                        employee_email=employee.company_email,
+                        request_code=req.request_code,
+                        category=category,
+                        amount=final_amount,
+                        currency=currency,
+                        description=description or "N/A",
+                        expense_date=expense_date,
+                        approve_url=approve_url,
+                        reject_url=reject_url
+                    )
+            else:
+                logger.warning(f"No manager assigned for employee {employee_id}")
+        except Exception as e:
+            logger.error(f"Failed to send manager expense notification: {e}")
+        
         return {
             "request_id": req.request_id,
             "request_code": req.request_code,
@@ -412,8 +455,78 @@ def list_all_expenses(
     print(f"Completed /mgr-exp-list in {datetime.now() - start_time}")
     return result
  
+@router.get("/manager-action/{request_id}")
+async def manager_expense_action_get(
+    request_id: int,
+    action: Literal["Approved", "Rejected"],
+    session: Session = Depends(get_session)
+):
+    """Manager approval/rejection from email link"""
+    logger.info(f"Manager action from email: request_id={request_id}, action={action}")
+    
+    expense = session.get(ExpenseRequest, request_id)
+    if not expense:
+        raise HTTPException(status_code=404, detail="Expense request not found")
+    
+    if expense.status != "pending_manager_approval":
+        raise HTTPException(status_code=400, detail="Action already taken on this expense")
+    
+    employee = session.get(User, expense.employee_id)
+    
+    if action == "Rejected":
+        expense.status = "mgr_rejected"
+        # Send rejection email to employee
+        if employee and employee.company_email:
+            await send_employee_expense_status(
+                email=employee.company_email,
+                request_code=expense.request_code,
+                category=expense.category,
+                amount=expense.final_amount or expense.amount,
+                currency=expense.currency,
+                expense_date=str(expense.expense_date.date()),
+                status="Rejected",
+                rejected_by="Manager"
+            )
+    else:
+        expense.status = "pending_hr_approval"
+        # Send notification to HR
+        hr_assignment = session.exec(
+            select(EmployeeHR).where(EmployeeHR.employee_id == expense.employee_id)
+        ).first()
+        
+        if hr_assignment:
+            hr = session.get(User, hr_assignment.hr_id)
+            if hr and hr.company_email:
+                approve_url = f"{BASE_URL}/expenses/hr-action/{request_id}?action=Approved"
+                reject_url = f"{BASE_URL}/expenses/hr-action/{request_id}?action=Rejected"
+                
+                await send_hr_expense_notification(
+                    email=hr.company_email,
+                    employee_name=employee.name,
+                    employee_email=employee.company_email,
+                    request_code=expense.request_code,
+                    category=expense.category,
+                    amount=expense.final_amount or expense.amount,
+                    currency=expense.currency,
+                    description=expense.description or "N/A",
+                    expense_date=str(expense.expense_date.date()),
+                    approve_url=approve_url,
+                    reject_url=reject_url
+                )
+    
+    expense.updated_at = datetime.utcnow()
+    session.add(expense)
+    session.commit()
+    
+    return {
+        "success": True,
+        "message": f"Expense request {action} by Manager",
+        "request_id": request_id,
+        "action": action
+    }
+
 @router.put("/mgr-upd-status/{request_id}")
-def update_expense_status(
+async def update_expense_status(
     request_id: int,
     manager_id: int = Form(...),
     status: str = Form(...),
@@ -425,11 +538,11 @@ def update_expense_status(
    
     if status not in ["Pending", "Approved", "Rejected"]:
         raise HTTPException(status_code=400, detail="Invalid status")
- 
+
     expense = session.get(ExpenseRequest, request_id)
     if not expense:
         raise HTTPException(status_code=404, detail="Expense not found")
- 
+
     # Verify manager authorization
     is_manager = session.exec(
         select(EmployeeManager).where(
@@ -439,20 +552,58 @@ def update_expense_status(
     ).first() is not None
     if not is_manager:
         raise HTTPException(status_code=403, detail="Unauthorized: Not the assigned manager")
- 
+
+    employee = session.get(User, expense.employee_id)
+
     # Map frontend → DB statuses
     if status == "Pending":
         expense.status = "pending_manager_approval"
     elif status == "Approved":
         expense.status = "pending_hr_approval"
+        # Send notification to HR
+        hr_assignment = session.exec(
+            select(EmployeeHR).where(EmployeeHR.employee_id == expense.employee_id)
+        ).first()
+        
+        if hr_assignment:
+            hr = session.get(User, hr_assignment.hr_id)
+            if hr and hr.company_email:
+                approve_url = f"{BASE_URL}/expenses/hr-action/{request_id}?action=Approved"
+                reject_url = f"{BASE_URL}/expenses/hr-action/{request_id}?action=Rejected"
+                
+                await send_hr_expense_notification(
+                    email=hr.company_email,
+                    employee_name=employee.name if employee else "Unknown",
+                    employee_email=employee.company_email if employee else "unknown@example.com",
+                    request_code=expense.request_code,
+                    category=expense.category,
+                    amount=expense.final_amount or expense.amount,
+                    currency=expense.currency,
+                    description=expense.description or "N/A",
+                    expense_date=str(expense.expense_date.date()),
+                    approve_url=approve_url,
+                    reject_url=reject_url
+                )
     elif status == "Rejected":
         expense.status = "mgr_rejected"
- 
+        # Send rejection email to employee
+        if employee and employee.company_email:
+            await send_employee_expense_status(
+                email=employee.company_email,
+                request_code=expense.request_code,
+                category=expense.category,
+                amount=expense.final_amount or expense.amount,
+                currency=expense.currency,
+                expense_date=str(expense.expense_date.date()),
+                status="Rejected",
+                rejected_by="Manager"
+            )
+
     expense.updated_at = datetime.utcnow()
     session.add(expense)
     session.commit()
     session.refresh(expense)
- 
+
     history_entry = ExpenseHistory(
         request_id=request_id,
         action_by=manager_id,
@@ -462,7 +613,7 @@ def update_expense_status(
     )
     session.add(history_entry)
     session.commit()
- 
+
     print(f"Expense status updated: request_id={request_id}, new_status={expense.status}")
     return {
         "message": "Manager Status updated",
@@ -561,8 +712,76 @@ def list_all_expenses(
     print(f"Completed /hr-exp-list in {datetime.now() - start_time}")
     return result
  
+@router.get("/hr-action/{request_id}")
+async def hr_expense_action_get(
+    request_id: int,
+    action: Literal["Approved", "Rejected"],
+    session: Session = Depends(get_session)
+):
+    """HR approval/rejection from email link"""
+    logger.info(f"HR action from email: request_id={request_id}, action={action}")
+    
+    expense = session.get(ExpenseRequest, request_id)
+    if not expense:
+        raise HTTPException(status_code=404, detail="Expense request not found")
+    
+    if expense.status != "pending_hr_approval":
+        raise HTTPException(status_code=400, detail="Action already taken on this expense")
+    
+    employee = session.get(User, expense.employee_id)
+    
+    if action == "Rejected":
+        expense.status = "hr_rejected"
+        # Send rejection email to employee
+        if employee and employee.company_email:
+            await send_employee_expense_status(
+                email=employee.company_email,
+                request_code=expense.request_code,
+                category=expense.category,
+                amount=expense.final_amount or expense.amount,
+                currency=expense.currency,
+                expense_date=str(expense.expense_date.date()),
+                status="Rejected",
+                rejected_by="HR"
+            )
+    else:
+        expense.status = "pending_account_mgr_approval"
+        # Send notification to Account Manager
+        account_manager = session.exec(
+            select(User).where(User.role == "Account Manager")
+        ).first()
+        
+        if account_manager and account_manager.company_email:
+            approve_url = f"{BASE_URL}/expenses/account-manager-action/{request_id}?action=Approved"
+            reject_url = f"{BASE_URL}/expenses/account-manager-action/{request_id}?action=Rejected"
+            
+            await send_account_manager_expense_notification(
+                email=account_manager.company_email,
+                employee_name=employee.name if employee else "Unknown",
+                employee_email=employee.company_email if employee else "unknown@example.com",
+                request_code=expense.request_code,
+                category=expense.category,
+                amount=expense.final_amount or expense.amount,
+                currency=expense.currency,
+                description=expense.description or "N/A",
+                expense_date=str(expense.expense_date.date()),
+                approve_url=approve_url,
+                reject_url=reject_url
+            )
+    
+    expense.updated_at = datetime.utcnow()
+    session.add(expense)
+    session.commit()
+    
+    return {
+        "success": True,
+        "message": f"Expense request {action} by HR",
+        "request_id": request_id,
+        "action": action
+    }
+
 @router.put("/hr-upd-status/{request_id}")
-def update_hr_status(
+async def update_hr_status(
     request_id: int,
     hr_id: int = Form(...),
     status: str = Form(...),
@@ -574,11 +793,11 @@ def update_hr_status(
    
     if status not in ["Pending", "Approved", "Rejected"]:
         raise HTTPException(status_code=400, detail="Invalid status")
- 
+
     expense = session.get(ExpenseRequest, request_id)
     if not expense:
         raise HTTPException(status_code=404, detail="Expense not found")
- 
+
     # Verify HR authorization
     is_hr = session.exec(
         select(EmployeeHR).where(
@@ -588,20 +807,56 @@ def update_hr_status(
     ).first() is not None
     if not is_hr:
         raise HTTPException(status_code=403, detail="Unauthorized: Not the assigned HR")
- 
+
+    employee = session.get(User, expense.employee_id)
+
     # Map frontend → DB statuses
     if status == "Pending":
         expense.status = "pending_hr_approval"
     elif status == "Approved":
         expense.status = "pending_account_mgr_approval"
+        # Send notification to Account Manager
+        account_manager = session.exec(
+            select(User).where(User.role == "Account Manager")
+        ).first()
+        
+        if account_manager and account_manager.company_email:
+            approve_url = f"{BASE_URL}/expenses/account-manager-action/{request_id}?action=Approved"
+            reject_url = f"{BASE_URL}/expenses/account-manager-action/{request_id}?action=Rejected"
+            
+            await send_account_manager_expense_notification(
+                email=account_manager.company_email,
+                employee_name=employee.name if employee else "Unknown",
+                employee_email=employee.company_email if employee else "unknown@example.com",
+                request_code=expense.request_code,
+                category=expense.category,
+                amount=expense.final_amount or expense.amount,
+                currency=expense.currency,
+                description=expense.description or "N/A",
+                expense_date=str(expense.expense_date.date()),
+                approve_url=approve_url,
+                reject_url=reject_url
+            )
     elif status == "Rejected":
         expense.status = "hr_rejected"
- 
+        # Send rejection email to employee
+        if employee and employee.company_email:
+            await send_employee_expense_status(
+                email=employee.company_email,
+                request_code=expense.request_code,
+                category=expense.category,
+                amount=expense.final_amount or expense.amount,
+                currency=expense.currency,
+                expense_date=str(expense.expense_date.date()),
+                status="Rejected",
+                rejected_by="HR"
+            )
+
     expense.updated_at = datetime.utcnow()
     session.add(expense)
     session.commit()
     session.refresh(expense)
- 
+
     history_entry = ExpenseHistory(
         request_id=request_id,
         action_by=hr_id,
@@ -611,7 +866,7 @@ def update_hr_status(
     )
     session.add(history_entry)
     session.commit()
- 
+
     print(f"Expense status updated: request_id={request_id}, new_status={expense.status}")
     return {
         "message": "HR status updated",
@@ -706,8 +961,65 @@ def list_acc_mgr_expenses(
     print(f"Completed /acc-mgr-exp-list in {datetime.now() - start_time}")
     return result
  
+@router.get("/account-manager-action/{request_id}")
+async def account_manager_expense_action_get(
+    request_id: int,
+    action: Literal["Approved", "Rejected"],
+    session: Session = Depends(get_session)
+):
+    """Account Manager approval/rejection from email link"""
+    logger.info(f"Account Manager action from email: request_id={request_id}, action={action}")
+    
+    expense = session.get(ExpenseRequest, request_id)
+    if not expense:
+        raise HTTPException(status_code=404, detail="Expense request not found")
+    
+    if expense.status != "pending_account_mgr_approval":
+        raise HTTPException(status_code=400, detail="Action already taken on this expense")
+    
+    employee = session.get(User, expense.employee_id)
+    
+    if action == "Rejected":
+        expense.status = "acc_mgr_rejected"
+        # Send rejection email to employee
+        if employee and employee.company_email:
+            await send_employee_expense_status(
+                email=employee.company_email,
+                request_code=expense.request_code,
+                category=expense.category,
+                amount=expense.final_amount or expense.amount,
+                currency=expense.currency,
+                expense_date=str(expense.expense_date.date()),
+                status="Rejected",
+                rejected_by="Account Manager"
+            )
+    else:
+        expense.status = "approved"
+        # Send approval email to employee
+        if employee and employee.company_email:
+            await send_employee_expense_status(
+                email=employee.company_email,
+                request_code=expense.request_code,
+                category=expense.category,
+                amount=expense.final_amount or expense.amount,
+                currency=expense.currency,
+                expense_date=str(expense.expense_date.date()),
+                status="Approved"
+            )
+    
+    expense.updated_at = datetime.utcnow()
+    session.add(expense)
+    session.commit()
+    
+    return {
+        "success": True,
+        "message": f"Expense request {action} by Account Manager",
+        "request_id": request_id,
+        "action": action
+    }
+
 @router.put("/acc-mgr-upd-status/{request_id}")
-def update_acc_mgr_status(
+async def update_acc_mgr_status(
     request_id: int,
     acc_mgr_id: int = Form(...),
     status: str = Form(...),
@@ -719,31 +1031,54 @@ def update_acc_mgr_status(
    
     if status not in ["Pending", "Approved", "Rejected"]:
         raise HTTPException(status_code=400, detail="Invalid status")
- 
+
     expense = session.get(ExpenseRequest, request_id)
     if not expense:
         raise HTTPException(status_code=404, detail="Expense not found")
- 
+
     # Verify account manager authorization (same location as employee)
     employee = session.get(User, expense.employee_id)
     acc_mgr = session.get(User, acc_mgr_id)
     if not employee or not acc_mgr or employee.location_id != acc_mgr.location_id:
         raise HTTPException(status_code=403, detail="Unauthorized: Account manager not in same location as employee")
- 
+
     # Map frontend → DB statuses
     if status == "Pending":
         expense.status = "pending_account_mgr_approval"
     elif status == "Approved":
         expense.status = "approved"
+        # Send approval email to employee
+        if employee and employee.company_email:
+            await send_employee_expense_status(
+                email=employee.company_email,
+                request_code=expense.request_code,
+                category=expense.category,
+                amount=expense.final_amount or expense.amount,
+                currency=expense.currency,
+                expense_date=str(expense.expense_date.date()),
+                status="Approved"
+            )
     elif status == "Rejected":
         expense.status = "acc_mgr_rejected"
         expense.account_mgr_rejection_reason = reason
- 
+        # Send rejection email to employee
+        if employee and employee.company_email:
+            await send_employee_expense_status(
+                email=employee.company_email,
+                request_code=expense.request_code,
+                category=expense.category,
+                amount=expense.final_amount or expense.amount,
+                currency=expense.currency,
+                expense_date=str(expense.expense_date.date()),
+                status="Rejected",
+                rejected_by="Account Manager"
+            )
+
     expense.updated_at = datetime.utcnow()
     session.add(expense)
     session.commit()
     session.refresh(expense)
- 
+
     history_entry = ExpenseHistory(
         request_id=request_id,
         action_by=acc_mgr_id,
@@ -753,7 +1088,7 @@ def update_acc_mgr_status(
     )
     session.add(history_entry)
     session.commit()
- 
+
     print(f"Expense status updated: request_id={request_id}, new_status={expense.status}")
     return {
         "message": "Account Manager status updated",

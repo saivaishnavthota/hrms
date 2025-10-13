@@ -5,6 +5,7 @@ from schemas.onboarding_schema import UserCreate,AssignEmployeeRequest,ReassignE
 from database import get_session
 from fastapi.responses import JSONResponse,StreamingResponse
 from utils.email import send_login_email,send_onboarding_email,send_credentials_email
+from routes.weekoff_routes import set_default_weekoffs
 from auth import get_current_user, create_access_token, verify_password, role_required, hash_password
 from sqlalchemy.sql import text
 from sqlmodel import Session, select
@@ -720,6 +721,15 @@ async def assign_employee(
                 )
         
         session.commit()
+        
+        # Set default weekoffs for first assignment
+        if is_first_assignment:
+            try:
+                set_default_weekoffs(data.employee_id, session)
+                logger.info(f"Default weekoffs set for employee {data.employee_id}")
+            except Exception as e:
+                logger.error(f"Error setting default weekoffs for employee {data.employee_id}: {str(e)}")
+                # Don't fail the assignment if weekoff setting fails
         
         # Only send email for first assignment
         if is_first_assignment:

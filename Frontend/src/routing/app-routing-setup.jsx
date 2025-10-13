@@ -55,8 +55,7 @@ import HRConfig from '@/components/HR/HRConfig';
 import ITSupporterDashboard from '@/components/ITSupporter/Dashboard';
 import ITSupporterAssets from '@/components/ITSupporter/Assets';
 import ITSupporterVendors from '@/components/ITSupporter/Vendors';
-import ITSupporterEmployees from '@/components/ITSupporter/Employees';
-import ITSupporterAllocations from '@/components/ITSupporter/Allocations';
+
 import ITSupporterMaintanance from '@/components/ITSupporter/Maintanance';
 import ITSupporterMyActivity from '@/components/ITSupporter/MyActivity';
 
@@ -168,13 +167,11 @@ export const AppRoutingSetup = () => {
       <Route path="/" element={<Navigate to="/login" replace />} />
 
       {/* Public IT Supporter demo routes using Layout1 with IT menu (no auth) */}
-      <Route path="/it-supporter-demo" element={<Layout1 menu={MENU_SIDEBAR_IT_SUPPORTER.map(item => ({ ...item, path: item.path.replace('/it-supporter', '/it-supporter-demo') }))} />}>
+      <Route path="/it-supporter" element={<ProtectedRoute allowedRoles={["itadmin"]}><Layout1 menu={MENU_SIDEBAR_IT_SUPPORTER} /></ProtectedRoute>}>
         <Route index element={<ITSupporterDashboard />} />
         <Route path="dashboard" element={<ITSupporterDashboard />} />
         <Route path="assets" element={<ITSupporterAssets />} />
         <Route path="vendors" element={<ITSupporterVendors />} />
-        <Route path="employees" element={<ITSupporterEmployees />} />
-        <Route path="allocations" element={<ITSupporterAllocations />} />
         <Route path="maintanance" element={<ITSupporterMaintanance />} />
         <Route path="my-activity" element={<ITSupporterMyActivity />} />
       </Route>

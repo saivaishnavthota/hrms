@@ -35,7 +35,8 @@ export default function Login() {
 
   // Helper function to get dashboard path based on role
   const getDashboardPath = (role, isSuperHR = false) => {
-    switch (role?.toLowerCase()) {
+    const normalizedRole = (role ?? '').toString().trim().toLowerCase();
+    switch (normalizedRole) {
       case 'employee':
         return '/employee';
       case 'hr':
@@ -44,6 +45,9 @@ export default function Login() {
         return '/account-manager';
       case 'manager':
         return '/manager';
+      case 'itadmin':
+        return '/it-supporter';  
+  
       default:
         return isSuperHR ? '/super-hr/dashboard' : '/hr/dashboard';
     }
@@ -129,7 +133,7 @@ export default function Login() {
       const redirectPath = calculateRedirectPath(
         response.onboarding_status,
         response.login_status,
-        response.type,
+        response.role ?? response.type,
         response.super_hr === true
       );
       console.log('Calculated redirect path:', redirectPath);

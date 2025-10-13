@@ -45,12 +45,7 @@ services:
     networks:
       - app-network
 
-volumes:
-  postgres_data:
 
-networks:
-  app-network:
-    driver: bridge
 redis:
     image: redis:7-alpine
     container_name: redis_cache

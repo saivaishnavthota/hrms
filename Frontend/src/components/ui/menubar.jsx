@@ -42,7 +42,7 @@ function MenubarTrigger({ className, ...props }) {
       data-slot="menubar-trigger"
       className={cn(
         'flex cursor-pointer select-none items-center rounded-md px-3 py-1.5 text-sm font-medium outline-hidden',
-        'focus:bg-accent focus:text-accent-foreground',
+        'focus-visible:bg-accent focus-visible:text-accent-foreground',
         'data-[state=open]:bg-accent data-[state=open]:text-accent-foreground',
         '[&>svg]:pointer-events-none [&_svg:not([role=img]):not([class*=text-])]:opacity-60 [&_svg:not([class*=size-])]:size-4 [&>svg]:shrink-0',
         'data-[here=true]:bg-accent',
@@ -59,7 +59,7 @@ function MenubarSubTrigger({ className, inset, children, ...props }) {
       data-slot="menubar-sub-tirgger"
       className={cn(
         'flex cursor-pointer select-none items-center rounded-md px-2 py-1.5 text-sm outline-hidden',
-        'focus:bg-accent focus:text-accent-foreground',
+        'focus-visible:bg-accent focus-visible:text-accent-foreground',
         'data-[state=open]:bg-accent data-[state=open]:text-accent-foreground',
         '[&>svg]:pointer-events-none [&_svg:not([role=img]):not([class*=text-])]:opacity-60 [&_svg:not([class*=size-])]:size-4 [&>svg]:shrink-0',
         'data-[here=true]:bg-accent data-[here=true]:text-accent-foreground',
@@ -117,7 +117,7 @@ function MenubarItem({ className, inset, ...props }) {
       data-slot="menubar-item"
       className={cn(
         'relative flex cursor-default select-none items-center rounded-md px-2 py-1.5 text-sm outline-hidden data-disabled:pointer-events-none data-disabled:opacity-50',
-        'focus:bg-accent focus:text-accent-foreground',
+        'focus-visible:bg-accent focus-visible:text-accent-foreground',
         'data-[active=true]:bg-accent data-[active=true]:text-accent-foreground',
         inset && 'ps-8',
         className,
@@ -132,7 +132,7 @@ function MenubarCheckboxItem({ className, children, checked, ...props }) {
     <MenubarPrimitive.CheckboxItem
       data-slot="menubar-checkbox-item"
       className={cn(
-        'relative flex cursor-default select-none items-center rounded-md py-1.5 ps-8 pe-2 text-sm outline-hidden focus:bg-accent focus:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50',
+        'relative flex cursor-default select-none items-center rounded-md py-1.5 ps-8 pe-2 text-sm outline-hidden focus-visible:bg-accent focus-visible:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50',
         className,
       )}
       checked={checked}
@@ -153,7 +153,7 @@ function MenubarRadioItem({ className, children, ...props }) {
     <MenubarPrimitive.RadioItem
       data-slot="menubar-radio-item"
       className={cn(
-        'relative flex cursor-default select-none items-center rounded-md py-1.5 ps-8 pe-2 text-sm outline-hidden focus:bg-accent focus:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50',
+        'relative flex cursor-default select-none items-center rounded-md py-1.5 ps-8 pe-2 text-sm outline-hidden focus-visible:bg-accent focus-visible:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50',
         className,
       )}
       {...props}

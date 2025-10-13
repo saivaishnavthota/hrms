@@ -1,4 +1,4 @@
-import { LayoutGrid, ClipboardList, Plane, Upload, DollarSign, KeyRound } from 'lucide-react';
+import { LayoutGrid, ClipboardList, Plane, Upload, DollarSign, KeyRound,CalendarCheck,Coins } from 'lucide-react';
 
 export const MENU_SIDEBAR_EMPLOYEE = [
   {
@@ -13,7 +13,7 @@ export const MENU_SIDEBAR_EMPLOYEE = [
   },
   {
     title: 'Apply Leave',
-    icon: Plane,
+    icon: CalendarCheck,
     path: '/employee/apply-leave',
   },
   {
@@ -23,7 +23,7 @@ export const MENU_SIDEBAR_EMPLOYEE = [
   },
   {
     title: 'Submit Expense',
-    icon: DollarSign,
+    icon: Coins,
     path: '/employee/submit-expense',
   },
   {

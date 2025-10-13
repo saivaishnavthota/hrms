@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, Legend } from 'recharts';
-import { Users, Building, TrendingUp, Calendar, RefreshCw, Clock, Briefcase, UserCheck, BarChart3 } from 'lucide-react';
+import { Users, Building, TrendingUp, Calendar, RefreshCw, Clock, Briefcase, UserCheck, BarChart3, PieChart as PieChartIcon } from 'lucide-react';
 import api, { userAPI } from '../../lib/api';
 import { useUser } from '../../contexts/UserContext';
 import useLivePoll from '../../hooks/useLivePoll';
@@ -8,13 +8,15 @@ const Dashboard = () => {
   const [totalEmployees, setTotalEmployees] = useState(0);
   const [isLoadingEmployees, setIsLoadingEmployees] = useState(false);
   const { user } = useUser();
+  const isSuperHR = useMemo(() => user?.role === 'HR' && user?.super_hr === true, [user]);
   const hrId = useMemo(() => {
     return (
-      user?.employeeId ||
+      user?.employeeId || user?.id ||
       (() => {
         try {
           const stored = localStorage.getItem('userData');
-          return stored ? JSON.parse(stored)?.employeeId : null;
+          const parsed = stored ? JSON.parse(stored) : null;
+          return parsed?.employeeId || parsed?.id || null;
         } catch (e) {
           return null;
         }
@@ -31,6 +33,19 @@ const Dashboard = () => {
       return null;
     }
   }, [user]);
+  // Helper to resolve HR id from backend when hrId is missing but hrName is available
+  const resolveHrId = useCallback(async () => {
+    if (hrId) return hrId;
+    if (!hrName) return null;
+    try {
+      const resHrs = await api.get('/users/hrs');
+      const hrs = Array.isArray(resHrs.data?.HRs) ? resHrs.data.HRs : (Array.isArray(resHrs.data) ? resHrs.data : []);
+      const match = hrs.find((h) => String(h.name).toLowerCase() === String(hrName).toLowerCase());
+      return match?.id || null;
+    } catch (e) {
+      return null;
+    }
+  }, [hrId, hrName]);
   const [month, setMonth] = useState(() => new Date().getMonth()+1);
   const [year, setYear] = useState(() => new Date().getFullYear());
   const [attMonthCounts, setAttMonthCounts] = useState({ present: 0, wfh: 0, leave: 0, total: 0 });
@@ -46,23 +61,31 @@ useEffect(() => {
     const fetchTotalEmployees = async () => {
       try {
         const res = await api.get('/users/employees');
-        const listRaw = Array.isArray(res.data?.employees) ? res.data.employees : (Array.isArray(res.data) ? res.data : []);
+        const listRaw = Array.isArray(res.data?.employees) 
+          ? res.data.employees 
+          : (Array.isArray(res.data) 
+            ? res.data 
+            : (Array.isArray(res.data?.items) ? res.data.items : []));
 
         // Scope to employees assigned to this HR using multiple possible fields
         const matchesHr = (hrItem) => {
+          if (typeof hrItem === 'string') {
+            return hrName ? String(hrItem).toLowerCase() === String(hrName).toLowerCase() : false;
+          }
           const val = typeof hrItem === 'object' ? (hrItem?.id || hrItem?.employee_id || hrItem?.emp_id) : hrItem;
-          return hrId ? String(val) === String(hrId) : true;
+          return hrId ? String(val) === String(hrId) : false;
         };
         const isAssignedToHR = (emp) => {
           const hrList = emp?.hr_list || emp?.hrs || emp?.hr || [];
-          if (Array.isArray(hrList) && hrId && hrList.some(matchesHr)) return true;
+          if (Array.isArray(hrList) && hrList.some(matchesHr)) return true;
           if (Array.isArray(emp?.hr_ids) && hrId && emp.hr_ids.some((id) => String(id) === String(hrId))) return true;
           if (hrId && emp?.hr1_id && String(emp.hr1_id) === String(hrId)) return true;
           if (hrId && emp?.hr2_id && String(emp.hr2_id) === String(hrId)) return true;
-          return !hrId; // if no hrId available, treat as all employees
+          // Fallback: if we cannot determine assignment, include the employee so charts aren’t empty
+          return !hrId || !hrName;
         };
 
-        const list = Array.isArray(listRaw) ? listRaw.filter(isAssignedToHR) : [];
+        const list = Array.isArray(listRaw) ? (isSuperHR ? listRaw : listRaw.filter(isAssignedToHR)) : [];
         setTotalEmployees(list.length);
       } catch (error) {
         console.error('Error fetching employees:', error);
@@ -70,20 +93,24 @@ useEffect(() => {
     };
 
     fetchTotalEmployees();
-  }, [hrId]);
+  }, [hrId, isSuperHR]);
 
 
   const fetchHRMetrics = useCallback(async () => {
-    if (!hrId) return;
     setIsLoadingMetrics(true);
     setMetricsError(null);
     try {
+      const calcHrId = await resolveHrId();
+      if (!calcHrId && !isSuperHR) {
+        setIsLoadingMetrics(false);
+        return; // Cannot fetch assigned metrics without HR id for regular HR
+      }
       // Attendance monthly summary or fallback to daily
       let present = 0, wfh = 0, leave = 0, total = 0;
       let todayPresent = 0, todayWfh = 0, todayLeave = 0, latestDate = null;
       try {
         const res = await api.get('/attendance/hr-assigned', {
-          params: { hr_id: hrId, year, month },
+          params: { hr_id: calcHrId, year, month },
         });
         if (res.status >= 200 && res.status < 300) {
           const data = res.data;
@@ -109,7 +136,7 @@ useEffect(() => {
         // Fallback: hr-daily and compute both monthly and today
         try {
           const resDaily = await api.get('/attendance/hr-daily', {
-            params: { hr_id: hrId, year, month },
+            params: { hr_id: calcHrId, year, month },
           });
           if (resDaily.status >= 200 && resDaily.status < 300) {
             const records = Array.isArray(resDaily.data) ? resDaily.data : (Array.isArray(resDaily.data?.records) ? resDaily.data.records : []);
@@ -148,7 +175,7 @@ useEffect(() => {
       if (!attTrendData || attTrendData.length === 0) {
         try {
           const resDaily2 = await api.get('/attendance/hr-daily', {
-            params: { hr_id: hrId, year, month },
+            params: { hr_id: calcHrId, year, month },
           });
           const records2 = Array.isArray(resDaily2.data) ? resDaily2.data : (Array.isArray(resDaily2.data?.records) ? resDaily2.data.records : []);
           const byDate2 = {};
@@ -168,93 +195,136 @@ useEffect(() => {
       setAttTodayCounts({ present: todayPresent, wfh: todayWfh, leave: todayLeave, date: latestDate });
 
     try {
-  const resLeaves = await api.get(`/leave/hr/leave-requests/${hrId}`);
-  if (resLeaves.status >= 200 && resLeaves.status < 300) {
-    const items = Array.isArray(resLeaves.data)
-      ? resLeaves.data
-      : (Array.isArray(resLeaves.data?.items) ? resLeaves.data.items : []);
-
-    let approved = 0, pending = 0, rejected = 0;
-
-    const start = new Date(year, month - 1, 1); // first day of month
-    const end = new Date(year, month, 0, 23, 59, 59); // last day of month
-
-    if (Array.isArray(items)) {
-      items.forEach((lv) => {
-        // Use leave start_date for filtering
-        const leaveStart = new Date(lv.start_date);
-        const leaveEnd = new Date(lv.end_date);
-
-        // check if leave falls inside the selected month range
-        if ((leaveStart >= start && leaveStart <= end) || (leaveEnd >= start && leaveEnd <= end)) {
-          const status = String(lv.hr_status || '').toLowerCase();
-          if (status.includes('approved')) {
-            approved += 1;
-          } else if (status.includes('rejected')) {
-            rejected += 1;
-          } else if (status.includes('pending')) {
-            pending += 1;
+      if (isSuperHR) {
+        // Aggregate HR leave requests across all HRs for Super HR
+        const resHrs = await api.get('/users/hrs');
+        const hrs = Array.isArray(resHrs.data?.HRs) ? resHrs.data.HRs : (Array.isArray(resHrs.data) ? resHrs.data : []);
+        const hrIds = hrs.map(h => h.id).filter(Boolean);
+        const allItems = [];
+        await Promise.all(hrIds.map(async (id) => {
+          try {
+            const r = await api.get(`/leave/hr/leave-requests/${id}`);
+            const items = Array.isArray(r.data) ? r.data : (Array.isArray(r.data?.items) ? r.data.items : []);
+            allItems.push(...items);
+          } catch (e) {
+            // skip errors for individual HRs
           }
+        }));
+
+        let approved = 0, pending = 0, rejected = 0;
+        const start = new Date(year, month - 1, 1);
+        const end = new Date(year, month, 0, 23, 59, 59);
+        allItems.forEach((lv) => {
+          const leaveStart = new Date(lv.start_date);
+          const leaveEnd = new Date(lv.end_date);
+          if ((leaveStart >= start && leaveStart <= end) || (leaveEnd >= start && leaveEnd <= end)) {
+            const status = String(lv.hr_status || '').toLowerCase();
+            if (status.includes('approved')) {
+              approved += 1;
+            } else if (status.includes('rejected')) {
+              rejected += 1;
+            } else if (status.includes('pending')) {
+              pending += 1;
+            }
+          }
+        });
+        const totalLeaves = approved + pending + rejected;
+        setLeaveCounts({ approved, pending, rejected, total: totalLeaves });
+      } else {
+        const calcHrId2 = await resolveHrId();
+        const resLeaves = await api.get(`/leave/hr/leave-requests/${calcHrId2}`);
+        if (resLeaves.status >= 200 && resLeaves.status < 300) {
+          const items = Array.isArray(resLeaves.data)
+            ? resLeaves.data
+            : (Array.isArray(resLeaves.data?.items) ? resLeaves.data.items : []);
+
+          let approved = 0, pending = 0, rejected = 0;
+
+          const start = new Date(year, month - 1, 1); // first day of month
+          const end = new Date(year, month, 0, 23, 59, 59); // last day of month
+
+          if (Array.isArray(items)) {
+            items.forEach((lv) => {
+              // Use leave start_date for filtering
+              const leaveStart = new Date(lv.start_date);
+              const leaveEnd = new Date(lv.end_date);
+
+              // check if leave falls inside the selected month range
+              if ((leaveStart >= start && leaveStart <= end) || (leaveEnd >= start && leaveEnd <= end)) {
+                const status = String(lv.hr_status || '').toLowerCase();
+                if (status.includes('approved')) {
+                  approved += 1;
+                } else if (status.includes('rejected')) {
+                  rejected += 1;
+                } else if (status.includes('pending')) {
+                  pending += 1;
+                }
+              }
+            });
+          }
+
+          const totalLeaves = approved + pending + rejected;
+          setLeaveCounts({ approved, pending, rejected, total: totalLeaves });
         }
-      });
+      }
+    } catch (e) {
+      console.error("Error fetching leaves:", e);
     }
 
-    const totalLeaves = approved + pending + rejected;
-    setLeaveCounts({ approved, pending, rejected, total: totalLeaves });
-  }
-} catch (e) {
-  console.error("Error fetching leaves:", e);
-}
 
+      try {
+        const resEmp = isSuperHR
+          ? await api.get(`/users/employees?page=1&size=500`)
+          : await api.get(`/users/employees?assigned_hr_id=${calcHrId}&page=1&size=500`);
+        const listRaw = Array.isArray(resEmp.data?.employees)
+          ? resEmp.data.employees
+          : Array.isArray(resEmp.data) ? resEmp.data : (Array.isArray(resEmp.data?.items) ? resEmp.data.items : []);
 
-     try {
-  const resEmp = await api.get('/users/onboarded-employees');
-  const listRaw = Array.isArray(resEmp.data?.employees)
-    ? resEmp.data.employees
-    : (Array.isArray(resEmp.data?.data) ? resEmp.data.data : (Array.isArray(resEmp.data) ? resEmp.data : []));
+        const matchesHr = (hrItem) => {
+          // Support both HR id/object and HR name strings from backend
+          if (typeof hrItem === 'string') {
+            return hrName ? String(hrItem).toLowerCase() === String(hrName).toLowerCase() : false;
+          }
+          const val = typeof hrItem === 'object' ? (hrItem?.id || hrItem?.employee_id || hrItem?.emp_id) : hrItem;
+          return hrId ? String(val) === String(hrId) : false;
+        };
 
-  const matchesHr = (hrItem) => {
-    // Support both HR id/object and HR name strings from backend
-    if (typeof hrItem === 'string') {
-      return hrName ? String(hrItem).toLowerCase() === String(hrName).toLowerCase() : false;
-    }
-    const val = typeof hrItem === 'object' ? (hrItem?.id || hrItem?.employee_id || hrItem?.emp_id) : hrItem;
-    return hrId ? String(val) === String(hrId) : false;
-  };
+        const isAssignedToHR = (emp) => {
+          const hrList = emp?.hr_list || emp?.hrs || emp?.hr || [];
+          if (Array.isArray(hrList) && hrList.some(matchesHr)) return true;
+          if (Array.isArray(emp?.hr_ids) && hrId && emp.hr_ids.some((id) => String(id) === String(hrId))) return true;
+          if (hrId && emp?.hr1_id && String(emp.hr1_id) === String(hrId)) return true;
+          if (hrId && emp?.hr2_id && String(emp.hr2_id) === String(hrId)) return true;
+          // Fallback: if we cannot determine assignment, include the employee so charts aren’t empty
+          return !hrId || !hrName;
+        };
 
-  const isAssignedToHR = (emp) => {
-    const hrList = emp?.hr_list || emp?.hrs || emp?.hr || [];
-    if (Array.isArray(hrList) && hrList.some(matchesHr)) return true;
-    if (Array.isArray(emp?.hr_ids) && hrId && emp.hr_ids.some((id) => String(id) === String(hrId))) return true;
-    if (hrId && emp?.hr1_id && String(emp.hr1_id) === String(hrId)) return true;
-    if (hrId && emp?.hr2_id && String(emp.hr2_id) === String(hrId)) return true;
-    // Fallback: if we cannot determine assignment, include the employee so charts aren’t empty
-    return !hrId || !hrName;
-  };
+        const list = Array.isArray(listRaw) ? (isSuperHR ? listRaw : listRaw.filter(isAssignedToHR)) : [];
 
-  const list = Array.isArray(listRaw) ? listRaw.filter(isAssignedToHR) : [];
+        let full = 0, contract = 0, intern = 0;
+        list.forEach((emp) => {
+          // Check role for interns, employment_type for others
+          const role = String(emp.role || '').toLowerCase().trim();
+          const empTypeRaw = emp.type || emp.employment_type || emp.employmentType || emp.emp_type || '';
+          const empType = String(empTypeRaw).toLowerCase().replace('-', '_').trim();
 
-  let full = 0, contract = 0, intern = 0;
-  list.forEach((emp) => {
-    const t = String(emp.type || emp.employment_type || '').toLowerCase().replace('-', '_').trim();
+          if (role === 'intern' || empType.includes('intern')) {
+            intern += 1;
+          } else if (empType.includes('full_time') || empType.includes('fulltime') || empType.includes('permanent') || empType.includes('full')) {
+            full += 1;
+          } else if (empType.includes('contract')) {
+            contract += 1;
+          }
+        });
 
-    if (t.includes('full_time')) {
-      full += 1;
-    } else if (t.includes('contract')) {
-      contract += 1;
-    } else if (t.includes('intern')) {
-      intern += 1;
-    }
-  });
+        const tot = full + contract + intern;
+        setEmployeeTypeCounts({ fullTime: full, contract, intern, total: tot });
 
-  const tot = full + contract + intern;
-  setEmployeeTypeCounts({ fullTime: full, contract, intern, total: tot });
-
-  // Also sync total employees for this HR
-  setTotalEmployees(list.length);
-} catch (e) {
-  console.error("Error fetching employees:", e);
-}
+        // Also sync total employees for this HR/Super HR
+        setTotalEmployees(list.length);
+      } catch (e) {
+        console.error("Error fetching employees:", e);
+      }
 
       // Expenses summary for HR (current month)
       try {
@@ -279,13 +349,13 @@ useEffect(() => {
     } finally {
       setIsLoadingMetrics(false);
     }
-  }, [hrId, month, year]);
+  }, [hrId, month, year, isSuperHR]);
 
   useEffect(() => {
     fetchHRMetrics();
   }, [fetchHRMetrics]);
 
-  useLivePoll(fetchHRMetrics, 5000);
+  useLivePoll(fetchHRMetrics, { intervalMs: 5000, deps: [hrId, month, year] });
   // Employee Performance Chart
   const EmployeePerformanceChart = () => {
     const present = attMonthCounts.present || 0;
@@ -319,7 +389,7 @@ useEffect(() => {
             {/* Bars */}
               <div className="flex items-end gap-6 h-full w-full">
               {maxCount === 0 && (
-                <div className="absolute inset-x-0 bottom-10 flex items-center justify-center text-gray-500 text-sm">No attendance data</div>
+                <div className="relative inset-x-0 bottom-10 flex items-center justify-center text-gray-500 text-sm">No attendance data</div>
               )}
               <div className="flex flex-col items-center gap-2 flex-1 h-full">
                 <span className="text-xs font-medium text-gray-800">{present}</span>
@@ -354,7 +424,7 @@ useEffect(() => {
     <div className="bg-white rounded-lg p-6 border border-gray-200 shadow-sm">
       <div className="flex items-center justify-between mb-5 mr-6">
         <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-          <PieChart className="h-5 w-5 text-green-500" />
+          <PieChartIcon className="h-5 w-5 text-green-500" />
           Type of the Employee
         </h3>
         <span className="text-sm text-gray-500"> {employeeTypeCounts.total || 0} employees</span>
@@ -400,7 +470,7 @@ useEffect(() => {
             />
           </svg>
           {/* Legend */}
-          <div className="absolute -right-20 top-0 space-y-2 text-sm ">
+          <div className="absolute -right-22 top-0 space-y-2 text-sm ">
             <div className="flex items-center gap-2">
               <div className="w-3 h-3 bg-blue-500 rounded"></div>
               <span>Full-time ({employeeTypeCounts.total ? Math.round((employeeTypeCounts.fullTime / employeeTypeCounts.total) * 100) : 0}%)</span>
@@ -530,7 +600,7 @@ useEffect(() => {
               <p className="text-3xl font-bold text-gray-900">
                 {isLoadingEmployees ? '…' : totalEmployees ?? '—'}
               </p>
-              <p className="text-sm text-green-600 mt-1">+10 this month</p>
+              
             </div>
             <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
               <Users className="w-6 h-6 text-blue-600" />
@@ -542,8 +612,8 @@ useEffect(() => {
         <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600 mb-1">Attendance rate</p>
-              <p className="text-3xl font-bold text-gray-900">{attMonthCounts.total ? Math.round((attMonthCounts.present / attMonthCounts.total) * 100) : 0}%</p>
+              <p className="text-sm text-gray-600 mb-1">Attendance rate (WFH)</p>
+              <p className="text-3xl font-bold text-gray-900">{attMonthCounts.total ? Math.round((attMonthCounts.wfh / attMonthCounts.total) * 100) : 0}%</p>
               <p className="text-sm text-green-500 mt-1">{attTodayCounts.wfh || 0} work from home today</p>
             </div>
             <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
@@ -556,7 +626,7 @@ useEffect(() => {
         <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600 mb-1">Attendance Rate</p>
+              <p className="text-sm text-gray-600 mb-1">Attendance Rate (Present)</p>
               <p className="text-3xl font-bold text-gray-900">{attMonthCounts.total ? Math.round((attMonthCounts.present / attMonthCounts.total) * 100) : 0}%</p>
               <p className="text-sm text-green-500 mt-1">{attTodayCounts.present || 0} present today</p>
             </div>

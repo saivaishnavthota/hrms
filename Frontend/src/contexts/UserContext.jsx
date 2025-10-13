@@ -23,6 +23,10 @@ export const UserProvider = ({ children }) => {
         
         if (storedUser && authToken) {
           const userData = JSON.parse(storedUser);
+          // Ensure super_hr is properly handled (could be undefined, null, or false)
+          userData.super_hr = userData.super_hr === true;
+          console.log('Loaded user from localStorage:', userData);
+          console.log('super_hr value:', userData.super_hr);
           setUser(userData);
         }
       } catch (error) {
@@ -42,21 +46,25 @@ export const UserProvider = ({ children }) => {
   const loginUser = (loginResponse) => {
     try {
       console.log('loginUser called with:', loginResponse);
+      console.log('super_hr from response:', loginResponse.super_hr);
       
       const userData = {
         employeeId: loginResponse.employeeId,
         name: loginResponse.name,
         role: loginResponse.role,
         email: loginResponse.email,
+        company_employee_id: loginResponse.company_employee_id,
         onboarding_status: loginResponse.onboarding_status,
         login_status: loginResponse.login_status,
         access_token: loginResponse.access_token,
         type: loginResponse.type,
         message: loginResponse.message,
-        location_id: loginResponse.location_id || null
+        location_id: loginResponse.location_id || null,
+        super_hr: loginResponse.super_hr === true  // Ensure it's explicitly a boolean
       };
 
       console.log('Processed userData:', userData);
+      console.log('super_hr after processing:', userData.super_hr);
       setUser(userData);
       
       // Store in localStorage
@@ -130,17 +138,18 @@ export const UserProvider = ({ children }) => {
 
   // Get dashboard path based on role
   const getDashboardPath = (role) => {
+    const isSuperHR = user?.super_hr === true;
     switch (role?.toLowerCase()) {
       case 'employee':
         return '/employee';
       case 'hr':
-        return '/hr/dashboard';
+        return isSuperHR ? '/super-hr/dashboard' : '/hr/dashboard';
       case 'account manager':
         return '/account-manager';
       case 'manager':
         return '/manager';
       default:
-        return '/hr/dashboard';
+        return isSuperHR ? '/super-hr/dashboard' : '/hr/dashboard';
     }
   };
 

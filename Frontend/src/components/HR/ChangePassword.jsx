@@ -1,8 +1,11 @@
 import React, { useState } from 'react';
-import { Lock, Eye, EyeOff, Key, Shield } from 'lucide-react';
+import { Lock, Eye, EyeOff, Key, Shield, AlertCircle } from 'lucide-react';
 import { toast } from 'react-toastify';
+import { useUser } from '@/contexts/UserContext';
+import { authAPI } from '@/lib/api';
 
 const ChangePassword = () => {
+  const { user } = useUser();
   const [formData, setFormData] = useState({
     currentPassword: '',
     newPassword: '',
@@ -16,6 +19,7 @@ const ChangePassword = () => {
   });
   
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errors, setErrors] = useState({});
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -23,6 +27,14 @@ const ChangePassword = () => {
       ...prev,
       [name]: value
     }));
+    
+    // Clear error when user starts typing
+    if (errors[name]) {
+      setErrors(prev => ({
+        ...prev,
+        [name]: ''
+      }));
+    }
   };
 
   const togglePasswordVisibility = (field) => {
@@ -32,37 +44,89 @@ const ChangePassword = () => {
     }));
   };
 
-  // Removed client-side validation logic
+  const validateForm = () => {
+    const newErrors = {};
+
+    if (!formData.currentPassword) {
+      newErrors.currentPassword = 'Current password is required';
+    }
+
+    if (!formData.newPassword) {
+      newErrors.newPassword = 'New password is required';
+    } else if (formData.newPassword.length < 6) {
+      newErrors.newPassword = 'Password must be at least 6 characters long';
+    }
+
+    if (!formData.confirmPassword) {
+      newErrors.confirmPassword = 'Please confirm your new password';
+    } else if (formData.newPassword !== formData.confirmPassword) {
+      newErrors.confirmPassword = 'Passwords do not match';
+    }
+
+    if (formData.currentPassword && formData.newPassword && 
+        formData.currentPassword === formData.newPassword) {
+      newErrors.newPassword = 'New password must be different from current password';
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    // Skip client-side validations; submit directly
+    
+    if (!validateForm()) {
+      return;
+    }
+
+    if (!user?.email && !user?.company_email) {
+      toast.error('User email not found. Please login again.');
+      return;
+    }
 
     setIsSubmitting(true);
     
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Use company email if available, otherwise use personal email
+      const userEmail = user.company_email || user.email;
       
-      // Reset form on success
-      setFormData({
-        currentPassword: '',
-        newPassword: '',
-        confirmPassword: ''
+      const response = await authAPI.resetPassword({
+        email: userEmail,
+        currentPassword: formData.currentPassword,
+        new_password: formData.newPassword
       });
-      
-      toast.success('Password changed successfully!');
-    // eslint-disable-next-line no-unused-vars
+
+      if (response.status === 'success') {
+        toast.success('Password changed successfully!');
+        
+        // Reset form on success
+        setTimeout(() => {
+          setFormData({
+            currentPassword: '',
+            newPassword: '',
+            confirmPassword: ''
+          });
+          setErrors({});
+        }, 1500);
+      }
     } catch (error) {
-      console.log(error);
-      toast.error('Failed to change password. Please try again.');
+      console.error('Password change error:', error);
+      
+      if (error.response?.status === 400) {
+        toast.error('Current password is incorrect. Please try again.');
+        setErrors({ currentPassword: 'Invalid current password' });
+      } else if (error.response?.status === 404) {
+        toast.error('User not found. Please login again.');
+      } else {
+        toast.error(error.response?.data?.detail || 'Failed to change password. Please try again.');
+      }
     } finally {
       setIsSubmitting(false);
     }
   };
 
   return (
-    <div className="p-4 bg-gray-50 min-h-screen flex items-center justify-center">
+    <div className="p-4  min-h-screen flex items-center justify-center">
       <div className="max-w-lg mx-auto w-full">
         {/* Header */}
         <div className="mb-6">
@@ -88,16 +152,18 @@ const ChangePassword = () => {
                   <Lock className="h-4 w-4 text-gray-400" />
                 </div>
                 <input
-              type={showPasswords.current}
-                id="currentPassword"
-               name="currentPassword"
-                value={formData.currentPassword}
+                  type={showPasswords.current ? "text" : "password"}
+                  id="currentPassword"
+                  name="currentPassword"
+                  value={formData.currentPassword}
                   onChange={handleInputChange}
-                  autoComplete="off"        // disables browser auto-fill & eye
-                  spellCheck="false"        // optional, avoids suggestions
-                  className="block w-full pl-9 pr-10 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 border-gray-300"
+                  autoComplete="off"
+                  spellCheck="false"
+                  className={`block w-full pl-9 pr-10 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                    errors.currentPassword ? 'border-red-500 bg-red-50' : 'border-gray-300'
+                  }`}
                   placeholder="Enter your current password"
-          />
+                />
                 <button
                   type="button"
                   className="absolute inset-y-0 right-0 pr-3 flex items-center"
@@ -110,7 +176,12 @@ const ChangePassword = () => {
                   )}
                 </button>
               </div>
-              {/* Removed client-side error message */}
+              {errors.currentPassword && (
+                <p className="text-xs text-red-600 mt-1 flex items-center gap-1">
+                  <AlertCircle className="h-3 w-3" />
+                  {errors.currentPassword}
+                </p>
+              )}
             </div>
 
             {/* New Password */}
@@ -128,8 +199,10 @@ const ChangePassword = () => {
                   name="newPassword"
                   value={formData.newPassword}
                   onChange={handleInputChange}
-                  className={`block w-full pl-9 pr-10 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 border-gray-300`}
-                  placeholder="Enter your new password"
+                  className={`block w-full pl-9 pr-10 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                    errors.newPassword ? 'border-red-500 bg-red-50' : 'border-gray-300'
+                  }`}
+                  placeholder="Enter your new password (min. 6 characters)"
                 />
                 <button
                   type="button"
@@ -143,7 +216,12 @@ const ChangePassword = () => {
                   )}
                 </button>
               </div>
-              {/* Removed client-side error and hint text */}
+              {errors.newPassword && (
+                <p className="text-xs text-red-600 mt-1 flex items-center gap-1">
+                  <AlertCircle className="h-3 w-3" />
+                  {errors.newPassword}
+                </p>
+              )}
             </div>
 
             {/* Confirm Password */}
@@ -161,7 +239,9 @@ const ChangePassword = () => {
                   name="confirmPassword"
                   value={formData.confirmPassword}
                   onChange={handleInputChange}
-                  className={`block w-full pl-9 pr-10 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 border-gray-300`}
+                  className={`block w-full pl-9 pr-10 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                    errors.confirmPassword ? 'border-red-500 bg-red-50' : 'border-gray-300'
+                  }`}
                   placeholder="Confirm your new password"
                 />
                 <button
@@ -176,7 +256,12 @@ const ChangePassword = () => {
                   )}
                 </button>
               </div>
-              {/* Removed client-side error message */}
+              {errors.confirmPassword && (
+                <p className="text-xs text-red-600 mt-1 flex items-center gap-1">
+                  <AlertCircle className="h-3 w-3" />
+                  {errors.confirmPassword}
+                </p>
+              )}
             </div>
 
             {/* Submit Button */}

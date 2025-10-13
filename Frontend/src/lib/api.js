@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 // Configurable Base URL with sensible defaults
-const BASE_URL = import.meta.env.VITE_API_URL;
+const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
 // Create axios instance with default configuration
 const api = axios.create({
@@ -185,6 +185,10 @@ export const onboardingAPI = {
   },
   handleAssignEmployee: async (employeeData) => {
     const response = await api.post('/onboarding/hr/assign', employeeData);
+    return response.data;
+  },
+  handleReassignEmployee: async (employeeData) => {
+    const response = await api.post('/onboarding/hr/reassign', employeeData);
     return response.data;
   },
   // POST /onboarding/hr/approve/{onboarding_id} - Approve employee
@@ -436,6 +440,210 @@ export const calendarAPI = {
     const response = await api.get(`/calendar/by-location/${locationId}`);
     return response.data;
   }
+};
+
+// Policy API endpoints
+export const policiesAPI = {
+  // POST /policies/ - Create a policy
+  createPolicy: async (formData, hrId) => {
+    try {
+      const response = await api.post(`/policies/?hr_id=${hrId}`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Create Policy Error:', {
+        status: error.response?.status,
+        data: error.response?.data,
+        message: error.message,
+      });
+      throw error;}},
+ 
+  // GET /policies/{location_id} - Get policies by location
+  getPoliciesByLocation: async (locationId, userIdObj) => {
+    const query = new URLSearchParams(userIdObj).toString();
+    const response = await api.get(`/policies/${locationId}?${query}`);
+    return response.data;
+  },
+ 
+  // GET /policies/view/{policy_id} - Get single policy details
+  getPolicy: async (policyId, userIdObj) => {
+    const query = new URLSearchParams(userIdObj).toString();
+    const response = await api.get(`/policies/view/${policyId}?${query}`);
+    return response.data;
+  },
+ 
+  // PUT /policies/{policy_id} - Update a policy
+  updatePolicy: async (policyId, formData, hrId) => {
+    const response = await api.put(`/policies/${policyId}?hr_id=${hrId}`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data;
+  },
+ 
+  // DELETE /policies/{policy_id} - Delete a policy
+  deletePolicy: async (policyId, hrId) => {
+    const response = await api.delete(`/policies/${policyId}?hr_id=${hrId}`);
+    return response.data;
+  },
+ 
+  // GET /policies/download/{policy_id} - Download a policy file
+  downloadPolicy: async (policyId, userIdObj) => {
+    const query = new URLSearchParams(userIdObj).toString();
+    const response = await api.get(`/policies/download/${policyId}?${query}`, {
+      responseType: 'blob'
+    });
+    return response.data;
+  },
+};
+ 
+// Policy Categories API endpoints
+export const categoriesAPI = {
+  // GET /policies/categories - Get all categories
+  getCategories: async (userIdObj = {}) => {
+    const query = new URLSearchParams(userIdObj).toString();
+    const response = await api.get(`/policies/categories?${query}`);
+    return response.data;
+  },
+ 
+  // POST /policies/categories - Create a category
+  createCategory: async (categoryData, hrId) => {
+    const response = await api.post(`/policies/categories?hr_id=${hrId}`, categoryData);
+    return response.data;
+  },
+ 
+  // PUT /policies/categories/{category_id} - Update a category
+  updateCategory: async (categoryId, categoryData, hrId) => {
+    const response = await api.put(`/policies/categories/${categoryId}?hr_id=${hrId}`, categoryData);
+    return response.data;
+  },
+ 
+  // DELETE /policies/categories/{category_id} - Delete a category
+  deleteCategory: async (categoryId, hrId) => {
+    const response = await api.delete(`/policies/categories/${categoryId}?hr_id=${hrId}`);
+    return response.data;
+  },
+};
+
+//Asset Management
+export const getAssets = async (filters = {}) => {
+  const params = {};
+  if (filters.status) params.status = filters.status;
+  if (filters.asset_type) params.asset_type = filters.asset_type;
+  const res = await axios.get(`${BASE_URL}/assets/assets/`, { params });
+  return res.data;
+};
+
+export const getAssetById = async (id) => {
+  const res = await axios.get(`${BASE_URL}/assets/assets/${id}`);
+  return res.data;
+};
+
+export const createAsset = async (asset) => {
+  const res = await axios.post(`${BASE_URL}/assets/assets/`, asset);
+  return res.data;
+};
+
+export const updateAsset = async (id, asset) => {
+  const res = await axios.put(`${BASE_URL}/assets/assets/${id}`, asset);
+  return res.data;
+};
+
+export const deleteAsset = async (id) => {
+  await axios.delete(`${BASE_URL}/assets/assets/${id}`);
+};
+
+export const getVendors = async (vendor_type = null) => {
+  try {
+    const params = vendor_type ? { vendor_type } : {};
+    const res = await axios.get(`${BASE_URL}/assets/vendors/`, { params });
+    return res.data;
+  } catch (error) {
+    throw error.response?.data?.detail || 'Error fetching vendors';
+  }
+};
+
+export const getVendorById = async (id) => {
+  try {
+    const res = await axios.get(`${BASE_URL}/assets/vendors/${id}`);
+    return res.data;
+  } catch (error) {
+    throw error.response?.data?.detail || 'Error fetching vendor';
+  }
+};
+
+export const createVendor = async (vendor) => {
+  try {
+    const res = await axios.post(`${BASE_URL}/assets/vendors/`, vendor);
+    return res.data;
+  } catch (error) {
+    throw error.response?.data?.detail || 'Error creating vendor';
+  }
+};
+
+export const updateVendor = async (id, vendor) => {
+  try {
+    const res = await axios.put(`${BASE_URL}/assets/vendors/${id}`, vendor);
+    return res.data;
+  } catch (error) {
+    throw error.response?.data?.detail || 'Error updating vendor';
+  }
+};
+
+export const deleteVendor = async (id) => {
+  try {
+    await axios.delete(`${BASE_URL}/assets/vendors/${id}`);
+  } catch (error) {
+    throw error.response?.data?.detail || 'Error deleting vendor';
+  }
+};
+
+// Allocation Management
+export const getAllocations = async () => {
+  const response = await axios.get(`${BASE_URL}/assets/allocations/`);
+  return response.data;
+};
+
+export const createAllocation = async (allocation) => {
+  const response = await axios.post(`${BASE_URL}/assets/allocations/`, allocation);
+  return response.data;
+};
+
+export const updateAllocation = async (id, allocation) => {
+  const response = await axios.put(`${BASE_URL}/assets/allocations/${id}`, allocation);
+  return response.data;
+};
+
+export const deleteAllocation = async (id) => {
+  await axios.delete(`${BASE_URL}/assets/allocations/${id}`);
+};
+
+export const getEmployees = async (filters = {}) => {
+  const params = {};
+  if (filters.name) params.name = filters.name;
+  if (filters.id) params.id = filters.id;
+  if (filters.role) params.role = filters.role;
+  const res = await axios.get(`${BASE_URL}/assets/employees/`, { params });
+  return res.data;
+};
+
+export const getMaintenanceRecords = async () => {
+  const response = await axios.get(`${BASE_URL}/assets/maintenance/`);
+  return response.data;
+};
+
+export const createMaintenance = async (record) => {
+  const response = await axios.post(`${BASE_URL}/assets/maintenance/`, record);
+  return response.data;
+};
+
+export const updateMaintenance = async (id, record) => {
+  const response = await axios.put(`${BASE_URL}/assets/maintenance/${id}`, record);
+  return response.data;
+};
+
+export const deleteMaintenance = async (id) => {
+  await axios.delete(`${BASE_URL}/assets/maintenance/${id}`);
 };
 
 // Export the axios instance for custom requests

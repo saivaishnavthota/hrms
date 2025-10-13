@@ -1,6 +1,9 @@
+
+
+
 import React, { useState, useEffect } from 'react';
 import api from '@/lib/api';
-import { Calendar, Clock, Plus, X, Save, ChevronLeft, ChevronRight, Trash2, Edit3, Search, Filter, Eye, Briefcase } from 'lucide-react';
+import { Calendar, Clock, Plus, X, Save, ChevronLeft, ChevronRight, Edit3, Search, Filter, Eye, Briefcase } from 'lucide-react';
 import { useUser } from '../../contexts/UserContext';
 import { toast } from 'react-toastify';
 import { useNavigate } from 'react-router-dom';
@@ -80,7 +83,7 @@ const AddAttendance = () => {
         date: dateStr,
         day: date.toLocaleDateString('en-US', { weekday: 'long' }),
         status: '',
-        hours: 0.0, // Initialize as float
+        hours: 0,
         projects: [],
         submitted: false
       };
@@ -96,8 +99,10 @@ const AddAttendance = () => {
       fetchDailyAttendance();
       fetchWeekOffs();
     } else if (user) {
+      // If user exists but no employeeId, logout
       toast.error('Employee ID not found. Logging out...');
-      navigate('/login');
+      // Assume UserContext has a logout function; if not, navigate to login
+      navigate('/login'); // Or call logout from context if available
     }
   }, [user, navigate]);
 
@@ -181,23 +186,20 @@ const AddAttendance = () => {
         }
       });
 
-      console.log('Daily Attendance Response:', response.data);
+      console.log('Daily Attendance Response:', response.data); // Debugging
 
       if (response.data && response.data.length > 0) {
         const formattedData = response.data.map(record => ({
           date: record.date,
           status: record.status || record.action || 'Not set',
-          hours: parseFloat(record.hours || 0), // Ensure float
+          hours: record.hours || 0,
           type: record.type || 'Full-Time',
           projects: (record.projects || []).map(p => ({
             projectId: String(p.value),
             projectName: p.label,
             subtasks: (record.subTasks || [])
               .filter(st => st.project === p.label)
-              .flatMap(st => (st.subTasks || []).map(sub => ({
-                name: sub.sub_task,
-                hours: parseFloat(sub.hours || 0) // Ensure float
-              })))
+              .flatMap(st => (st.subTasks || []).map(sub => ({ name: sub.sub_task, hours: sub.hours })))
           }))
         }));
         setDailyAttendance(formattedData);
@@ -252,13 +254,15 @@ const AddAttendance = () => {
       }
     }
   };
-
   const fetchWeeklyAttendance = async () => {
     try {
       if (!user?.employeeId) return;
-
+   
       setLoading(true);
       const weekDates = getWeekDates(currentWeek);
+      const weekStart = formatDateLocal(weekDates[0]);
+      const weekEnd = formatDateLocal(weekDates[6]);
+   
       const baseData = {};
       weekDates.forEach((date, index) => {
         const dateStr = formatDateLocal(date);
@@ -266,18 +270,22 @@ const AddAttendance = () => {
           date: dateStr,
           day: date.toLocaleDateString('en-US', { weekday: 'long' }),
           status: '',
-          hours: 0.0, // Initialize as float
+          hours: 0.0,
           projects: [],
           submitted: false
         };
       });
-
+   
       const response = await api.get('/attendance/weekly', {
-        params: { employee_id: user.employeeId }
+        params: {
+          employee_id: user.employeeId,
+          week_start: weekStart, // Pass week_start
+          week_end: weekEnd      // Pass week_end
+        }
       });
-
+   
       console.log('Weekly Attendance Response:', response.data);
-
+   
       if (response.data) {
         const updatedData = { ...baseData };
         Object.keys(response.data).forEach(dateStr => {
@@ -285,7 +293,7 @@ const AddAttendance = () => {
           const rowIndex = Object.keys(updatedData).find(key =>
             updatedData[key].date === dateStr
           );
-
+   
           if (rowIndex !== undefined) {
             const projects = (attendance.projects || []).map(p => ({
               projectId: String(p.value),
@@ -294,18 +302,17 @@ const AddAttendance = () => {
                 .filter(st => st.project === p.label)
                 .flatMap(st => (st.subTasks || []).map(sub => ({
                   name: sub.sub_task,
-                  hours: parseFloat(sub.hours || 0) // Ensure float
+                  hours: parseFloat(sub.hours || 0)
                 })))
             }));
-
-            // Calculate total hours from subtasks
+   
             const totalHours = projects.reduce((sum, project) =>
               sum + (project.subtasks || []).reduce((subSum, subtask) => subSum + parseFloat(subtask.hours || 0), 0), 0);
-
+   
             updatedData[rowIndex] = {
               ...updatedData[rowIndex],
               status: attendance.action || attendance.status,
-              hours: parseFloat(totalHours.toFixed(2)), // Ensure float with 2 decimal places
+              hours: parseFloat(totalHours.toFixed(2)),
               projects: projects,
               submitted: !!attendance.action
             };
@@ -329,14 +336,14 @@ const AddAttendance = () => {
       setLoading(false);
     }
   };
-
+  
   const handleStatusChange = (index, status) => {
     setAttendanceData(prev => ({
       ...prev,
       [index]: {
         ...prev[index],
         status,
-        hours: status === 'Leave' ? 0.0 : prev[index].hours // Ensure float
+        hours: status === 'Leave' ? 0 : prev[index].hours
       }
     }));
   };
@@ -350,14 +357,14 @@ const AddAttendance = () => {
     if (selectedRowIndex !== null) {
       // Calculate total hours from subtasks
       const totalHours = selectedProjects.reduce((sum, project) =>
-        sum + (project.subtasks || []).reduce((subSum, subtask) => subSum + parseFloat(subtask.hours || 0), 0), 0);
+        sum + (project.subtasks || []).reduce((subSum, subtask) => subSum + (subtask.hours || 0), 0), 0);
 
       setAttendanceData(prev => ({
         ...prev,
         [selectedRowIndex]: {
           ...prev[selectedRowIndex],
           projects: selectedProjects,
-          hours: parseFloat(totalHours.toFixed(2)) // Ensure float with 2 decimal places
+          hours: totalHours
         }
       }));
     }
@@ -369,14 +376,14 @@ const AddAttendance = () => {
     setAttendanceData(prev => {
       const updatedProjects = prev[rowIndex].projects.filter((_, i) => i !== projectIndex);
       const totalHours = updatedProjects.reduce((sum, project) =>
-        sum + (project.subtasks || []).reduce((subSum, subtask) => subSum + parseFloat(subtask.hours || 0), 0), 0);
+        sum + (project.subtasks || []).reduce((subSum, subtask) => subSum + (subtask.hours || 0), 0), 0);
 
       return {
         ...prev,
         [rowIndex]: {
           ...prev[rowIndex],
           projects: updatedProjects,
-          hours: parseFloat(totalHours.toFixed(2)) // Ensure float with 2 decimal places
+          hours: totalHours
         }
       };
     });
@@ -498,7 +505,7 @@ const AddAttendance = () => {
               (p.subtasks || []).map(subtask => ({
                 project_id: parseInt(p.projectId, 10),
                 sub_task: subtask.name,
-                hours: parseFloat(subtask.hours || 0) // Ensure float
+                hours: subtask.hours
               }))
             )
             .flat()
@@ -507,7 +514,7 @@ const AddAttendance = () => {
           dataToSubmit[row.date] = {
             date: row.date,
             action: row.status || '',
-            hours: parseFloat(row.hours.toFixed(2)), // Ensure float
+            hours: row.hours || 0, // Hours are now computed from subtasks
             project_ids: project_ids,
             sub_tasks: sub_tasks
           };
@@ -521,7 +528,7 @@ const AddAttendance = () => {
         return;
       }
 
-      console.log('Submitting Attendance Data:', dataToSubmit);
+      console.log('Submitting Attendance Data:', dataToSubmit); // Debugging
 
       const response = await api.post('/attendance', dataToSubmit, {
         params: { employee_id: user.employeeId }
@@ -560,11 +567,11 @@ const AddAttendance = () => {
     }, [existingProjects]);
 
     const addProject = () => {
-  setSelectedProjects([
-    ...selectedProjects, // Spread existing projects
-    { projectId: '', projectName: '', subtasks: [{ name: '', hours: 0.0 }] } // New project object
-  ]);
-};
+      setSelectedProjects([
+        ...selectedProjects,
+        { projectId: '', projectName: '', subtasks: [{ name: '', hours: 0 }] }
+      ]);
+    };
 
     const updateProject = (index, field, value) => {
       const updated = [...selectedProjects];
@@ -574,7 +581,7 @@ const AddAttendance = () => {
           ...updated[index],
           projectId: value,
           projectName: project ? project.project_name : '',
-          subtasks: updated[index].subtasks.length > 0 ? updated[index].subtasks : [{ name: '', hours: 0.0 }]
+          subtasks: updated[index].subtasks.length > 0 ? updated[index].subtasks : [{ name: '', hours: 0 }]
         };
       } else {
         updated[index][field] = value;
@@ -584,13 +591,13 @@ const AddAttendance = () => {
 
     const addSubtask = (projectIndex) => {
       const updated = [...selectedProjects];
-      updated[projectIndex].subtasks.push({ name: '', hours: 0.0 }); // Initialize as float
+      updated[projectIndex].subtasks.push({ name: '', hours: 0 });
       setSelectedProjects(updated);
     };
 
     const updateSubtask = (projectIndex, subtaskIndex, field, value) => {
       const updated = [...selectedProjects];
-      updated[projectIndex].subtasks[subtaskIndex][field] = field === 'hours' ? parseFloat(value) || 0.0 : value;
+      updated[projectIndex].subtasks[subtaskIndex][field] = field === 'hours' ? parseFloat(value) || 0 : value;
       setSelectedProjects(updated);
     };
 
@@ -634,7 +641,7 @@ const AddAttendance = () => {
                     onClick={() => removeProject(projectIndex)}
                     className="text-red-500 hover:text-red-700 p-1"
                   >
-                    <Trash2 size={18} />
+                    <X size={18} />
                   </button>
                 </div>
 
@@ -723,10 +730,10 @@ const AddAttendance = () => {
   }
 
   return (
-    <div className="max-w-6xl mx-auto p-6 bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen">
+    <div className="max-w-6xl mx-auto p-6 min-h-screen">
       <div className="bg-white rounded-2xl shadow-xl overflow-hidden">
         <div className="bg-gradient-to-r from-blue-500 to-indigo-600 text-white p-6">
-          <h1 className="text-xl font-bold flex items-center gap-3">
+          <h1 className="text-medium font-bold flex items-center gap-3">
             <Calendar className="text-blue-200" />
             Attendance Management
           </h1>
@@ -738,7 +745,7 @@ const AddAttendance = () => {
         </div>
 
         <div className="border-b border-gray-200 bg-gray-50">
-          <nav className="flex space-x-8 px-6">
+          <nav className="grid grid-cols-3 gap-2 px-6">
             {[
               { id: 'add', label: 'Add Attendance', icon: Plus },
               { id: 'calendar', label: 'Calendar View', icon: Calendar },
@@ -747,7 +754,7 @@ const AddAttendance = () => {
               <button
                 key={id}
                 onClick={() => setActiveTab(id)}
-                className={`py-4 px-2 border-b-2 font-medium text-sm flex items-center gap-2 transition-colors ${activeTab === id
+                className={`w-full justify-center py-4 px-2 border-b-2 font-medium text-sm flex items-center gap-2 transition-colors ${activeTab === id
                   ? 'border-blue-500 text-blue-600'
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                   }`}
@@ -861,24 +868,18 @@ const AddAttendance = () => {
                           </td>
                           <td className="px-4 py-4">
                             {weekOffDays.includes(row.day) ? (
-                              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800 border border-gray-200">
-                                Week-off
-                              </span>
-                            ) : row.status ? (
-                              <span
-                                className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${row.status === 'Present'
-                                  ? 'bg-green-100 text-green-800 border border-green-200'
-                                  : row.status === 'WFH' || row.status === 'Work From Home'
-                                    ? 'bg-blue-100 text-blue-800 border border-blue-200'
-                                    : row.status === 'Leave'
-                                      ? 'bg-red-100 text-red-800 border border-red-200'
-                                      : 'bg-gray-100 text-gray-800 border border-gray-200'
-                                  }`}
-                              >
-                                {row.status}
-                              </span>
+                              <span className="text-gray-400 text-sm">Week-off</span>
                             ) : (
-                              <span className="text-gray-400 text-sm">No Action</span>
+                              <select
+                                value={row.status}
+                                onChange={(e) => handleStatusChange(index, e.target.value)}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
+                              >
+                                <option value="">Select Status</option>
+                                <option value="Present">Present</option>
+                                <option value="Leave">Leave</option>
+                                <option value="WFH">Work From Home</option>
+                              </select>
                             )}
                           </td>
                           <td className="px-4 py-4">
@@ -1052,7 +1053,7 @@ const AddAttendance = () => {
                               {attendanceRecord.hours > 0 && (
                                 <div className="text-xs text-gray-600 flex items-center gap-1">
                                   <Clock className="h-3 w-3" />
-                                  {attendanceRecord.hours.toFixed(2)}h {/* Fixed to show float */}
+                                  {attendanceRecord.hours}h
                                 </div>
                               )}
                               {attendanceRecord.projects && attendanceRecord.projects.length > 0 && (
@@ -1139,7 +1140,6 @@ const AddAttendance = () => {
                     >
                       <option value="all">All Types</option>
                       <option value="Full-Time">Full-Time</option>
-                      <option value="Intern">Intern</option>
                       <option value="Contract">Contract</option>
                     </select>
                   </div>
@@ -1232,7 +1232,7 @@ const AddAttendance = () => {
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="text-sm text-gray-900">
-                              {record.hours.toFixed(2)} hrs {/* Fixed to show float */}
+                              {record.hours.toFixed(2)} hrs
                             </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
@@ -1319,7 +1319,7 @@ const AddAttendance = () => {
                           {project.subtasks.map((subtask, subIndex) => (
                             <div key={subIndex} className="flex items-center text-sm text-gray-600">
                               <div className="w-2 h-2 bg-blue-400 rounded-full mr-2"></div>
-                              {subtask.name} - {subtask.hours.toFixed(2)} hours {/* Fixed to show float */}
+                              {subtask.name} - {subtask.hours} hours
                             </div>
                           ))}
                         </div>
@@ -1343,7 +1343,7 @@ const AddAttendance = () => {
       )}
 
       {loading && (
-        <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-transparent bg-opacity-30 flex items-center justify-center z-50">
           <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
         </div>
       )}

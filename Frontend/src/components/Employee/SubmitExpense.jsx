@@ -1,5 +1,3 @@
-
-
 import React, { useEffect, useState } from 'react';
 import { useUser } from '../../contexts/UserContext';
 import { Receipt, DollarSign, Calendar, Upload, X, CheckCircle, AlertCircle, Trash2, Eye } from 'lucide-react';
@@ -9,7 +7,7 @@ import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from '@/components/ui/select';
 import api, { expensesAPI } from '@/lib/api';
 import { toast } from 'react-toastify';
-
+ 
 const SubmitExpense = () => {
   const { user } = useUser();
   const [expenseData, setExpenseData] = useState({
@@ -19,31 +17,34 @@ const SubmitExpense = () => {
     date: new Date().toISOString().split('T')[0],
     description: '',
     tax_included: false,
+    cgst: 0,
+    sgst: 0,
+    discount: 0,
   });
   const [receipts, setReceipts] = useState([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [expenseHistory, setExpenseHistory] = useState([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyError, setHistoryError] = useState('');
-  
+ 
   // Filter states
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
-
+ 
   // Popup states
   const [selectedRecord, setSelectedRecord] = useState(null);
   const [showProjectModal, setShowProjectModal] = useState(false);
-
+ 
   const expenseCategories = [
     'Travel', 'Food', 'Entertainment', 'Office Supplies', 'Software & Subscriptions',
     'Training & Education', 'Communication', 'Marketing', 'Equipment', 'Other'
   ];
-
+ 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setExpenseData(prev => ({ ...prev, [name]: value }));
   };
-
+ 
   const handleReceiptUpload = (e) => {
     const files = Array.from(e.target.files);
     const newReceipts = files.map(file => ({
@@ -55,13 +56,13 @@ const SubmitExpense = () => {
     }));
     setReceipts(prev => [...prev, ...newReceipts]);
   };
-
+ 
   const handleRemoveReceipt = (id) => {
     const receipt = receipts.find(r => r.id === id);
     if (receipt?.preview) URL.revokeObjectURL(receipt.preview);
     setReceipts(prev => prev.filter(r => r.id !== id));
   };
-
+ 
   const formatFileSize = (bytes) => {
     if (bytes === 0) return '0 Bytes';
     const k = 1024;
@@ -69,7 +70,7 @@ const SubmitExpense = () => {
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
-
+ 
   const mapStatus = (item) => {
     const s = (item.status || '').toLowerCase();
     switch (s) {
@@ -84,16 +85,15 @@ const SubmitExpense = () => {
       default: return item.status || 'Pending';
     }
   };
-
+ 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsSubmitting(true);
-
+ 
     try {
       let employeeId = user?.employeeId || JSON.parse(localStorage.getItem('userData') || '{}')?.employeeId;
       if (!employeeId) throw new Error('Employee ID not found. Please log in.');
-
-      // Create FormData for multipart request
+ 
       const formData = new FormData();
       formData.append('employee_id', Number(employeeId));
       formData.append('category', expenseData.category || 'Other');
@@ -102,32 +102,43 @@ const SubmitExpense = () => {
       formData.append('description', expenseData.description || '');
       formData.append('expense_date', expenseData.date);
       formData.append('tax_included', expenseData.tax_included);
-
-      // Append files
+      if (expenseData.tax_included) {
+        formData.append('cgst', parseFloat(expenseData.cgst || 0));
+        formData.append('sgst', parseFloat(expenseData.sgst || 0));
+        formData.append('discount', parseFloat(expenseData.discount || 0));
+      }
+ 
       receipts.forEach(receipt => {
         if (receipt.file) {
           formData.append('files', receipt.file);
         }
       });
-
-      // Use the correct endpoint
+ 
       const res = await api.post('/expenses/submit-exp', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
       });
-
+ 
       toast.success(`Expense submitted successfully! Reference: ${res.data.request_code || res.data.request_id}`);
-
+ 
       setExpenseData({
-        category: '', amount: '', currency: 'INR', date: new Date().toISOString().split('T')[0],
-        description: '', tax_included: false
+        category: '',
+        amount: '',
+        currency: 'INR',
+        date: new Date().toISOString().split('T')[0],
+        description: '',
+        tax_included: false,
+        cgst: 0,
+        sgst: 0,
+        discount: 0
       });
+ 
       receipts.forEach(r => r.preview && URL.revokeObjectURL(r.preview));
       setReceipts([]);
-
+ 
       await loadExpenseHistory(employeeId);
-
+ 
     } catch (error) {
       console.error('Submit error:', error);
       toast.error(error.response?.data?.detail || error.message || 'Failed to submit expense');
@@ -135,12 +146,12 @@ const SubmitExpense = () => {
       setIsSubmitting(false);
     }
   };
-
+ 
   const handleDeleteExpense = async (requestId) => {
     try {
       let employeeId = user?.employeeId || JSON.parse(localStorage.getItem('userData') || '{}')?.employeeId;
       if (!employeeId) throw new Error('Employee ID not found. Please log in.');
-
+ 
       await api.delete(`/expenses/${requestId}?user_id=${employeeId}`);
       toast.success('Expense deleted successfully');
       setExpenseHistory(prev => prev.filter(r => r.id !== requestId));
@@ -148,24 +159,31 @@ const SubmitExpense = () => {
       toast.error(error.response?.data?.detail || error.message || 'Failed to delete expense');
     }
   };
-
+ 
   const loadExpenseHistory = async (employeeId, year = selectedYear, month = selectedMonth) => {
     setHistoryLoading(true);
     setHistoryError('');
     try {
       if (!employeeId) return;
-
+ 
       const res = await api.get('/expenses/my-expenses', {
         params: { employee_id: employeeId, year, month }
       });
-      
+ 
       console.log('Expense API Response:', res);
-
+ 
       const mapped = (res.data || []).map((item) => {
         const approvals = Array.isArray(item.history)
           ? item.history.filter(h => ['Manager', 'HR', 'Account Manager'].includes(h.action_role))
             .map(h => ({ name: h.action_by_name || h.action_role, role: h.action_role, reason: h.reason || '-', status: h.action }))
           : [];
+            // ✅ Compute gross, discount, and final amounts here
+  const gross_amount = (item.amount / (item.sgst_percentage + item.cgst_percentage + 100)) * 100;
+  const discount = (gross_amount * (item.discount_percentage || 0)) / 100;
+  const after_discount = gross_amount - discount;
+  const cgst_amount = after_discount * ((item.cgst_percentage || 0) / 100);
+  const sgst_amount = after_discount * ((item.sgst_percentage || 0) / 100);
+  const final_amount = after_discount + cgst_amount + sgst_amount;
         return {
           id: item.request_id,
           date: (item.expense_date || '').slice(0, 10),
@@ -174,10 +192,19 @@ const SubmitExpense = () => {
           currency: item.currency,
           description: item.description || '',
           status: mapStatus(item),
-          approvals
+          approvals,
+          tax_included: item.tax_included,
+          cgst: item.cgst_percentage || 0,
+          sgst: item.sgst_percentage || 0,
+          discount: item.discount_percentage || 0,
+          final_amount, // ✅ updated computed value
+    gross_amount,
+    discount_amount: discount,
+    cgst_amount,
+    sgst_amount,// Fallback to amount if final_amount is not available
         };
       });
-
+ 
       setExpenseHistory(mapped);
     } catch (err) {
       console.error('Error loading expense history:', err);
@@ -186,21 +213,24 @@ const SubmitExpense = () => {
       setHistoryLoading(false);
     }
   };
-
+ 
   // Handle filter changes
   const handleFilterChange = () => {
     const employeeId = user?.employeeId || JSON.parse(localStorage.getItem('userData') || '{}')?.employeeId;
     if (employeeId) loadExpenseHistory(employeeId, selectedYear, selectedMonth);
   };
 
+ 
+ 
   useEffect(() => {
     const employeeId = user?.employeeId || JSON.parse(localStorage.getItem('userData') || '{}')?.employeeId;
     if (employeeId) loadExpenseHistory(employeeId, selectedYear, selectedMonth);
   }, [user, selectedYear, selectedMonth]);
+ 
 
   return (
     <div className="max-w-4xl mx-auto">
-      {/* --- Popup Card for Eye button --- */}
+      {/* --- Popup Card for Eye button (Icon View) --- */}
       {showProjectModal && selectedRecord && (
         <div className="fixed inset-0 bg-black/20 backdrop-blur-[2px] flex items-center justify-center z-50">
           <div className="bg-gradient-to-br from-white via-gray-50 to-blue-50 rounded-xl shadow-2xl max-w-2xl w-full mx-4 max-h-[80vh] overflow-y-auto border border-gray-200">
@@ -215,7 +245,7 @@ const SubmitExpense = () => {
                 <X className="h-6 w-6" />
               </button>
             </div>
-
+ 
             <div className="space-y-4 p-6">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
                 <div className="rounded-lg p-4 bg-white">
@@ -233,16 +263,56 @@ const SubmitExpense = () => {
                   </div>
                 </div>
                 <div className="rounded-lg p-4 bg-white">
+                  <div className="text-gray-500">Tax Included</div>
+                  <div className="font-medium text-gray-800">{selectedRecord.tax_included ? 'Yes' : 'No'}</div>
+                </div>
+                {selectedRecord.tax_included && (
+                  <>
+                    <div className="rounded-lg p-4 bg-white">
+                      <div className="text-gray-500">Discount Amount</div>
+                      <div className="font-medium text-gray-800">
+                        {selectedRecord.discount_amount?.toFixed(2)} {selectedRecord.currency}
+                      </div>
+                    </div>
+                    <div className="rounded-lg p-4 bg-white">
+                      <div className="text-gray-500">CGST Amount ({selectedRecord.cgst}%)</div>
+                      <div className="font-medium text-gray-800">
+                        {selectedRecord.cgst_amount?.toFixed(2)} {selectedRecord.currency}
+                      </div>
+                    </div>
+                    <div className="rounded-lg p-4 bg-white">
+                      <div className="text-gray-500">SGST Amount ({selectedRecord.sgst}%)</div>
+                      <div className="font-medium text-gray-800">
+                        {selectedRecord.sgst_amount?.toFixed(2)} {selectedRecord.currency}
+                      </div>
+                    </div>
+                    <div className="rounded-lg p-4 bg-white">
+                      <div className="text-gray-500">Final Amount (after discount & taxes)</div>
+                      <div className="font-medium text-gray-800">
+                        {selectedRecord.final_amount?.toFixed(2)} {selectedRecord.currency}
+                      </div>
+                    </div>
+                  </>
+                )}
+                {!selectedRecord.tax_included && (
+                  <div className="rounded-lg p-4 bg-white">
+                    <div className="text-gray-500">Final Amount</div>
+                    <div className="font-medium text-gray-800">
+                      {selectedRecord.final_amount} {selectedRecord.currency}
+                    </div>
+                  </div>
+                )}
+                <div className="rounded-lg p-4 bg-white">
                   <div className="text-gray-500">Status</div>
                   <div className="font-medium text-gray-800">{selectedRecord.status}</div>
                 </div>
               </div>
-
+ 
               <div className="rounded-lg p-4 bg-white">
                 <div className="text-gray-500">Description</div>
                 <div className="font-medium text-gray-800">{selectedRecord.description || '-'}</div>
               </div>
-
+ 
               {/* Approvals Section */}
               <div className="rounded-lg p-4 bg-white">
                 <h4 className="text-gray-700 font-semibold mb-3">Approvals</h4>
@@ -259,13 +329,12 @@ const SubmitExpense = () => {
                         </div>
                         <div className="text-gray-600">{appr.reason}</div>
                         <span
-                          className={`px-2 py-1 rounded-md text-xs ${
-                            appr.status === 'Approved'
-                              ? 'text-green-700 bg-green-50 border border-green-200'
-                              : appr.status === 'Rejected'
+                          className={`px-2 py-1 rounded-md text-xs ${appr.status === 'Approved'
+                            ? 'text-green-700 bg-green-50 border border-green-200'
+                            : appr.status === 'Rejected'
                               ? 'text-red-700 bg-red-50 border border-red-200'
                               : 'text-yellow-700 bg-yellow-50 border border-yellow-200'
-                          }`}
+                            }`}
                         >
                           {appr.status}
                         </span>
@@ -280,7 +349,7 @@ const SubmitExpense = () => {
           </div>
         </div>
       )}
-
+ 
       {/* Submit & History Tabs */}
       <div className="bg-card rounded-lg shadow-sm border p-6">
         <Tabs defaultValue="submit" className="w-full">
@@ -288,7 +357,7 @@ const SubmitExpense = () => {
             <TabsTrigger value="submit">Submit Expense</TabsTrigger>
             <TabsTrigger value="history">Expense History</TabsTrigger>
           </TabsList>
-
+ 
           {/* ---- Submit Expense Form ---- */}
           <TabsContent value="submit">
             <form onSubmit={handleSubmit} className="space-y-6">
@@ -308,7 +377,7 @@ const SubmitExpense = () => {
                   ))}
                 </select>
               </div>
-
+ 
               {/* Amount, Currency, Date */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
@@ -353,7 +422,7 @@ const SubmitExpense = () => {
                   />
                 </div>
               </div>
-
+ 
               {/* Description */}
               <div>
                 <label className="block text-sm font-medium mb-2">Description *</label>
@@ -366,7 +435,70 @@ const SubmitExpense = () => {
                   required
                 />
               </div>
-
+ 
+              {/* Tax Included Checkbox */}
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="tax_included"
+                  checked={expenseData.tax_included}
+                  onChange={(e) =>
+                    setExpenseData(prev => ({ ...prev, tax_included: e.target.checked }))
+                  }
+                  className="h-4 w-4"
+                />
+                <label htmlFor="tax_included" className="text-sm font-medium">
+                  Tax Included
+                </label>
+ 
+                {expenseData.tax_included && (
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-2">
+                    <div>
+                      <label className="block text-sm font-medium mb-1">Discount %</label>
+                      <input
+                        type="number"
+                        name="discount"
+                        value={expenseData.discount}
+                        onChange={(e) =>
+                          setExpenseData(prev => ({ ...prev, discount: parseFloat(e.target.value) }))
+                        }
+                        min="0"
+                        step="0.01"
+                        className="w-full px-3 py-2 border rounded-lg"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-1">CGST %</label>
+                      <input
+                        type="number"
+                        name="cgst"
+                        value={expenseData.cgst}
+                        onChange={(e) =>
+                          setExpenseData(prev => ({ ...prev, cgst: parseFloat(e.target.value) }))
+                        }
+                        min="0"
+                        step="0.01"
+                        className="w-full px-3 py-2 border rounded-lg"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-1">SGST %</label>
+                      <input
+                        type="number"
+                        name="sgst"
+                        value={expenseData.sgst}
+                        onChange={(e) =>
+                          setExpenseData(prev => ({ ...prev, sgst: parseFloat(e.target.value) }))
+                        }
+                        min="0"
+                        step="0.01"
+                        className="w-full px-3 py-2 border rounded-lg"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+ 
               {/* Receipt Upload */}
               <div>
                 <label className="block text-sm font-medium mb-2">Upload Receipts</label>
@@ -385,7 +517,7 @@ const SubmitExpense = () => {
                 >
                   Select Files
                 </Button>
-
+ 
                 {receipts.length > 0 && (
                   <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-4">
                     {receipts.map((receipt) => (
@@ -406,7 +538,7 @@ const SubmitExpense = () => {
                   </div>
                 )}
               </div>
-
+ 
               <div className="flex gap-3 pt-4">
                 <Button
                   type="submit"
@@ -418,7 +550,7 @@ const SubmitExpense = () => {
               </div>
             </form>
           </TabsContent>
-
+ 
           {/* ---- Expense History ---- */}
           <TabsContent value="history">
             {/* Filter Controls */}
@@ -440,7 +572,7 @@ const SubmitExpense = () => {
                   })}
                 </select>
               </div>
-              
+ 
               <div className="flex items-center gap-2">
                 <label className="text-sm font-medium text-gray-700">Month:</label>
                 <select
@@ -459,7 +591,7 @@ const SubmitExpense = () => {
                   })}
                 </select>
               </div>
-              
+ 
               <button
                 onClick={handleFilterChange}
                 className="px-4 py-1 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -467,7 +599,7 @@ const SubmitExpense = () => {
                 Apply Filters
               </button>
             </div>
-            
+ 
             <div className="rounded-lg border">
               <Table>
                 <TableHeader>
@@ -525,9 +657,9 @@ const SubmitExpense = () => {
                               ${item.status === 'Approved'
                                 ? 'text-green-700 bg-green-100'
                                 : item.status.includes('Rejected')
-                                ? 'text-red-700 bg-red-100'
-                                : 'text-yellow-700 bg-yellow-100'
-                            }`}
+                                  ? 'text-red-700 bg-red-100'
+                                  : 'text-yellow-700 bg-yellow-100'
+                              }`}
                           >
                             {item.status}
                           </span>
@@ -569,5 +701,5 @@ const SubmitExpense = () => {
     </div>
   );
 };
-
+ 
 export default SubmitExpense;

@@ -1,4 +1,4 @@
-import { LayoutGrid, DollarSign, Briefcase, KeyRound, CoinsIcon, Coins } from 'lucide-react';
+import { LayoutGrid, DollarSign, Briefcase, KeyRound, ClipboardList, Plane, Upload ,CalendarCheck,Coins} from 'lucide-react';
 
 export const MENU_SIDEBAR_ACCOUNT_MANAGER = [
   {
@@ -8,8 +8,23 @@ export const MENU_SIDEBAR_ACCOUNT_MANAGER = [
   },
   {
     title: 'Expense Management',
-    icon: DollarSign,
+    icon: Coins,
     path: '/account-manager/expense-management',
+  },
+  {
+    title: 'Upload Documents',
+    icon: Upload,
+    path: '/account-manager/upload-documents',
+  },
+  {
+    title: 'Add Attendance',
+    icon: ClipboardList,
+    path: '/account-manager/add-attendance',
+  },
+  {
+    title: 'Apply Leave',
+    icon: CalendarCheck,
+    path: '/account-manager/apply-leave',
   },
   {
     title: 'Projects',

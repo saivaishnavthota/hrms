@@ -1,5 +1,4 @@
 
-
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   Eye,
@@ -83,7 +82,7 @@ const ExpenseManagement = () => {
 
   // Fallback implementation for avatarBg
   const getAvatarColor = (name) => {
-    const colors = ['bg-blue-500', 'bg-green-500', 'bg-purple-500', 'bg-red-500', 'bg-indigo-500'];
+    const colors = [ 'bg-[rgb(141,233,113)]', 'bg-[rgb(173,150,220)]', 'bg-black'];
     const index = name ? name.length % colors.length : 0;
     return colors[index];
   };
@@ -135,6 +134,11 @@ const ExpenseManagement = () => {
     submittedOn: formatDate(item.submitted_at),
     status: mapStatus(item.status),
     attachments: item.attachments || [],
+    discount_percentage: item.discount_percentage || 0,
+    cgst_percentage: item.cgst_percentage || 0,
+    sgst_percentage: item.sgst_percentage || 0,
+    final_amount: item.final_amount || item.amount,
+    taxIncluded: item.taxIncluded || false,
   });
 
   const mapMyExpense = (item) => ({
@@ -205,7 +209,7 @@ const ExpenseManagement = () => {
         headers: { Authorization: `Bearer ${token}` },
       });
       const mapped = (response.data || []).map(mapExpense);
-      setExpenses(mapped.filter((e) => e.status.toLowerCase() !== 'pending'));
+      setExpenses(mapped);
       setError(null);
     } catch (err) {
       console.error('Error fetching all expenses:', err);
@@ -404,20 +408,20 @@ const ExpenseManagement = () => {
   };
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-6 space-y-6 bg-gray-50">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold text-gray-900">Expense Management</h1>
           <p className="text-gray-600 mt-1">Review and approve team expense claims</p>
         </div>
         <div className="flex gap-2">
-          <Button
+          {/* <Button
             className="bg-blue-500 hover:bg-blue-600 text-white"
             onClick={() => setIsNewExpenseOpen(true)}
           >
             <Plus className="h-4 w-4 mr-2" />
             Add Expense for Employee
-          </Button>
+          </Button> */}
           <Button
             className="bg-blue-500 hover:bg-blue-600 text-white"
             onClick={() => setIsOwnExpenseOpen(true)}
@@ -562,7 +566,7 @@ const ExpenseManagement = () => {
                                 <div className="rounded-lg p-4 bg-white">
                                   <div className="text-gray-500">Amount</div>
                                   <div className="font-medium text-gray-800">
-                                    {item.amount} {item.currency}
+                                    {item.final_amount} {item.currency}
                                   </div>
                                 </div>
                                 <div className="rounded-lg p-4 bg-white">
@@ -744,7 +748,7 @@ const ExpenseManagement = () => {
                     <TableCell className="px-6 py-4 text-gray-700">{expense.category}</TableCell>
                     <TableCell className="px-6 py-4 font-medium text-gray-900">
                       {new Intl.NumberFormat(undefined, { style: 'currency', currency: expense.currency || 'INR' }).format(
-                        expense.amount
+                        expense.final_amount
                       )}
                     </TableCell>
                     <TableCell className="px-6 py-4 text-gray-700">
@@ -852,7 +856,7 @@ const ExpenseManagement = () => {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="text-sm font-medium text-gray-500">Amount</label>
+                  <label className="text-sm font-medium text-gray-500">Base Amount</label>
                   <p className="text-lg font-bold text-gray-900">
                     {new Intl.NumberFormat(undefined, { style: 'currency', currency: selectedExpense.currency || 'INR' }).format(
                       selectedExpense.amount
@@ -864,6 +868,37 @@ const ExpenseManagement = () => {
                   <div className="mt-1">{getStatusBadge(selectedExpense.status)}</div>
                 </div>
               </div>
+              {selectedExpense.taxIncluded && (
+                <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
+                  <h4 className="text-xs font-semibold text-blue-900 mb-2">Tax & Discount Breakdown</h4>
+                  <div className="grid grid-cols-2 gap-3 text-xs">
+                    {selectedExpense.discount_percentage > 0 && (
+                      <div>
+                        <span className="text-blue-700">Discount:</span>
+                        <span className="font-semibold text-blue-900 ml-1">{selectedExpense.discount_percentage}%</span>
+                      </div>
+                    )}
+                    {selectedExpense.cgst_percentage > 0 && (
+                      <div>
+                        <span className="text-blue-700">CGST:</span>
+                        <span className="font-semibold text-blue-900 ml-1">{selectedExpense.cgst_percentage}%</span>
+                      </div>
+                    )}
+                    {selectedExpense.sgst_percentage > 0 && (
+                      <div>
+                        <span className="text-blue-700">SGST:</span>
+                        <span className="font-semibold text-blue-900 ml-1">{selectedExpense.sgst_percentage}%</span>
+                      </div>
+                    )}
+                  </div>
+                  <div className="mt-3 pt-3 border-t border-blue-300">
+                    <span className="text-xs text-blue-700">Final Amount:</span>
+                    <p className="text-lg font-bold text-blue-900">
+                      {new Intl.NumberFormat(undefined, { style: 'currency', currency: selectedExpense.currency || 'INR' }).format(selectedExpense.final_amount)}
+                    </p>
+                  </div>
+                </div>
+              )}
               <div>
                 <label className="text-sm font-medium text-gray-500">Submitted On</label>
                 <p className="text-sm text-gray-900">{selectedExpense.submittedOn}</p>

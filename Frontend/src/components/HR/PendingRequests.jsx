@@ -229,7 +229,7 @@ const PendingRequests = () => {
 
   if (error) {
     return (
-      <div className="p-6">
+      <div className="p-6 bg-gray-50">
         <div className="bg-red-50 border border-red-200 rounded-lg p-4">
           <div className="flex items-center">
             <div className="flex-shrink-0">
@@ -418,20 +418,7 @@ const PendingRequests = () => {
                             <X className="w-4 h-4" />
                           )}
                         </button>
-                        <button
-                          onClick={() => {
-                            try {
-                              markDeleted('pendingLeaves', request.id);
-                            } catch (e) {
-                              console.error('Error marking pending leave deleted locally:', e);
-                            }
-                            setPendingRequests(prev => prev.filter(r => r.id !== request.id));
-                          }}
-                          className="text-red-600 hover:text-red-900 p-1 rounded-full hover:bg-red-50"
-                          title="Delete"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                      
                       </div>
                     </td>
                   </tr>

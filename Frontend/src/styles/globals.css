@@ -35,6 +35,9 @@
   --input: var(--color-zinc-200);
   --ring: var(--color-zinc-400);
   --radius: 0.5rem;
+  /* Brand (pearl) */
+  --brand: var(--color-zinc-50);
+  --brand-foreground: var(--color-zinc-900);
 }
 
 .dark {
@@ -62,6 +65,9 @@
   --border: var(--color-zinc-800);
   --input: var(--color-zinc-800);
   --ring: var(--color-zinc-600);
+  /* Brand (pearl) - dark */
+  --brand: var(--color-zinc-800);
+  --brand-foreground: var(--color-zinc-50);
 }
 
 /** Theme Setup **/
@@ -83,6 +89,9 @@
   --color-secondary-foreground: var(--secondary-foreground);
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
+  /* Brand mapping */
+  --color-brand: var(--brand);
+  --color-brand-foreground: var(--brand-foreground);
 
   /** Base Styles **/
   --color-border: var(--border);

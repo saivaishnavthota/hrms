@@ -1,12 +1,15 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { Outlet } from 'react-router-dom';
 import { Link } from 'react-router-dom';
 import { toAbsoluteUrl } from '@/lib/helpers';
 import { UserDropdownMenu } from '@/components/layouts/layout-1/shared/topbar/user-dropdown-menu';
+import CompanyPoliciesModal from '@/components/shared/CompanyPoliciesModal';
 import '@/styles/employee-layout.css';
 
 export function EmployeeLayout() {
+  const [isPoliciesModalOpen, setIsPoliciesModalOpen] = useState(false);
+
   return (
     <>
       <Helmet>
@@ -60,11 +63,23 @@ export function EmployeeLayout() {
         <footer className="employee-footer">
           <div className="employee-footer-container">
             <div className="employee-footer-content">
-              © 2025 Employee Portal. All rights reserved.
+              <span>© 2025 Employee Portal. All rights reserved.</span>
+              <span className="mx-2">•</span>
+              <button 
+                onClick={() => setIsPoliciesModalOpen(true)}
+                className="text-blue-600 hover:text-blue-700 hover:underline cursor-pointer"
+              >
+                Company Policies
+              </button>
             </div>
           </div>
         </footer>
       </div>
+
+      <CompanyPoliciesModal 
+        isOpen={isPoliciesModalOpen} 
+        onClose={() => setIsPoliciesModalOpen(false)} 
+      />
     </>
   );
 }

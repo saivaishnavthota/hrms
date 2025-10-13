@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { User, Trash2, Eye, X, Search, CheckCircle, Home, CalendarDays } from 'lucide-react';
+import { User, Eye, X, Search, CheckCircle, Home, CalendarDays } from 'lucide-react';
 import { avatarBg } from '../../lib/avatarColors';
 import api from '@/lib/api';
 import { toast } from 'react-toastify';
@@ -48,12 +48,8 @@ const ManagerEmployeeAttendance = () => {
 
     const transformData = (data) => {
       return data.map((record, index) => {
-        const typeMap = {
-          'Employee': 'Full-Time',
-          'Intern': 'Intern',
-          'Contract': 'Contract'
-        };
-        const type = typeMap[record.type] || record.type || 'Full-Time';
+        // Use employment_type directly from backend (Full-Time or Contract)
+        const type = record.type || 'Full-Time';
         const totalHours = (record.subTasks || []).reduce((sum, st) => sum + parseFloat(st.hours || 0), 0);
 
         return {
@@ -80,9 +76,6 @@ const ManagerEmployeeAttendance = () => {
     fetchAttendance();
   }, [userId, year, month]);
 
-  const handleRemoveRecord = (id) => {
-    setAttendanceRecords(attendanceRecords.filter(record => record.id !== id));
-  };
 
   const handleShowProjects = (record) => {
     setSelectedRecord(record);
@@ -253,7 +246,6 @@ const ManagerEmployeeAttendance = () => {
                 >
                   <option value="all">All Types</option>
                   <option value="Full-Time">Full-Time</option>
-                  <option value="Intern">Intern</option>
                   <option value="Contract">Contract</option>
                 </select>
                 <select
@@ -342,13 +334,6 @@ const ManagerEmployeeAttendance = () => {
                           title="View Details"
                         >
                           <Eye className="h-4 w-4" />
-                        </button>
-                        <button
-                          onClick={() => handleRemoveRecord(record.id)}
-                          className="text-red-600 hover:text-red-900 p-1 rounded-full hover:bg-red-50"
-                          title="Remove Record"
-                        >
-                          <Trash2 className="h-4 w-4" />
                         </button>
                       </div>
                     </td>

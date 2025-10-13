@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Eye, Edit, Trash2, ChevronUp, ChevronDown } from 'lucide-react';
+import { Eye, Edit, Trash2, ChevronUp, ChevronDown, Info } from 'lucide-react';
 import { toast } from 'react-toastify';
 import api from '@/lib/api';
 import { avatarBg } from '../../lib/avatarColors';
@@ -23,21 +23,94 @@ const AssignLeaves = () => {
   const [actionMessage, setActionMessage] = useState(null);
   const [actionError, setActionError] = useState(null);
 
+  // Load default leave categories from API
+  const [leaveCategories, setLeaveCategories] = useState([]);
+
   const getAvatarColor = (name) => avatarBg(name);
+
+  // Helper function to map category names to backend fields
+  const mapCategoryToField = (categoryName) => {
+    const name = categoryName.toLowerCase();
+    if (name.includes('sick')) return 'sick_leaves';
+    if (name.includes('casual')) return 'casual_leaves';
+    if (name.includes('annual') || name.includes('paid') || name.includes('earned')) return 'paid_leaves';
+    if (name.includes('maternity')) return 'maternity_leave';
+    if (name.includes('paternity')) return 'paternity_leave';
+    return null;
+  };
+
+  // Build default leaves object from configured categories
+  const getDefaultLeavesConfig = () => {
+    const defaults = {
+      sick_leaves: 0,
+      casual_leaves: 0,
+      paid_leaves: 0,
+      maternity_leave: 0,
+      paternity_leave: 0,
+    };
+
+    leaveCategories.forEach(cat => {
+      const field = mapCategoryToField(cat.name);
+      if (field) {
+        defaults[field] = cat.totalLeaves;
+      }
+    });
+
+    return defaults;
+  };
+
+  // Generate button text from configured categories
+  const getButtonText = () => {
+    if (leaveCategories.length === 0) {
+      return 'Assign Default Leaves';
+    }
+    
+    const values = [];
+    const config = getDefaultLeavesConfig();
+    
+    // Show the main leave types
+    if (config.sick_leaves > 0) values.push(config.sick_leaves);
+    if (config.casual_leaves > 0) values.push(config.casual_leaves);
+    if (config.paid_leaves > 0) values.push(config.paid_leaves);
+    
+    if (values.length > 0) {
+      return `Assign Default Leaves (${values.join('/')})`;
+    }
+    
+    return 'Assign Default Leaves';
+  };
+
+  // Load leave categories from API
+  React.useEffect(() => {
+    const fetchLeaveCategories = async () => {
+      try {
+        const response = await api.get('/hr-config/leave-categories');
+        setLeaveCategories(response.data.map(cat => ({
+          id: cat.id,
+          name: cat.name,
+          totalLeaves: cat.default_days,
+          description: cat.description
+        })));
+      } catch (error) {
+        console.error('Error loading leave categories:', error);
+      }
+    };
+    fetchLeaveCategories();
+  }, []);
 
   React.useEffect(() => {
     const fetchEmployees = async () => {
       setEmployeesError(null);
       setLoadingEmployees(true);
       try {
-        const res = await api.get('/users/onboarded-employees');
-        const list = Array.isArray(res.data) ? res.data : res.data?.data || [];
+        const res = await api.get('/users/employees');
+        const list = res.data?.employees || [];
         const mapped = list.map(e => ({
-          id: e.id,
+          id: e.employeeId,
           employee: e.name,
-          email: e.email || e.personal_email || '',
+          email: e.email || e.to_email || '',
           avatar: e.avatar || null,
-          type: e.type || 'Full-time',
+          type: e.employment_type ,
           role: e.role || 'Employee',
           sickLeave: 0,
           casualLeave: 0,
@@ -158,14 +231,19 @@ const AssignLeaves = () => {
       toast.info('Please select at least one employee');
       return;
     }
+    
+    // Get defaults from configured leave categories
+    const DEFAULTS = getDefaultLeavesConfig();
+    
+    // Check if any leaves are configured
+    const hasLeaves = Object.values(DEFAULTS).some(val => val > 0);
+    if (!hasLeaves) {
+      setActionError('No leave categories configured. Please configure leave categories in HR Config first.');
+      toast.error('No leave categories configured. Please configure leave categories in HR Config first.');
+      return;
+    }
+    
     setActionLoading(true);
-    const DEFAULTS = {
-      sick_leaves: 6,
-      casual_leaves: 6,
-      paid_leaves: 15,
-      maternity_leave: 0,
-      paternity_leave: 0,
-    };
 
     try {
       const ids = Array.from(selectedIds);
@@ -250,6 +328,39 @@ const AssignLeaves = () => {
         <p className="text-gray-600 mt-1">Manage employee leave balances and assignments</p>
       </div>
 
+      {/* Display Default Leave Categories from HR Config */}
+      {leaveCategories.length > 0 && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+          <div className="flex items-start gap-3">
+            <Info className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
+            <div className="flex-1">
+              <h3 className="text-sm font-semibold text-blue-900 mb-2">
+                Configured Default Leave Categories
+              </h3>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+                {leaveCategories.map((category) => (
+                  <div
+                    key={category.id}
+                    className="bg-white rounded-md px-3 py-2 border border-blue-200"
+                  >
+                    <div className="text-xs font-medium text-gray-700 truncate" title={category.name}>
+                      {category.name}
+                    </div>
+                    <div className="text-lg font-bold text-blue-600">
+                      {category.totalLeaves}
+                    </div>
+                    <div className="text-xs text-gray-500">days/year</div>
+                  </div>
+                ))}
+              </div>
+              <p className="text-xs text-blue-700 mt-3">
+                These default values are configured in HR Configuration. You can modify them from the HR Config page.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="bg-white rounded-lg shadow">
         {/* Toolbar */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
@@ -259,7 +370,7 @@ const AssignLeaves = () => {
               disabled={selectedIds.size === 0 || actionLoading || loadingEmployees}
               className={`inline-flex items-center px-3 py-2 rounded-md text-sm font-medium ${selectedIds.size === 0 || actionLoading ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-blue-600 text-white hover:bg-blue-700'}`}
             >
-              Assign Default Leaves (6/6/15)
+              {getButtonText()}
             </button>
             {actionLoading && (
               <span className="text-sm text-gray-600">Applying...</span>
@@ -337,7 +448,7 @@ const AssignLeaves = () => {
                   </div>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
-                  <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${emp.type === 'Full-time' ? 'bg-green-100 text-green-800' : emp.type === 'Part-time' ? 'bg-yellow-100 text-yellow-800' : 'bg-blue-100 text-blue-800'}`}>{emp.type}</span>
+                  <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${emp.type === 'full_time' ? 'bg-green-100 text-green-800' : emp.type === 'Contract' ? 'bg-yellow-100 text-yellow-800' : 'bg-blue-100 text-blue-800'}`}>{emp.type}</span>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{emp.role}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-center"><span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">{emp.sickLeave}</span></td>

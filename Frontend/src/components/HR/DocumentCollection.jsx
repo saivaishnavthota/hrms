@@ -29,7 +29,7 @@ const DocumentCollection = () => {
           id: employee.id,
           name: employee.name,
           email: employee.email,
-          type: 'Employee',
+          type: employee.type,
           role: employee.role || 'Employee',
           totalDocuments: 16,
           submittedDocuments: uploadedDocs,
@@ -195,7 +195,7 @@ const DocumentCollection = () => {
   };
 
   const getAvatarColor = (name) => {
-    const colors = ['bg-blue-500', 'bg-green-500', 'bg-purple-500', 'bg-pink-500', 'bg-indigo-500', 'bg-yellow-500', 'bg-red-500', 'bg-teal-500'];
+    const colors = ['bg-[rgb(141,233,113)]', 'bg-[rgb(173,150,220)]', 'bg-black'];
     const index = name.charCodeAt(0) % colors.length;
     return colors[index];
   };
@@ -406,10 +406,19 @@ const DocumentCollection = () => {
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="text-sm text-gray-900">{employee.type}</span>
-                    </td>
+                  <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${employee.type === 'full_time' ? 'bg-green-100 text-green-800' : employee.type === 'Contract' ? 'bg-yellow-100 text-yellow-800' : 'bg-blue-100 text-blue-800'}`}>{employee.type}</span>
+                </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="text-sm text-gray-900">{employee.role}</span>
+                    <span className={`px-2 py-1 text-xs font-semibold rounded ${
+                        employee.role === 'HR' ? 'text-purple-700 bg-purple-50' :
+                        employee.role === 'Manager' ? 'text-orange-700 bg-orange-50' :
+                        employee.role === 'Account Manager' ? 'text-pink-700 bg-pink-50' :
+                        employee.role === 'Intern' ? 'text-green-700 bg-green-50' :
+                        employee.role === 'Employee' ? 'text-yellow-700 bg-yellow-50' :
+                        'text-gray-700 bg-gray-50'
+                      }`}>
+                        {employee.role}
+                      </span> 
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
@@ -556,10 +565,10 @@ const DocumentCollection = () => {
 
       {/* Document Request Modal */}
       {showDocumentRequestModal && selectedEmployeeForRequest && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full mx-4 max-h-[70vh] overflow-y-auto">
-            <div className="flex items-center justify-between p-6 border-b border-gray-200">
-              <h3 className="text-xl font-semibold text-gray-900">
+        <div className="fixed inset-0 bg-transparent backdrop-blur-[2px] flex items-center justify-center z-50">
+          <div className="bg-gradient-to-br from-white via-gray-50 to-blue-50 rounded-xl shadow-2xl max-w-3xl w-full mx-4 max-h-[80vh] overflow-y-auto border border-gray-200">
+            <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-gradient-to-r from-gray-600 to-blue-600 rounded-t-xl">
+              <h3 className="text-xl font-semibold text-white">
                 Request Documents from {selectedEmployeeForRequest.name}
               </h3>
               <button 

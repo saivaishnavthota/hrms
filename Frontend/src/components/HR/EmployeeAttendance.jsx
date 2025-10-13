@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { User, Trash2, Eye, X, Search, CheckCircle, Home, CalendarDays } from 'lucide-react';
+import { User, Eye, X, Search, CheckCircle, Home, CalendarDays } from 'lucide-react';
 import { avatarBg } from '../../lib/avatarColors';
-import api from '@/lib/api';
+import api from "@/lib/api";
 import { toast } from 'react-toastify';
 
-const EmployeeAttendance = () => {
+const ManagerEmployeeAttendance = () => {
   const [attendanceRecords, setAttendanceRecords] = useState([]);
   const [selectedRecord, setSelectedRecord] = useState(null);
   const [showModal, setShowModal] = useState(false);
@@ -13,10 +13,15 @@ const EmployeeAttendance = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [typeFilter, setTypeFilter] = useState('all');
   const [roleFilter, setRoleFilter] = useState('all');
-  const [year, setYear] = useState(new Date().getFullYear()); // Default to current year (2025)
-  const [month, setMonth] = useState(new Date().getMonth() + 1); // Default to current month (10 for October)
+    const [year, setYear] = useState(new Date().getFullYear()); // current year
+    const [month, setMonth] = useState(new Date().getMonth() + 1); // current month (1-12)
+
   const [userId, setUserId] = useState(null);
   const [error, setError] = useState(null);
+
+   const getAvatarColor = (name) => avatarBg(name);
+
+ 
 
   // Fetch userId from localStorage on component mount
   useEffect(() => {
@@ -38,45 +43,46 @@ const EmployeeAttendance = () => {
         const response = await api.get('/attendance/hr-daily', {
           params: { hr_id: userId, year, month }
         });
-        console.log('HR Daily Response:', response.data); // Debug log
         setAttendanceRecords(transformData(response.data));
       } catch (error) {
         console.error('Error fetching attendance:', error);
-        toast.error(`Failed to fetch attendance records: ${error.message}. Please try again.`);
+        setError(`Failed to fetch attendance records: ${error.message}. Please try again.`);
         setAttendanceRecords([]);
       }
     };
 
     const transformData = (data) => {
       return data.map((record, index) => {
-        // Map backend type to frontend type if needed
-        const typeMap = {
-          'Employee': 'Full-Time',
-          'Intern': 'Intern',
-          'Contract': 'Contract'
-        };
-        const type = typeMap[record.type] || record.type || 'Full-Time';
-
-        // Calculate total hours from subtasks
+        // Use employment_type directly from backend (Full-Time or Contract)
+        const type = record.type || 'Full-Time'; // Default to 'Full-Time' if type is missing
+        
+        // Calculate total hours from subtasks (same as Manager component)
         const totalHours = (record.subTasks || []).reduce((sum, st) => sum + parseFloat(st.hours || 0), 0);
+        
+        // Transform projects with subtasks
+        const projects = record.projects && record.projects.length > 0
+          ? [...new Map(record.projects.map(p => [p.label, {
+              name: p.label,
+              total_hours: p.total_hours,
+              subtasks: (record.subTasks || [])
+                .filter(st => st.project === p.label)
+                .map(st => ({
+                  name: st.subTask,
+                  hours: parseFloat(st.hours || 0)
+                }))
+            }])).values()]
+          : [];
 
         return {
           id: index + 1,
           employee: { name: record.name || 'Unknown', email: record.email || 'N/A' },
           type: type,
-          role: record.role || 'Employee',
+          role: record.role || 'Employee', // Keep role as backend provides for roleFilter
           day: record.day || new Date(record.date).toLocaleDateString('en-US', { weekday: 'long' }),
           date: record.date || 'N/A',
           status: record.status || 'Unknown',
-          hours: parseFloat(totalHours.toFixed(2)), // Use subtask total
-          projects: record.projects && record.projects.length > 0
-            ? [...new Map(record.projects.map(p => [p.label, {
-                name: p.label,
-                subtasks: record.subTasks
-                  .filter(st => st.project === p.label)
-                  .map(st => ({ name: st.subTask, hours: parseFloat(st.hours || 0) })) // Include hours
-              }])).values()]
-            : []
+          hours: parseFloat(totalHours.toFixed(2)), // Use calculated hours from subtasks
+          projects
         };
       });
     };
@@ -84,10 +90,6 @@ const EmployeeAttendance = () => {
     fetchAttendance();
   }, [userId, year, month]);
 
-  // Handle removing a record (Placeholder)
-  const handleRemoveRecord = (id) => {
-    setAttendanceRecords(attendanceRecords.filter(record => record.id !== id));
-  };
 
   const handleShowProjects = (record) => {
     setSelectedRecord(record);
@@ -146,10 +148,8 @@ const EmployeeAttendance = () => {
     );
   };
 
-  const getAvatarColor = (name) => avatarBg(name);
-
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
+    <div className="min-h-screen  p-6">
       <div className="max-w-7xl mx-auto">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900">Employee Attendance</h1>
@@ -161,22 +161,23 @@ const EmployeeAttendance = () => {
               type="number"
               placeholder="Year"
               value={year}
-              onChange={(e) => setYear(parseInt(e.target.value))}
+              onChange={(e) => setYear(e.target.value)}
               className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm w-24"
             />
             <select
               value={month}
-              onChange={(e) => setMonth(parseInt(e.target.value))}
+              onChange={(e) => setMonth(e.target.value)}
               className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
             >
               {[...Array(12)].map((_, i) => (
-                <option key={i + 1} value={i + 1}>{new Date(0, i).toLocaleString('en-US', { month: 'long' })}</option>
+                <option key={i + 1} value={i + 1}>{i + 1}</option>
               ))}
             </select>
           </div>
         </div>
         {/* Summary counts below filters */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+          {/* Monthly Summary */}
           <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
             <div className="px-4 py-3 border-b border-gray-200 flex items-center gap-2">
               <CalendarDays className="h-4 w-4 text-gray-700" />
@@ -203,6 +204,8 @@ const EmployeeAttendance = () => {
               </div>
             </div>
           </div>
+
+          {/* Daily Summary (latest date with data) */}
           <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
             <div className="px-4 py-3 border-b border-gray-200 flex items-center gap-2">
               <CalendarDays className="h-4 w-4 text-gray-700" />
@@ -260,7 +263,6 @@ const EmployeeAttendance = () => {
                 >
                   <option value="all">All Types</option>
                   <option value="Full-Time">Full-Time</option>
-                  <option value="Intern">Intern</option>
                   <option value="Contract">Contract</option>
                 </select>
                 <select
@@ -294,15 +296,18 @@ const EmployeeAttendance = () => {
                 {filteredRecords.map((record) => (
                   <tr key={record.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center gap-3">
-                        <div className={`flex-shrink-0 h-10 w-10 rounded-full ${getAvatarColor(record.employee.name)} flex items-center justify-center`}>
-                          <span className="text-sm font-medium text-white">
-                            {record.employee.name.split(' ').map(n => n[0]).join('')}
-                          </span>
+                      <div className="flex items-center">
+                        <div className="flex-shrink-0 h-10 w-10">
+                         
+ <div className={`flex-shrink-0 h-10 w-10 rounded-full ${getAvatarColor(record.employee.name)} flex items-center justify-center`}>
+                        <span className="text-sm font-medium text-white">
+                          {record.employee.name.split(' ').map(n => n[0]).join('')}
+                        </span>
+                      </div>
                         </div>
-                        <div className="text-sm font-medium text-gray-900">
-                          {record.employee.name}<br />
-                          <span className="text-sm text-gray-500">{record.employee.email}</span>
+                        <div className="ml-4">
+                          <div className="text-sm font-medium text-gray-900">{record.employee.name}</div>
+                          <div className="text-sm text-gray-500">{record.employee.email}</div>
                         </div>
                       </div>
                     </td>
@@ -349,13 +354,6 @@ const EmployeeAttendance = () => {
                           title="View Details"
                         >
                           <Eye className="h-4 w-4" />
-                        </button>
-                        <button
-                          onClick={() => handleRemoveRecord(record.id)}
-                          className="text-red-600 hover:text-red-900 p-1 rounded-full hover:bg-red-50"
-                          title="Remove Record"
-                        >
-                          <Trash2 className="h-4 w-4" />
                         </button>
                       </div>
                     </td>
@@ -406,17 +404,21 @@ const EmployeeAttendance = () => {
                           <p className="text-sm font-medium text-gray-700 mb-2">Subtasks:</p>
                           <div className="grid grid-cols-1 gap-2">
                             {project.subtasks.map((subtask, subtaskIndex) => (
-                              <div
-                                key={subtaskIndex}
-                                className="flex items-center p-2 bg-white/50 rounded-md border border-blue-100"
-                              >
-                                <div className="w-2 h-2 bg-gradient-to-r from-emerald-400 to-teal-500 rounded-full mr-3"></div>
-                                <span className="text-sm text-gray-800">{subtask.name} ({subtask.hours}h)</span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      ) : (
+        <div
+          key={subtaskIndex}
+          className="flex items-center justify-between p-2 bg-white/50 rounded-md border border-blue-100"
+        >
+          <div className="flex items-center">
+            <div className="w-2 h-2 bg-gradient-to-r from-emerald-400 to-teal-500 rounded-full mr-3"></div>
+            <span className="text-sm text-gray-800">{subtask.name}</span>
+          </div>
+          <span className="text-xs font-semibold text-gray-600">{subtask.hours}h</span>
+        </div>
+      ))}
+    </div>
+  </div>
+) : (
+
                         <p className="text-sm text-gray-500 italic">No subtasks for this project</p>
                       )}
                     </div>
@@ -522,12 +524,15 @@ const EmployeeAttendance = () => {
                           <h5 className="font-medium text-gray-800 mb-2">{project.name}</h5>
                           <div className="space-y-1">
                             {project.subtasks.map((subtask, subIndex) => (
-                              <div key={subIndex} className="flex items-center space-x-2">
-                                <div className="w-1.5 h-1.5 bg-gradient-to-r from-blue-400 to-purple-400 rounded-full"></div>
-                                <span className="text-sm text-gray-700">{subtask.name} ({subtask.hours}h)</span>
-                              </div>
-                            ))}
-                          </div>
+    <div key={subIndex} className="flex items-center justify-between space-x-2">
+      <div className="flex items-center space-x-2">
+        <div className="w-1.5 h-1.5 bg-gradient-to-r from-blue-400 to-purple-400 rounded-full"></div>
+        <span className="text-sm text-gray-700">{subtask.name}</span>
+      </div>
+      <span className="text-xs font-semibold text-gray-600">{subtask.hours}h</span>
+    </div>
+  ))}
+</div>
                         </div>
                       ))}
                     </div>
@@ -554,4 +559,4 @@ const EmployeeAttendance = () => {
   );
 };
 
-export default EmployeeAttendance;
+export default ManagerEmployeeAttendance;

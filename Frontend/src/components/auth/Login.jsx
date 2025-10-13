@@ -9,7 +9,7 @@ export default function Login() {
   const { loginUser } = useUser();
   
   // Helper function to calculate redirect path from login response
-  const calculateRedirectPath = (onboarding_status, login_status, role) => {
+  const calculateRedirectPath = (onboarding_status, login_status, role, isSuperHR = false) => {
     // Case 1: onboarding false, login_status false -> change password -> new user details
     if (!onboarding_status && !login_status) {
       return '/change-password-onboarding';
@@ -25,27 +25,27 @@ export default function Login() {
       return '/change-password-onboarding';
     }
 
-    // Case 4: onboarding true, login_status true -> dashboard based on role
+    // Case 4: onboarding true, login_status true -> dashboard based on role (consider Super HR)
     if (onboarding_status && login_status) {
-      return getDashboardPath(role);
+      return getDashboardPath(role, isSuperHR === true);
     }
 
     return '/login';
   };
 
   // Helper function to get dashboard path based on role
-  const getDashboardPath = (role) => {
+  const getDashboardPath = (role, isSuperHR = false) => {
     switch (role?.toLowerCase()) {
       case 'employee':
         return '/employee';
       case 'hr':
-        return '/hr/dashboard';
+        return isSuperHR ? '/super-hr/dashboard' : '/hr/dashboard';
       case 'account manager':
         return '/account-manager';
       case 'manager':
         return '/manager';
       default:
-        return '/hr/dashboard';
+        return isSuperHR ? '/super-hr/dashboard' : '/hr/dashboard';
     }
   };
   
@@ -126,7 +126,12 @@ export default function Login() {
       loginUser(response);
       
       // Calculate redirect path directly from response data since state update is async
-      const redirectPath = calculateRedirectPath(response.onboarding_status, response.login_status, response.type);
+      const redirectPath = calculateRedirectPath(
+        response.onboarding_status,
+        response.login_status,
+        response.type,
+        response.super_hr === true
+      );
       console.log('Calculated redirect path:', redirectPath);
       
       // Navigate to the appropriate page
@@ -323,7 +328,7 @@ export default function Login() {
                 value={formData.email}
                 onChange={handleInputChange}
                 className="w-full pl-10 pr-4 py-3 bg-slate-800/70 border border-slate-600/50 rounded-xl text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-green-500/50 focus:border-green-500/50 transition-all duration-200"
-                placeholder="Enter your email"
+                placeholder="Enter your company email"
                 required
               />
             </div>
@@ -404,13 +409,13 @@ export default function Login() {
           <div className="bg-slate-800/90 backdrop-blur-md border border-slate-700/50 rounded-2xl p-8 w-full max-w-md shadow-2xl">
             <div className="text-center mb-6">
               <h2 className="text-2xl font-bold text-white mb-2">Reset Password</h2>
-              <p className="text-slate-400">Enter your email address and we'll send you a link to reset your password.</p>
+              <p className="text-slate-400">Enter your company email address and we'll send you a code to reset your password.</p>
             </div>
 
             <form onSubmit={handleForgotPasswordSubmit} className="space-y-6">
               <div>
                 <label htmlFor="forgotEmail" className="block text-sm font-medium text-slate-200 mb-2">
-                  Email Address
+                  Company Email Address
                 </label>
                 <div className="relative">
                   <input
@@ -419,7 +424,7 @@ export default function Login() {
                     value={forgotPasswordEmail}
                     onChange={(e) => setForgotPasswordEmail(e.target.value)}
                     className="w-full px-4 py-3 bg-slate-800/70 border border-slate-600/50 rounded-xl text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-green-500/50 focus:border-green-500/50 transition-all duration-200 pl-12"
-                    placeholder="Enter your email"
+                    placeholder="Enter your company email"
                     required
                   />
                   <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-5 h-5" />

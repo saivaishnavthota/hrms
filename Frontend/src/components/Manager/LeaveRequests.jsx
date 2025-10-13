@@ -151,7 +151,7 @@ const getAvatarColor = (name) => avatarBg(name);
 
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-6 space-y-6 bg-gray-50">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold text-gray-900">Leave Requests</h1>

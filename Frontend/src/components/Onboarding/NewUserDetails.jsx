@@ -141,6 +141,22 @@ export default function NewUserDetails() {
     // Date of Birth validation
     if (!formData.dob) {
       newErrors.dob = 'Date of birth is required';
+    } else {
+      // Calculate age
+      const birthDate = new Date(formData.dob);
+      const today = new Date();
+      let age = today.getFullYear() - birthDate.getFullYear();
+      const monthDiff = today.getMonth() - birthDate.getMonth();
+      
+      // Adjust age if birthday hasn't occurred this year yet
+      if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+        age--;
+      }
+      
+      // Validate age is at least 18
+      if (age < 18) {
+        newErrors.dob = 'You must be at least 18 years old';
+      }
     }
 
     // Latest Graduation Year validation
@@ -233,9 +249,9 @@ export default function NewUserDetails() {
     <div className="h-screen w-full bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 overflow-hidden">
       <OnboardingHeader />
       <div className="pt-16 pb-4 px-4 w-full flex justify-center h-full">
-        <div style={{width: '800px'}} className="my-6 mb-12 p-6 bg-white rounded-xl shadow-xl border border-gray-100 overflow-y-auto max-h-full">
+        <div style={{width: '900px'}} className="my-6 mb-12 p-6 bg-white rounded-xl shadow-xl border border-gray-100 overflow-y-auto max-h-full">
           <div className="mb-4">
-            <h2 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent mb-2">
+            <h2 className="text-2xl font-bold bg-gradient-to-r from-black-600 to-balck-600 bg-clip-text text-transparent mb-2">
               Onboarding Employee Details
             </h2>
             <p className="text-gray-600">Please fill the details below</p>
@@ -304,6 +320,7 @@ export default function NewUserDetails() {
                 value={formData.dob}
                 onChange={handleInputChange}
                 disabled={isCompleted}
+                max={new Date(new Date().setFullYear(new Date().getFullYear() - 18)).toISOString().split('T')[0]}
                 className={`w-full pl-10 pr-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
                   errors.dob ? 'border-red-500 bg-red-50' : 'border-gray-300'
                 } ${isCompleted ? 'bg-gray-100 cursor-not-allowed' : ''}`}

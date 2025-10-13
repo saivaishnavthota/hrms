@@ -15,7 +15,7 @@ const LeaveRequests = () => {
     return user?.employeeId || JSON.parse(localStorage.getItem('userData') || '{}')?.employeeId || 1; // fallback for dev
   }, [user]);
 
-  const [activeTab, setActiveTab] = useState('pending');
+  const [activeTab, setActiveTab] = useState('leave-requests');
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedLeave, setSelectedLeave] = useState(null);
@@ -142,7 +142,7 @@ const LeaveRequests = () => {
   }, [leaveRequests, sortConfig]);
 
   return (
-    <div className="p-6">
+    <div className="p-6 bg-gray-50">
       {/* Tab Navigation */}
       <div className="mb-6">
         <div className="border-b border-gray-200">

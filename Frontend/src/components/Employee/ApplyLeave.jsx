@@ -176,7 +176,7 @@ const getLeaveTypeColor = (leaveType) => {
         setBalances({
           sick: {
             available: availableSick,
-            applied: totals.sick.approved + totals.sick.rejected,
+            applied: totals.sick.approved,
             // allocated reflects available + approved (exclude rejected)
             allocated: availableSick + totals.sick.approved,
           },
@@ -262,6 +262,22 @@ const getLeaveTypeColor = (leaveType) => {
       setIsSubmitting(false);
     }
   };
+  const [currentUserRole, setCurrentUserRole] = useState(null);
+useEffect(() => {
+  const employeeId = user?.employeeId || JSON.parse(localStorage.getItem('user') || '{}')?.employeeId;
+  if (!employeeId) return;
+ 
+  const loadUserProfile = async () => {
+    try {
+      const profile = await leaveAPI.getUserProfile(employeeId); // <-- add this API call in your leaveAPI.js
+      setCurrentUserRole(profile?.role || 'Employee'); // default role if not found
+    } catch (err) {
+      console.error("Failed to fetch user profile", err);
+    }
+  };
+ 
+  loadUserProfile();
+}, [user]);
 
   return (
     <div className="max-w-4xl mx-auto">
@@ -640,6 +656,8 @@ const getLeaveTypeColor = (leaveType) => {
         isOpen={!!selectedLeave}
         onClose={() => setSelectedLeave(null)}
         leaveData={selectedLeave}
+        role={currentUserRole} 
+        loggedInEmployeeId={user?.employeeId}
       />
     </div>
   );

@@ -79,15 +79,15 @@ export const MENU_SIDEBAR = [
     ],
   },
   {
-    title: 'Employees Form',
+    title: 'Employee Management',
     icon: FormIcon,
     path: '/hr/employees-form',
   },
-  {
-    title: 'Onboarding Employees',
-    icon: UserCheck,
-    path: '/hr/onboarding-employees',
-  },
+  // {
+  //   title: 'Onboarding Employees',
+  //   icon: UserCheck,
+  //   path: '/hr/onboarding-employees',
+  // },
   {
     title: 'Documents Collection',
     icon: Upload,
@@ -96,18 +96,12 @@ export const MENU_SIDEBAR = [
   {
     title: 'Leave Management',
     icon: Plane,
-    children: [
-      {
-        title: 'Assign Leaves',
-        icon: AssignIcon,
-        path: '/hr/assign-leaves',
-      },
-      {
-        title: 'Leave Requests',
-        icon: RequestIcon,
-        path: '/hr/leave-requests',
-      },
-    ],
+    path: '/hr/leave-requests',
+  },
+  {
+    title: 'Assign Leaves',
+    icon: AssignIcon,
+    path: '/hr/assign-leaves',
   },
   {
     title: 'Expense Management',
@@ -128,6 +122,11 @@ export const MENU_SIDEBAR = [
     title: 'Holidays',
     icon: CalendarCheck,
     path: '/hr/holidays',
+  },
+  {
+    title: 'Company Policies',
+    icon: FileText,
+    path: '/hr/company-policies',
   },
 ];
 

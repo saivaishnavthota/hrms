@@ -254,7 +254,7 @@ const OnboardingEmployees = () => {
       <div className="bg-white rounded-lg shadow-sm border border-gray-200">
         {/* Header */}
         <div className="px-6 py-4 border-b border-gray-200">
-          <h2 className="text-xl font-semibold text-gray-900">Onboarded Employees</h2>
+          <h2 className="text-xl font-semibold text-gray-900">Onboarding Employees</h2>
         </div>
 
         {/* Table */}

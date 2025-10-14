@@ -27,6 +27,11 @@ export const MENU_SIDEBAR_EMPLOYEE = [
     path: '/employee/submit-expense',
   },
   {
+    title: 'Software Requests',
+    icon: ClipboardList, 
+    path: '/employee/software-requests',
+  },
+  {
     title: 'Set Password',
     icon: KeyRound,
     path: '/employee/set-password',

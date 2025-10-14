@@ -32,6 +32,11 @@ export const MENU_SIDEBAR_IT_SUPPORTER = [
     path: '/it-supporter/maintanance',
   },
   {
+    title: 'Software Requests',
+    icon: ClipboardList,
+    path: '/it-supporter/software-requests',
+  },
+  {
     title: 'My Activity',
     icon: ClipboardList,
     path: '/it-supporter/my-activity',

@@ -646,5 +646,41 @@ export const deleteMaintenance = async (id) => {
   await axios.delete(`${BASE_URL}/assets/maintenance/${id}`);
 };
 
+// Software request API endpoints
+export const softwareRequestAPI = {
+  createSoftwareRequest: async (data) => {
+    const response = await api.post('/software_requests/', data);
+    return response.data;
+  },
+
+  getEmployeeManagers: async (employeeId) => {
+    const response = await api.get(`/software_requests/employees/${employeeId}/managers`);
+    return response.data;
+  },
+
+  getItAdmins: async () => {
+    const response = await api.get('/software_requests/it_admins/');
+    return response.data;
+  },
+
+  getSoftwareRequests: async () => {
+    const response = await api.get('/software_requests/');
+    return response.data;
+  },
+
+  managerAction: async (requestId, action, comments) => {
+    const response = await api.get(`/software_requests/${requestId}/manager-action`, {
+      params: { action, comments }
+    });
+    return response.data;
+  },
+
+  completeSoftwareRequest: async (requestId) => {
+    const response = await api.get(`/software_requests/${requestId}/complete`);
+    return response.data;
+  },
+};
+
+
 // Export the axios instance for custom requests
 export default api;

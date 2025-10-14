@@ -13,6 +13,7 @@ import Dashboard from '@/components/HR/Dashboard';
 import ChangePassword from '@/components/HR/ChangePassword';
 import LeaveRequests from '@/components/HR/LeaveRequests';
 import AssignLeaves from '@/components/HR/AssignLeaves';
+import SoftwareRequestCompletion from '@/components/ITSupporter/SoftwareRequestCompletion';
 
 import EmployeeAttendance from '@/components/HR/EmployeeAttendance';
 import Holidays from '@/components/HR/Holidays';
@@ -38,6 +39,7 @@ import ManagerAddAttendance from '@/components/Employee/AddAttendance';
 import ApplyLeave from '@/components/Employee/ApplyLeave';
 import SubmitExpense from '@/components/Employee/SubmitExpense';
 import UploadDocuments from '@/components/Employee/UploadDocuments';
+import SoftwareRequest from '@/components/Employee/SoftwareRequest';
 import SetPassword from '@/components/Employee/SetPassword';
 // Manager components
 import AccountManagerDashboard from '@/components/AccountManager/Dashboard';
@@ -49,6 +51,7 @@ import Projects from '@/components/AccountManager/Projects';
 import ManagerDashboard from '@/components/Manager/Dashboard';
 import ManagerExpenseManagement from '@/components/Manager/ExpenseManagement';
 import ManagerEmployeeAttendance from '@/components/Manager/EmployeesAttendance';
+import SoftwareRequestApproval from '@/components/Manager/SoftwareRequestApproval';
 import ManagerAttendance from '@/components/Manager/Attendance';
 // Super HR components
 import HRConfig from '@/components/HR/HRConfig';
@@ -116,6 +119,7 @@ export const AppRoutingSetup = () => {
         <Route path="apply-leave" element={<ApplyLeave />} />
         <Route path="submit-expense" element={<SubmitExpense />} />
         <Route path="upload-documents" element={<UploadDocuments />} />
+        <Route path="software-requests" element={<SoftwareRequest />} />
         <Route path="set-password" element={<SetPassword />} />
       </Route>
 
@@ -145,6 +149,7 @@ export const AppRoutingSetup = () => {
         <Route path="leave-requests" element={<ManagerLeaveManagement />} />
         <Route path="expense-management" element={<ManagerExpenseManagement />} />
         <Route path="upload-documents" element={<UploadDocuments />} />
+        <Route path="software-requests" element={<SoftwareRequestApproval />} />
         <Route path="change-password" element={<SetPassword />} />
       </Route>
 
@@ -188,6 +193,7 @@ export const AppRoutingSetup = () => {
         <Route path="employees" element={<ITSupporterEmployees />} />
         <Route path="allocations" element={<ITSupporterAllocations />} />
         <Route path="maintanance" element={<ITSupporterMaintanance />} />
+        <Route path="software-requests" element={<SoftwareRequestCompletion />} />
         <Route path="my-activity" element={<ITSupporterMyActivity />} />
       </Route>
     </Routes>

@@ -31,6 +31,11 @@ export const MENU_SIDEBAR_MANAGER = [
     icon: Upload,
     path: '/manager/upload-documents',
   },
+    {
+    title: 'Software Requests',
+    icon: ClipboardList,
+    path: '/manager/software-requests',
+  },
   {
     title: 'Change Password',
     icon: KeyRound,

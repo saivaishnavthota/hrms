@@ -3,7 +3,10 @@ from pydantic import EmailStr
 import os
 import base64
 from pathlib import Path
+from typing import Optional
 from dotenv import load_dotenv
+from models.user_model import User
+from models.swreq_model import SoftwareRequest
 
 load_dotenv()
 
@@ -597,4 +600,198 @@ async def send_employee_leave_status(email: str, leave_type: str, start_date: st
         return True
     except Exception as e:
         print(f"❌ Failed to send employee leave status email: {e}")
+        return False
+    
+
+async def send_new_request_email(
+    manager_email: Optional[str],
+    it_admin_email: str,
+    employee_name: str,
+    employee_email: str,
+    software_name: str,
+    software_version: str,
+    additional_info: Optional[str],
+    approve_url: Optional[str] = None,
+    reject_url: Optional[str] = None
+):
+    try:
+        fm = FastMail(mail_conf)
+
+        # --- Manager email with approve/reject buttons ---
+        if manager_email and approve_url and reject_url:
+            manager_content = f"""
+                <p class="greeting">Dear Manager,</p>
+                <p>{employee_name} ({employee_email}) has submitted a software request. Please review the details:</p>
+                <div class="info-box">
+                    <div><strong>Software Name:</strong> {software_name}</div>
+                    <div><strong>Software Version:</strong> {software_version}</div>
+                    {f'<div><strong>Additional Info:</strong> {additional_info}</div>' if additional_info else ''}
+                </div>
+                <p>Please take action:</p>
+                <a href="{approve_url}" style="padding:10px 15px; background-color:green; color:white; text-decoration:none; border-radius:5px;">Approve</a>
+                <a href="{reject_url}" style="padding:10px 15px; background-color:red; color:white; text-decoration:none; border-radius:5px;">Reject</a>
+                <p style="margin-top: 25px;">Best regards,<br><strong>Nxzen IT Team</strong></p>
+            """
+            message_manager = MessageSchema(
+                subject="🖥️ New Software Request - Manager Action Required",
+                recipients=[manager_email],
+                body=get_email_template("🖥️ Software Request Notification", manager_content),
+                subtype="html"
+            )
+            await fm.send_message(message_manager)
+            print(f"✅ Manager email sent to {manager_email}")
+
+        # --- IT Admin email (notification only) ---
+        it_content = f"""
+            <p>Hello IT Team,</p>
+            <p>{employee_name} ({employee_email}) has submitted a software request. Please prepare for this request:</p>
+            <div class="info-box">
+                <div><strong>Software Name:</strong> {software_name}</div>
+                <div><strong>Software Version:</strong> {software_version}</div>
+                {f'<div><strong>Additional Info:</strong> {additional_info}</div>' if additional_info else ''}
+            </div>
+            <p style="margin-top: 25px;">Best regards,<br><strong>Nxzen IT Team</strong></p>
+        """
+        message_it = MessageSchema(
+            subject="🖥️ New Software Request - Notification",
+            recipients=[it_admin_email],
+            body=get_email_template("🖥️ New Software Request", it_content),
+            subtype="html"
+        )
+        await fm.send_message(message_it)
+        print(f"✅ IT Admin email sent to {it_admin_email}")
+
+        return True
+
+    except Exception as e:
+        print(f"❌ Failed to send software request emails: {e}")
+        return False
+
+async def send_approval_email_to_employee(employee: User, manager: User, request: SoftwareRequest):
+    content = f"""
+        <p>Hello {employee.name},</p>
+        <p>Your software request has been <strong>approved</strong> by {manager.name} ({manager.company_email}).</p>
+        <div class="info-box">
+            <div><strong>Software Name:</strong> {request.software_name}</div>
+            <div><strong>Requested By:</strong> {employee.name} ({employee.company_email})</div>
+            {f'<div><strong>Additional Info:</strong> {request.additional_info}</div>' if request.additional_info else ''}
+        </div>
+        <p>Best regards,<br><strong>Nxzen Team</strong></p>
+    """
+    message = MessageSchema(
+        subject="Your Software Request Approved",
+        recipients=[employee.company_email],
+        body=get_email_template("Software Request Approved", content),
+        subtype="html"
+    )
+    fm = FastMail(mail_conf)
+    await fm.send_message(message)
+    print(f"✅ Approval email sent to Employee ({employee.company_email})")
+
+# Approval email to IT Admin
+async def send_approval_email_to_it(it_admin: User, employee: User, manager: User, request: SoftwareRequest):
+    content = f"""
+        <p>Hello IT Team,</p>
+        <p>The software request from {employee.name} ({employee.company_email}) has been <strong>approved</strong> by {manager.name} ({manager.company_email}).</p>
+        <div class="info-box">
+            <div><strong>Software Name:</strong> {request.software_name}</div>
+            <div><strong>Requested By:</strong> {employee.name} ({employee.company_email})</div>
+            {f'<div><strong>Additional Info:</strong> {request.additional_info}</div>' if request.additional_info else ''}
+        </div>
+        <p>Please proceed with installation or required actions.</p>
+        <p>Best regards,<br><strong>Nxzen Team</strong></p>
+    """
+    message = MessageSchema(
+        subject="🖥️ Software Request Approved - Action Required",
+        recipients=[it_admin.company_email],
+        body=get_email_template("Software Request Approved", content),
+        subtype="html"
+    )
+    fm = FastMail(mail_conf)
+    await fm.send_message(message)
+    print(f"✅ Approval email sent to IT Admin ({it_admin.company_email})")
+
+async def send_rejection_email(employee: User, it_admin: User, manager: User, request: SoftwareRequest, comments: Optional[str] = None):
+    try:
+        # --- Email to Employee ---
+        employee_content = f"""
+            <p>Hello {employee.name},</p>
+            <p>Your software request for <strong>{request.software_name}</strong> has been <strong>rejected</strong> by {manager.name} ({manager.company_email}).</p>
+            <div class="info-box">
+                <div><strong>Software Name:</strong> {request.software_name}</div>
+                <div><strong>Requested By:</strong> {employee.name} ({employee.company_email})</div>
+                {f'<div><strong>Comments:</strong> {comments}</div>' if comments else ''}
+            </div>
+            <p>Please contact your manager or IT team if you have any questions.</p>
+            <p>Best regards,<br><strong>Nxzen Team</strong></p>
+        """
+        message_employee = MessageSchema(
+            subject="Your Software Request Rejected",
+            recipients=[employee.company_email],
+            body=get_email_template("Software Request Rejected", employee_content),
+            subtype="html"
+        )
+
+        # --- Email to IT Admin ---
+        it_content = f"""
+            <p>Hello IT Team,</p>
+            <p>The software request for <strong>{request.software_name}</strong> submitted by {employee.name} ({employee.company_email}) has been <strong>rejected</strong> by {manager.name} ({manager.company_email}).</p>
+            <div class="info-box">
+                <div><strong>Software Name:</strong> {request.software_name}</div>
+                <div><strong>Requested By:</strong> {employee.name} ({employee.company_email})</div>
+                {f'<div><strong>Comments:</strong> {comments}</div>' if comments else ''}
+            </div>
+            <p>No further action is required.</p>
+            <p>Best regards,<br><strong>Nxzen Team</strong></p>
+        """
+        message_it = MessageSchema(
+            subject="Software Request Rejected - Action Notification",
+            recipients=[it_admin.company_email],
+            body=get_email_template("Software Request Rejected", it_content),
+            subtype="html"
+        )
+
+        # Send both emails
+        fm = FastMail(mail_conf)
+        await fm.send_message(message_employee)
+        await fm.send_message(message_it)
+
+        print(f"✅ Rejection emails sent: Employee ({employee.company_email}), IT Admin ({it_admin.company_email})")
+        return True
+    except Exception as e:
+        print(f"❌ Failed to send rejection emails: {e}")
+        return False
+
+
+async def send_completion_email(recipient: EmailStr, software_name: str, employee_name: str):
+    try:
+        content = f"""
+            <p class="greeting">Hello,</p>
+            <p>Your software request has been completed successfully. Details are below:</p>
+            <div class="info-box">
+                <div class="info-item">
+                    <span class="info-label">Software Name:</span>
+                    <span class="info-value">{software_name}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Requested By:</span>
+                    <span class="info-value">{employee_name}</span>
+                </div>
+            </div>
+            <p style="margin-top: 25px;">You can now access or start using the software.</p>
+            <p>Best regards,<br><strong>Nxzen IT Team</strong></p>
+        """
+        html_body = get_email_template("Software Request Completed", content)
+        message = MessageSchema(
+            subject="Software Request Completed - Nxzen",
+            recipients=[recipient],
+            body=html_body,
+            subtype="html"
+        )
+        fm = FastMail(mail_conf)
+        await fm.send_message(message)
+        print(f"✅ Completion email sent to {recipient}")
+        return True
+    except Exception as e:
+        print(f"❌ Failed to send completion email: {e}")
         return False

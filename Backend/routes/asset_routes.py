@@ -247,7 +247,7 @@ async def get_employees(o_status: Optional[bool] = True, role: Optional[str] = N
     return [
         Employee(
             employeeId=emp.id,
-            name=emp.name,
+            name=emp.company_email,
             email=emp.email,
             role=emp.role,
             hrs=[],

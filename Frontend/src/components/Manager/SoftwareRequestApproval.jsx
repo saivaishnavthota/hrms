@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { softwareRequestAPI } from '@/lib/api';
 import { getCurrentUser } from '@/lib/auth';
-import { Check, X, CheckCircle, Clock, XCircle } from 'lucide-react';
+import { Check, X, CheckCircle, Clock, XCircle, Eye } from 'lucide-react';
 import { toast } from 'react-toastify';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -14,16 +14,22 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { avatarBg } from '../../lib/avatarColors';
+import { useNavigate } from 'react-router-dom';
 
 const SoftwareRequestApproval = () => {
   const [requests, setRequests] = useState([]);
   const [comments, setComments] = useState({});
   const [loading, setLoading] = useState(false);
-  const [actionLoading, setActionLoading] = useState({}); 
+  const [actionLoading, setActionLoading] = useState({});
+  const [selectedRequestId, setSelectedRequestId] = useState(null);
+  const [complianceAnswers, setComplianceAnswers] = useState([]);
+  const [answersDialogOpen, setAnswersDialogOpen] = useState(false);
 
   const currentUser = getCurrentUser();
   const managerId = currentUser?.userId;
+  const navigate = useNavigate();
 
   const getAvatarColor = (name) => avatarBg(name);
 
@@ -35,22 +41,37 @@ const SoftwareRequestApproval = () => {
     return (first + second).toUpperCase();
   };
 
+  const formatDate = (iso) => {
+    if (!iso) return '';
+    try {
+      const d = new Date(iso);
+      return d.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+      });
+    } catch {
+      return iso;
+    }
+  };
+
   useEffect(() => {
     if (!managerId) {
       toast.error('User not authenticated. Please log in.');
+      navigate('/login'); // Redirect to login if not authenticated
       return;
     }
 
     const fetchRequests = async () => {
       setLoading(true);
       try {
-        const requestsData = await softwareRequestAPI.getSoftwareRequests();
+        const requestsData = await softwareRequestAPI.getSoftwareRequests('Pending');
         setRequests(
           requestsData
-            .filter((req) => req.manager_id === parseInt(managerId) && req.status === 'Pending')
+            .filter((req) => req.manager_id === parseInt(managerId))
             .map((req, index) => ({
-              id: index + 1, // Static ID for display
-              requestId: req.id, // Backend ID for API calls
+              id: index + 1,
+              requestId: req.id,
               employee: {
                 name: req.employee_name || req.employee_id || 'Unknown',
                 email: req.employee_email || 'N/A',
@@ -59,17 +80,22 @@ const SoftwareRequestApproval = () => {
               software_name: req.software_name,
               software_version: req.software_version || 'N/A',
               additional_info: req.additional_info || 'N/A',
+              business_unit_name: req.business_unit_name || 'N/A', // New field
+              software_duration: req.software_duration || 'N/A', // New field
               status: req.status,
+              compliance_answered: req.compliance_answered,
+              created_at: req.created_at,
             }))
         );
       } catch (err) {
+        console.error('Fetch requests error:', err);
         toast.error('Failed to fetch software requests. Please try again.');
       } finally {
         setLoading(false);
       }
     };
     fetchRequests();
-  }, [managerId]);
+  }, [managerId, navigate]);
 
   const handleCommentChange = (requestId, value) => {
     setComments((prev) => ({ ...prev, [requestId]: value }));
@@ -78,6 +104,7 @@ const SoftwareRequestApproval = () => {
   const handleAction = async (requestId, action) => {
     if (!managerId) {
       toast.error('User not authenticated. Please log in.');
+      navigate('/login');
       return;
     }
 
@@ -93,9 +120,22 @@ const SoftwareRequestApproval = () => {
         return newComments;
       });
     } catch (err) {
+      console.error(`Manager action (${action}) error:`, err);
       toast.error(err.response?.data?.detail || `Failed to ${action.toLowerCase()} software request.`);
     } finally {
       setActionLoading((prev) => ({ ...prev, [requestId]: false }));
+    }
+  };
+
+  const handleViewAnswers = async (requestId) => {
+    try {
+      const answers = await softwareRequestAPI.getComplianceAnswers(requestId);
+      setComplianceAnswers(answers);
+      setSelectedRequestId(requestId);
+      setAnswersDialogOpen(true);
+    } catch (err) {
+      console.error('Fetch compliance answers error:', err);
+      toast.error('Failed to fetch compliance answers.');
     }
   };
 
@@ -155,6 +195,8 @@ const SoftwareRequestApproval = () => {
                 <TableHead className="text-left font-semibold text-gray-700 px-6 py-4">EMPLOYEE</TableHead>
                 <TableHead className="text-left font-semibold text-gray-700 px-6 py-4">SOFTWARE</TableHead>
                 <TableHead className="text-left font-semibold text-gray-700 px-6 py-4">VERSION</TableHead>
+                <TableHead className="text-left font-semibold text-gray-700 px-6 py-4">BUSINESS UNIT</TableHead> {/* New column */}
+                <TableHead className="text-left font-semibold text-gray-700 px-6 py-4">DURATION</TableHead> {/* New column */}
                 <TableHead className="text-left font-semibold text-gray-700 px-6 py-4">ADDITIONAL INFO</TableHead>
                 <TableHead className="text-left font-semibold text-gray-700 px-6 py-4">COMMENTS</TableHead>
                 <TableHead className="text-left font-semibold text-gray-700 px-6 py-4">ACTIONS</TableHead>
@@ -179,6 +221,8 @@ const SoftwareRequestApproval = () => {
                   </TableCell>
                   <TableCell className="px-6 py-4 text-gray-700">{req.software_name}</TableCell>
                   <TableCell className="px-6 py-4 text-gray-700">{req.software_version}</TableCell>
+                  <TableCell className="px-6 py-4 text-gray-700">{req.business_unit_name}</TableCell> {/* New column */}
+                  <TableCell className="px-6 py-4 text-gray-700">{req.software_duration}</TableCell> {/* New column */}
                   <TableCell className="px-6 py-4 text-gray-700">{req.additional_info}</TableCell>
                   <TableCell className="px-6 py-4">
                     <Textarea
@@ -209,6 +253,16 @@ const SoftwareRequestApproval = () => {
                       >
                         <X className="h-4 w-4" />
                       </Button>
+                      {req.compliance_answered && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 w-8 p-0 text-blue-600 hover:bg-blue-50"
+                          onClick={() => handleViewAnswers(req.requestId)}
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                      )}
                     </div>
                   </TableCell>
                 </TableRow>
@@ -217,6 +271,27 @@ const SoftwareRequestApproval = () => {
           </Table>
         )}
       </div>
+
+      <Dialog open={answersDialogOpen} onOpenChange={setAnswersDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Compliance Answers</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            {complianceAnswers.length === 0 ? (
+              <p className="text-gray-600">No answers submitted yet.</p>
+            ) : (
+              complianceAnswers.map((answer) => (
+                <div key={answer.id} className="border-b pb-2">
+                  <p className="font-medium text-gray-700">{answer.question_text}</p>
+                  <p className="text-gray-600">Answer: {answer.answer}</p>
+                  <p className="text-xs text-gray-500">Submitted on: {formatDate(answer.created_at)}</p>
+                </div>
+              ))
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

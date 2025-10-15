@@ -3,10 +3,17 @@ from pydantic import EmailStr
 import os
 import base64
 from pathlib import Path
-from typing import Optional
+from typing import Optional, List
 from dotenv import load_dotenv
 from models.user_model import User
-from models.swreq_model import SoftwareRequest
+from models.swreq_model import SoftwareRequest, ComplianceAnswer, ComplianceQuestion
+from sqlmodel import Session, select
+import logging
+from database import get_session
+from fastapi import Depends
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 load_dotenv()
 
@@ -601,9 +608,10 @@ async def send_employee_leave_status(email: str, leave_type: str, start_date: st
     except Exception as e:
         print(f"❌ Failed to send employee leave status email: {e}")
         return False
-    
 
+#changed for IT Admin
 async def send_new_request_email(
+    manager_name: Optional[str],
     manager_email: Optional[str],
     it_admin_email: str,
     employee_name: str,
@@ -611,6 +619,8 @@ async def send_new_request_email(
     software_name: str,
     software_version: str,
     additional_info: Optional[str],
+    business_unit_name: Optional[str],  # Added new field
+    software_duration: Optional[str],   # Added new field
     approve_url: Optional[str] = None,
     reject_url: Optional[str] = None
 ):
@@ -620,11 +630,13 @@ async def send_new_request_email(
         # --- Manager email with approve/reject buttons ---
         if manager_email and approve_url and reject_url:
             manager_content = f"""
-                <p class="greeting">Dear Manager,</p>
+                <p class="greeting">Dear {manager_name or 'Manager'},</p>
                 <p>{employee_name} ({employee_email}) has submitted a software request. Please review the details:</p>
                 <div class="info-box">
                     <div><strong>Software Name:</strong> {software_name}</div>
                     <div><strong>Software Version:</strong> {software_version}</div>
+                    <div><strong>Business Unit:</strong> {business_unit_name or 'N/A'}</div>
+                    <div><strong>Software Duration:</strong> {software_duration or 'N/A'}</div>
                     {f'<div><strong>Additional Info:</strong> {additional_info}</div>' if additional_info else ''}
                 </div>
                 <p>Please take action:</p>
@@ -639,16 +651,22 @@ async def send_new_request_email(
                 subtype="html"
             )
             await fm.send_message(message_manager)
-            print(f"✅ Manager email sent to {manager_email}")
+            logger.info(f"✅ Manager email sent to {manager_email}")
 
-        # --- IT Admin email (notification only) ---
+        # --- IT Admin email (notification with manager info) ---
         it_content = f"""
             <p>Hello IT Team,</p>
-            <p>{employee_name} ({employee_email}) has submitted a software request. Please prepare for this request:</p>
+            <p>{employee_name} ({employee_email}) has submitted a new software request. Here are the details:</p>
             <div class="info-box">
                 <div><strong>Software Name:</strong> {software_name}</div>
                 <div><strong>Software Version:</strong> {software_version}</div>
+                <div><strong>Business Unit:</strong> {business_unit_name or 'N/A'}</div>
+                <div><strong>Software Duration:</strong> {software_duration or 'N/A'}</div>
                 {f'<div><strong>Additional Info:</strong> {additional_info}</div>' if additional_info else ''}
+            </div>
+            <div class="info-box" style="margin-top: 15px;">
+                <div><strong>Reporting Manager Name:</strong> {manager_name or 'N/A'}</div>
+                <div><strong>Reporting Manager Email:</strong> {manager_email or 'N/A'}</div>
             </div>
             <p style="margin-top: 25px;">Best regards,<br><strong>Nxzen IT Team</strong></p>
         """
@@ -659,59 +677,93 @@ async def send_new_request_email(
             subtype="html"
         )
         await fm.send_message(message_it)
-        print(f"✅ IT Admin email sent to {it_admin_email}")
+        logger.info(f"✅ IT Admin email sent to {it_admin_email}")
 
         return True
 
     except Exception as e:
-        print(f"❌ Failed to send software request emails: {e}")
+        logger.error(f"❌ Failed to send software request emails: {e}")
         return False
 
-async def send_approval_email_to_employee(employee: User, manager: User, request: SoftwareRequest):
-    content = f"""
-        <p>Hello {employee.name},</p>
-        <p>Your software request has been <strong>approved</strong> by {manager.name} ({manager.company_email}).</p>
-        <div class="info-box">
-            <div><strong>Software Name:</strong> {request.software_name}</div>
-            <div><strong>Requested By:</strong> {employee.name} ({employee.company_email})</div>
-            {f'<div><strong>Additional Info:</strong> {request.additional_info}</div>' if request.additional_info else ''}
-        </div>
-        <p>Best regards,<br><strong>Nxzen Team</strong></p>
-    """
-    message = MessageSchema(
-        subject="Your Software Request Approved",
-        recipients=[employee.company_email],
-        body=get_email_template("Software Request Approved", content),
-        subtype="html"
-    )
-    fm = FastMail(mail_conf)
-    await fm.send_message(message)
-    print(f"✅ Approval email sent to Employee ({employee.company_email})")
+async def send_approval_email_to_employee(employee: User, manager: User, request: SoftwareRequest, business_unit_name: Optional[str] = None):
+    try:
+        if not employee.company_email:
+            logger.error(f"Cannot send approval email to employee: No email address provided")
+            return False
 
-# Approval email to IT Admin
-async def send_approval_email_to_it(it_admin: User, employee: User, manager: User, request: SoftwareRequest):
-    content = f"""
-        <p>Hello IT Team,</p>
-        <p>The software request from {employee.name} ({employee.company_email}) has been <strong>approved</strong> by {manager.name} ({manager.company_email}).</p>
-        <div class="info-box">
-            <div><strong>Software Name:</strong> {request.software_name}</div>
-            <div><strong>Requested By:</strong> {employee.name} ({employee.company_email})</div>
-            {f'<div><strong>Additional Info:</strong> {request.additional_info}</div>' if request.additional_info else ''}
-        </div>
-        <p>Please proceed with installation or required actions.</p>
-        <p>Best regards,<br><strong>Nxzen Team</strong></p>
-    """
-    message = MessageSchema(
-        subject="🖥️ Software Request Approved - Action Required",
-        recipients=[it_admin.company_email],
-        body=get_email_template("Software Request Approved", content),
-        subtype="html"
-    )
-    fm = FastMail(mail_conf)
-    await fm.send_message(message)
-    print(f"✅ Approval email sent to IT Admin ({it_admin.company_email})")
+        content = f"""
+            <p>Hello {employee.name},</p>
+            <p>Your software request has been <strong>approved</strong> by {manager.name} ({manager.company_email}).</p>
+            <div class="info-box">
+                <div><strong>Software Name:</strong> {request.software_name}</div>
+                <div><strong>Software Version:</strong> {request.software_version or 'N/A'}</div>
+                <div><strong>Business Unit:</strong> {business_unit_name or 'N/A'}</div>
+                <div><strong>Software Duration:</strong> {request.software_duration or 'N/A'}</div>
+                {f'<div><strong>Additional Info:</strong> {request.additional_info}</div>' if request.additional_info else ''}
+            </div>
+            <p>Best regards,<br><strong>Nxzen Team</strong></p>
+        """
+        message = MessageSchema(
+            subject="Your Software Request Approved",
+            recipients=[employee.company_email],
+            body=get_email_template("Software Request Approved", content),
+            subtype="html"
+        )
+        fm = FastMail(mail_conf)
+        await fm.send_message(message)
+        logger.info(f"✅ Approval email sent to Employee ({employee.company_email})")
+        return True
+    except Exception as e:
+        logger.error(f"❌ Failed to send approval email to employee {employee.company_email}: {str(e)}")
+        return False
 
-async def send_rejection_email(employee: User, it_admin: User, manager: User, request: SoftwareRequest, comments: Optional[str] = None):
+async def send_approval_email_to_it(
+    it_admin: User,
+    employee: User,
+    manager: User,
+    request: SoftwareRequest,
+    business_unit_name: Optional[str] = None
+):
+    try:
+        if not it_admin.company_email:
+            logger.error(f"Cannot send approval email to IT admin: No email address provided")
+            return False
+
+        content = f"""
+            <p>Hello IT Team,</p>
+            <p>The software request from {employee.name} ({employee.company_email}) has been <strong>approved</strong> by {manager.name} ({manager.company_email}).</p>
+            <div class="info-box">
+                <div><strong>Software Name:</strong> {request.software_name}</div>
+                <div><strong>Software Version:</strong> {request.software_version or 'N/A'}</div>
+                <div><strong>Business Unit:</strong> {business_unit_name or 'N/A'}</div>
+                <div><strong>Software Duration:</strong> {request.software_duration or 'N/A'}</div>
+                {f'<div><strong>Additional Info:</strong> {request.additional_info}</div>' if request.additional_info else ''}
+            </div>
+            <p>Please proceed with installation or required actions.</p>
+            <p>Best regards,<br><strong>Nxzen Team</strong></p>
+        """
+        message = MessageSchema(
+            subject="🖥️ Software Request Approved - Action Required",
+            recipients=[it_admin.company_email],
+            body=get_email_template("Software Request Approved", content),
+            subtype="html"
+        )
+        fm = FastMail(mail_conf)
+        await fm.send_message(message)
+        logger.info(f"✅ Approval email sent to IT Admin ({it_admin.company_email})")
+        return True
+    except Exception as e:
+        logger.error(f"❌ Failed to send approval email to IT admin {it_admin.company_email}: {str(e)}")
+        return False
+
+async def send_rejection_email(
+    employee: User,
+    it_admin: User,
+    manager: User,
+    request: SoftwareRequest,
+    business_unit_name: Optional[str] = None,
+    comments: Optional[str] = None
+):
     try:
         # --- Email to Employee ---
         employee_content = f"""
@@ -719,7 +771,9 @@ async def send_rejection_email(employee: User, it_admin: User, manager: User, re
             <p>Your software request for <strong>{request.software_name}</strong> has been <strong>rejected</strong> by {manager.name} ({manager.company_email}).</p>
             <div class="info-box">
                 <div><strong>Software Name:</strong> {request.software_name}</div>
-                <div><strong>Requested By:</strong> {employee.name} ({employee.company_email})</div>
+                <div><strong>Software Version:</strong> {request.software_version}</div>
+                <div><strong>Business Unit:</strong> {business_unit_name or 'N/A'}</div>
+                <div><strong>Software Duration:</strong> {request.software_duration or 'N/A'}</div>
                 {f'<div><strong>Comments:</strong> {comments}</div>' if comments else ''}
             </div>
             <p>Please contact your manager or IT team if you have any questions.</p>
@@ -738,7 +792,9 @@ async def send_rejection_email(employee: User, it_admin: User, manager: User, re
             <p>The software request for <strong>{request.software_name}</strong> submitted by {employee.name} ({employee.company_email}) has been <strong>rejected</strong> by {manager.name} ({manager.company_email}).</p>
             <div class="info-box">
                 <div><strong>Software Name:</strong> {request.software_name}</div>
-                <div><strong>Requested By:</strong> {employee.name} ({employee.company_email})</div>
+                <div><strong>Software Version:</strong> {request.software_version}</div>
+                <div><strong>Business Unit:</strong> {business_unit_name or 'N/A'}</div>
+                <div><strong>Software Duration:</strong> {request.software_duration or 'N/A'}</div>
                 {f'<div><strong>Comments:</strong> {comments}</div>' if comments else ''}
             </div>
             <p>No further action is required.</p>
@@ -756,14 +812,19 @@ async def send_rejection_email(employee: User, it_admin: User, manager: User, re
         await fm.send_message(message_employee)
         await fm.send_message(message_it)
 
-        print(f"✅ Rejection emails sent: Employee ({employee.company_email}), IT Admin ({it_admin.company_email})")
+        logger.info(f"✅ Rejection emails sent: Employee ({employee.company_email}), IT Admin ({it_admin.company_email})")
         return True
     except Exception as e:
-        print(f"❌ Failed to send rejection emails: {e}")
+        logger.error(f"❌ Failed to send rejection emails: {e}")
         return False
 
-
-async def send_completion_email(recipient: EmailStr, software_name: str, employee_name: str):
+async def send_completion_email(
+    recipient: EmailStr,
+    software_name: str,
+    employee_name: str,
+    business_unit_name: Optional[str] = None,
+    software_duration: Optional[str] = None
+):
     try:
         content = f"""
             <p class="greeting">Hello,</p>
@@ -776,6 +837,14 @@ async def send_completion_email(recipient: EmailStr, software_name: str, employe
                 <div class="info-item">
                     <span class="info-label">Requested By:</span>
                     <span class="info-value">{employee_name}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Business Unit:</span>
+                    <span class="info-value">{business_unit_name or 'N/A'}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Software Duration:</span>
+                    <span class="info-value">{software_duration or 'N/A'}</span>
                 </div>
             </div>
             <p style="margin-top: 25px;">You can now access or start using the software.</p>
@@ -790,8 +859,120 @@ async def send_completion_email(recipient: EmailStr, software_name: str, employe
         )
         fm = FastMail(mail_conf)
         await fm.send_message(message)
-        print(f"✅ Completion email sent to {recipient}")
+        logger.info(f"✅ Completion email sent to {recipient}")
         return True
     except Exception as e:
-        print(f"❌ Failed to send completion email: {e}")
+        logger.error(f"❌ Failed to send completion email: {e}")
+        return False
+
+async def send_compliance_email(
+    employee_email: EmailStr,
+    employee_name: str,
+    software_name: str,
+    questions: List[str],
+    business_unit_name: Optional[str] = None,
+    software_duration: Optional[str] = None,
+):
+    try:
+        if not questions:
+            logger.warning("No compliance questions provided for email")
+            questions = ["No questions available at this time."]
+
+        content = f"""
+            <p>Hello {employee_name},</p>
+            <p>Your software request for <strong>{software_name}</strong> requires additional compliance information.</p>
+            <div class="info-box">
+                <div><strong>Software Name:</strong> {software_name}</div>
+                <div><strong>Business Unit:</strong> {business_unit_name or 'N/A'}</div>
+                <div><strong>Software Duration:</strong> {software_duration or 'N/A'}</div>
+            </div>
+            <p>Please log in to the Nxzen portal to answer the following compliance questions:</p>
+            <div class="info-box">
+                {''.join([f'<div>{i+1}. {q}</div>' for i, q in enumerate(questions)])}
+            </div>
+            <p>Once you complete the answers in the portal, your manager and IT Admin will be notified automatically.</p>
+            <p>Best regards,<br><strong>Nxzen IT Team</strong></p>
+        """
+        message = MessageSchema(
+            subject=f"Compliance Questions for {software_name} Installation",
+            recipients=[employee_email],
+            body=get_email_template("Compliance Questions", content),
+            subtype="html"
+        )
+        fm = FastMail(mail_conf)
+        await fm.send_message(message)
+        logger.info(f"✅ Compliance email sent to {employee_email}")
+        return True
+    except Exception as e:
+        logger.error(f"❌ Failed to send compliance email: {e}")
+        return False
+
+async def send_compliance_answers_email(
+    it_admin_email: Optional[EmailStr],
+    manager_email: Optional[EmailStr],
+    employee_name: str,
+    software_name: str,
+    request_id: int,
+    business_unit_name: Optional[str] = None,
+    session: Session = Depends(get_session)
+):
+    try:
+        recipients = [email for email in [it_admin_email, manager_email] if email]
+        if not recipients:
+            logger.warning("No recipients for compliance answers email")
+            return False
+
+        # Fetch software request details
+        db_request = session.get(SoftwareRequest, request_id)
+        if not db_request:
+            logger.error(f"Software request {request_id} not found")
+            return False
+
+        # Fetch compliance answers with corresponding questions
+        query = (
+            select(
+                ComplianceAnswer.id,
+                ComplianceAnswer.question_id,
+                ComplianceAnswer.answer,
+                ComplianceAnswer.created_at,
+                ComplianceQuestion.question_text
+            )
+            .join(ComplianceQuestion, ComplianceQuestion.id == ComplianceAnswer.question_id)
+            .where(ComplianceAnswer.request_id == request_id)
+        )
+        answers = session.exec(query).all()
+
+        # Format answers as HTML list
+        answers_html = "".join(
+            f"<li><strong>{ans.question_text}</strong>: {ans.answer}</li>"
+            for ans in answers
+        ) if answers else "<li>No answers submitted yet.</li>"
+
+        content = f"""
+            <p>Hello,</p>
+            <p>{employee_name} has submitted compliance answers for the software request for <strong>{software_name}</strong>.</p>
+            <div class="info-box">
+                <div><strong>Software Name:</strong> {software_name}</div>
+                <div><strong>Software Version:</strong> {db_request.software_version}</div>
+                <div><strong>Business Unit:</strong> {business_unit_name or 'N/A'}</div>
+                <div><strong>Software Duration:</strong> {db_request.software_duration or 'N/A'}</div>
+                <div><strong>Requested By:</strong> {employee_name}</div>
+            </div>
+            <p><strong>Compliance Answers:</strong></p>
+            <ul>{answers_html}</ul>
+            <p>Please review the answers in the portal.</p>
+            <p>Best regards,<br><strong>Nxzen IT Team</strong></p>
+        """
+        message = MessageSchema(
+            subject=f"Compliance Answers Submitted for {software_name}",
+            recipients=recipients,
+            body=get_email_template("Compliance Answers Submitted", content),
+            subtype="html"
+        )
+        fm = FastMail(mail_conf)
+        await fm.send_message(message)
+        logger.info(f"✅ Compliance answers email sent successfully to {recipients}")
+        return True
+    except Exception as e:
+        logger.error(f"❌ Failed to send compliance answers email: {e}")
         return False

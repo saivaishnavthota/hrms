@@ -5,6 +5,8 @@ import api from '@/lib/api';
 import { avatarBg } from '../../lib/avatarColors';
 import EditEmployeeModal from './EditEmployeeModal';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogClose } from '@/components/ui/dialog';
+import { PaginationControls, usePagination } from '@/components/ui/pagination-controls';
+import PageSizeSelect from '@/components/ui/page-size-select';
 
 
 const AssignLeaves = () => {
@@ -25,6 +27,17 @@ const AssignLeaves = () => {
 
   // Load default leave categories from API
   const [leaveCategories, setLeaveCategories] = useState([]);
+
+  // Pagination
+  const {
+    currentPage,
+    pageSize,
+    handlePageChange,
+    handlePageSizeChange,
+    getPaginatedData,
+    getTotalPages,
+    resetPagination,
+  } = usePagination(10);
 
   const getAvatarColor = (name) => avatarBg(name);
 
@@ -97,6 +110,11 @@ const AssignLeaves = () => {
     };
     fetchLeaveCategories();
   }, []);
+
+  // Reset pagination when data changes
+  React.useEffect(() => {
+    resetPagination();
+  }, [employeeLeaveData, sortConfig]);
 
   React.useEffect(() => {
     const fetchEmployees = async () => {
@@ -396,6 +414,16 @@ const AssignLeaves = () => {
         )}
       </div>
 
+      {sortedEmployees.length > 0 && (
+        <div className="flex justify-end mb-2 mt-4">
+          <PageSizeSelect
+            pageSize={pageSize}
+            onChange={handlePageSizeChange}
+            options={[10, 20, 30, 40, 50]}
+          />
+        </div>
+      )}
+
       <div className="bg-white rounded-lg shadow overflow-x-auto">
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
@@ -431,7 +459,7 @@ const AssignLeaves = () => {
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
-            {sortedEmployees.map(emp => (
+            {getPaginatedData(sortedEmployees).map(emp => (
               <tr key={emp.id} className="hover:bg-gray-50">
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                   <input type="checkbox" checked={selectedIds.has(emp.id)} onChange={() => toggleSelect(emp.id)} />
@@ -468,6 +496,21 @@ const AssignLeaves = () => {
           </tbody>
         </table>
       </div>
+
+      {sortedEmployees.length > 0 && (
+        <PaginationControls
+          className="mt-3"
+          align="right"
+          hideInfo={true}
+          hidePageSize={true}
+          currentPage={currentPage}
+          totalPages={getTotalPages(sortedEmployees.length)}
+          pageSize={pageSize}
+          totalItems={sortedEmployees.length}
+          onPageChange={handlePageChange}
+          onPageSizeChange={handlePageSizeChange}
+        />
+      )}
 
       <EditEmployeeModal isOpen={isEditModalOpen} onClose={handleCloseEdit} employee={selectedEmployee} onSave={handleSaveEmployee} />
   

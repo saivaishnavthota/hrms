@@ -7,6 +7,8 @@ import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from '@/components/ui/select';
 import api, { expensesAPI } from '@/lib/api';
 import { toast } from 'react-toastify';
+import { PaginationControls, usePagination } from '@/components/ui/pagination-controls';
+import PageSizeSelect from '@/components/ui/page-size-select';
  
 const SubmitExpense = () => {
   const { user } = useUser();
@@ -34,7 +36,18 @@ const SubmitExpense = () => {
   // Popup states
   const [selectedRecord, setSelectedRecord] = useState(null);
   const [showProjectModal, setShowProjectModal] = useState(false);
- 
+
+  // Pagination for expense history
+  const {
+    currentPage,
+    pageSize,
+    handlePageChange,
+    handlePageSizeChange,
+    getPaginatedData,
+    getTotalPages,
+    resetPagination,
+  } = usePagination(10);
+
   const expenseCategories = [
     'Travel', 'Food', 'Entertainment', 'Office Supplies', 'Software & Subscriptions',
     'Training & Education', 'Communication', 'Marketing', 'Equipment', 'Other'
@@ -226,6 +239,11 @@ const SubmitExpense = () => {
     const employeeId = user?.employeeId || JSON.parse(localStorage.getItem('userData') || '{}')?.employeeId;
     if (employeeId) loadExpenseHistory(employeeId, selectedYear, selectedMonth);
   }, [user, selectedYear, selectedMonth]);
+
+  // Reset pagination when data changes
+  useEffect(() => {
+    resetPagination();
+  }, [expenseHistory]);
  
 
   return (
@@ -600,6 +618,15 @@ const SubmitExpense = () => {
               </button>
             </div>
  
+            {expenseHistory.length > 0 && (
+              <div className="flex justify-end mb-2">
+                <PageSizeSelect
+                  pageSize={pageSize}
+                  onChange={handlePageSizeChange}
+                  options={[10, 20, 30, 40, 50]}
+                />
+              </div>
+            )}
             <div className="rounded-lg border">
               <Table>
                 <TableHeader>
@@ -635,10 +662,10 @@ const SubmitExpense = () => {
                       </TableCell>
                     </TableRow>
                   ) : (
-                    expenseHistory.map((item, index) => (
+                    getPaginatedData(expenseHistory).map((item, index) => (
                       <TableRow key={item.id} className="hover:bg-gray-50">
                         <TableCell className="text-center font-medium">
-                          {index + 1}
+                          {(currentPage - 1) * pageSize + index + 1}
                         </TableCell>
                         <TableCell>
                           <span className="text-gray-900 font-medium">{item.category}</span>
@@ -695,6 +722,20 @@ const SubmitExpense = () => {
                 </TableBody>
               </Table>
             </div>
+            {expenseHistory.length > 0 && (
+              <PaginationControls
+                className="mt-3"
+                align="right"
+                hideInfo={true}
+                hidePageSize={true}
+                currentPage={currentPage}
+                totalPages={getTotalPages(expenseHistory.length)}
+                pageSize={pageSize}
+                totalItems={expenseHistory.length}
+                onPageChange={handlePageChange}
+                onPageSizeChange={handlePageSizeChange}
+              />
+            )}
           </TabsContent>
         </Tabs>
       </div>

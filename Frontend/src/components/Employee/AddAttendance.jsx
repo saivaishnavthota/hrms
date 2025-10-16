@@ -10,6 +10,8 @@ import { Calendar, Clock, Plus, X, Save, ChevronLeft, ChevronRight, Edit3, Searc
 import { useUser } from '../../contexts/UserContext';
 import { toast } from 'react-toastify';
 import { useNavigate } from 'react-router-dom';
+import { PaginationControls, usePagination } from '@/components/ui/pagination-controls';
+import PageSizeSelect from '@/components/ui/page-size-select';
 
 // Local date helpers to avoid UTC offsets
 const formatDateLocal = (date) => {
@@ -50,6 +52,17 @@ const AddAttendance = () => {
   const [filteredDailyAttendance, setFilteredDailyAttendance] = useState([]);
   const [showProjectModal, setShowProjectModal] = useState(false);
   const [selectedRecord, setSelectedRecord] = useState(null);
+
+  // Pagination for daily attendance
+  const {
+    currentPage,
+    pageSize,
+    handlePageChange,
+    handlePageSizeChange,
+    getPaginatedData,
+    getTotalPages,
+    resetPagination,
+  } = usePagination(10);
 
   const getWeekDates = (date) => {
     const week = [];
@@ -126,6 +139,7 @@ const AddAttendance = () => {
 
   useEffect(() => {
     filterDailyAttendance();
+    resetPagination();
   }, [dailyAttendance, selectedMonth, selectedYear, searchDate, typeFilter]);
 
   useEffect(() => {
@@ -1287,80 +1301,100 @@ const AddAttendance = () => {
                   </p>
                 </div>
               ) : (
-                <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gradient-to-r from-blue-50 to-indigo-50">
-                      <tr>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Day
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Date
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Status
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Hours
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Projects
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
-                      {filteredDailyAttendance.map((record, index) => (
-                        <tr key={index} className="hover:bg-gray-50 transition-colors duration-200">
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm font-medium text-gray-900">
-                              {new Date(record.date).toLocaleDateString('en-US', { weekday: 'long' })}
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm text-gray-900">
-                              {new Date(record.date).toLocaleDateString('en-US', {
-                                year: 'numeric',
-                                month: 'short',
-                                day: 'numeric'
-                              })}
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${record.status === 'Present'
-                              ? 'bg-green-100 text-green-800'
-                              : record.status === 'Leave'
-                                ? 'bg-red-100 text-red-800'
-                                : record.status === 'WFH'
-                                  ? 'bg-purple-100 text-purple-800'
-                                  : record.status === 'Week-off'
-                                    ? 'bg-gray-100 text-gray-800'
-                                    : 'bg-gray-100 text-gray-800'
-                              }`}>
-                              {record.status}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm text-gray-900">
-                              {record.hours.toFixed(2)} hrs
-                              {record.hours.toFixed(2)} hrs
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm text-gray-900">
-                              <button
-                                onClick={() => handleShowProjects(record)}
-                                className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 hover:bg-blue-200 transition-colors duration-200"
-                              >
-                                <Eye className="h-3 w-3 mr-1" />
-                                View Details
-                              </button>
-                            </div>
-                          </td>
+                <>
+                  <div className="flex justify-end mb-2">
+                    <PageSizeSelect
+                      pageSize={pageSize}
+                      onChange={handlePageSizeChange}
+                      options={[10, 20, 30, 40, 50]}
+                    />
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead className="bg-gradient-to-r from-blue-50 to-indigo-50">
+                        <tr>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Day
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Date
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Status
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Hours
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Projects
+                          </th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {getPaginatedData(filteredDailyAttendance).map((record, index) => (
+                          <tr key={index} className="hover:bg-gray-50 transition-colors duration-200">
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="text-sm font-medium text-gray-900">
+                                {new Date(record.date).toLocaleDateString('en-US', { weekday: 'long' })}
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="text-sm text-gray-900">
+                                {new Date(record.date).toLocaleDateString('en-US', {
+                                  year: 'numeric',
+                                  month: 'short',
+                                  day: 'numeric'
+                                })}
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${record.status === 'Present'
+                                ? 'bg-green-100 text-green-800'
+                                : record.status === 'Leave'
+                                  ? 'bg-red-100 text-red-800'
+                                  : record.status === 'WFH'
+                                    ? 'bg-purple-100 text-purple-800'
+                                    : record.status === 'Week-off'
+                                      ? 'bg-gray-100 text-gray-800'
+                                      : 'bg-gray-100 text-gray-800'
+                                }`}>
+                                {record.status}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="text-sm text-gray-900">
+                                {record.hours.toFixed(2)} hrs
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="text-sm text-gray-900">
+                                <button
+                                  onClick={() => handleShowProjects(record)}
+                                  className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 hover:bg-blue-200 transition-colors duration-200"
+                                >
+                                  <Eye className="h-3 w-3 mr-1" />
+                                  View Details
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <PaginationControls
+                    className="mt-3"
+                    align="right"
+                    hideInfo={true}
+                    hidePageSize={true}
+                    currentPage={currentPage}
+                    totalPages={getTotalPages(filteredDailyAttendance.length)}
+                    pageSize={pageSize}
+                    totalItems={filteredDailyAttendance.length}
+                    onPageChange={handlePageChange}
+                    onPageSizeChange={handlePageSizeChange}
+                  />
+                </>
               )}
             </div>
           )}

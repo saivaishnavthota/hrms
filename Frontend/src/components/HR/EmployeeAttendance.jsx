@@ -6,6 +6,8 @@ import { toast } from 'react-toastify';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import * as XLSX from 'xlsx';
+import { PaginationControls, usePagination } from '@/components/ui/pagination-controls';
+import PageSizeSelect from '@/components/ui/page-size-select';
 
 const ManagerEmployeeAttendance = ({ viewOnly = false }) => {
   const [attendanceRecords, setAttendanceRecords] = useState([]);
@@ -21,6 +23,17 @@ const ManagerEmployeeAttendance = ({ viewOnly = false }) => {
 
   const [userId, setUserId] = useState(null);
   const [error, setError] = useState(null);
+
+  // Pagination
+  const {
+    currentPage,
+    pageSize,
+    handlePageChange,
+    handlePageSizeChange,
+    getPaginatedData,
+    getTotalPages,
+    resetPagination,
+  } = usePagination(10);
 
    const getAvatarColor = (name) => avatarBg(name);
 
@@ -92,6 +105,11 @@ const ManagerEmployeeAttendance = ({ viewOnly = false }) => {
 
     fetchAttendance();
   }, [userId, year, month]);
+
+  // Reset pagination when data changes
+  useEffect(() => {
+    resetPagination();
+  }, [filteredRecords]);
 
 
   const handleShowProjects = (record) => {
@@ -459,6 +477,15 @@ const ManagerEmployeeAttendance = ({ viewOnly = false }) => {
               </div>
             </div>
           </div>
+          {filteredRecords.length > 0 && (
+            <div className="flex justify-end mb-2 px-6">
+              <PageSizeSelect
+                pageSize={pageSize}
+                onChange={handlePageSizeChange}
+                options={[10, 20, 30, 40, 50]}
+              />
+            </div>
+          )}
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead className="bg-gray-50">
@@ -475,7 +502,7 @@ const ManagerEmployeeAttendance = ({ viewOnly = false }) => {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {filteredRecords.map((record) => (
+                {getPaginatedData(filteredRecords).map((record) => (
                   <tr key={record.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
@@ -555,6 +582,22 @@ const ManagerEmployeeAttendance = ({ viewOnly = false }) => {
               </div>
             )}
           </div>
+          {filteredRecords.length > 0 && (
+            <div className="px-6 pb-4">
+              <PaginationControls
+                className="mt-3"
+                align="right"
+                hideInfo={true}
+                hidePageSize={true}
+                currentPage={currentPage}
+                totalPages={getTotalPages(filteredRecords.length)}
+                pageSize={pageSize}
+                totalItems={filteredRecords.length}
+                onPageChange={handlePageChange}
+                onPageSizeChange={handlePageSizeChange}
+              />
+            </div>
+          )}
         </div>
       </div>
       {showModal && selectedRecord && (

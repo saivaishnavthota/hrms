@@ -13,6 +13,8 @@ import { Eye, Edit, Trash2 } from 'lucide-react';
 import api, { projectsAPI } from '@/lib/api';
 import { toast } from 'react-toastify';
 import { markDeleted, filterListByDeleted } from '@/lib/localDelete';
+import { PaginationControls, usePagination } from '@/components/ui/pagination-controls';
+import PageSizeSelect from '@/components/ui/page-size-select';
 
 const Projects = ({ viewOnly = false }) => {
   const location = useLocation();
@@ -24,6 +26,17 @@ const Projects = ({ viewOnly = false }) => {
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
  
   const storageKey = 'accountManagerProjects';
+
+  // Pagination
+  const {
+    currentPage,
+    pageSize,
+    handlePageChange,
+    handlePageSizeChange,
+    getPaginatedData,
+    getTotalPages,
+    resetPagination,
+  } = usePagination(10);
 
   const form = useForm({
     defaultValues: {
@@ -119,6 +132,11 @@ const Projects = ({ viewOnly = false }) => {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Reset pagination when projects change
+  useEffect(() => {
+    resetPagination();
+  }, [projects]);
 
   useEffect(() => {
     if (activeTab === 'view') fetchProjects();
@@ -274,7 +292,18 @@ const Projects = ({ viewOnly = false }) => {
             {loading && <div className="text-sm text-muted-foreground">Loading projects...</div>}
             {error && <div className="text-sm text-destructive">{error}</div>}
             {!loading && !error && (
-              <div className="overflow-x-auto">
+              <>
+                {projects.length > 0 && (
+                  <div className="flex justify-end mb-2">
+                    <PageSizeSelect
+                      pageSize={pageSize}
+                      onChange={handlePageSizeChange}
+                      options={[10, 20, 30, 40, 50]}
+                    />
+                  </div>
+                )}
+
+                <div className="overflow-x-auto">
                 <Table>
                    <TableHeader>
               <TableRow className="bg-gray-50 border-b border-gray-200">
@@ -294,7 +323,7 @@ const Projects = ({ viewOnly = false }) => {
                         </TableCell>
                       </TableRow>
                     ) : (
-                      projects.map((p) => (
+                      getPaginatedData(projects).map((p) => (
                         <TableRow key={p.id} className="hover:bg-gray-50">
                           <TableCell className="font-medium">{p.name}</TableCell>
                           <TableCell>{p.startDate ? new Date(p.startDate).toLocaleDateString() : '-'}</TableCell>
@@ -336,6 +365,22 @@ const Projects = ({ viewOnly = false }) => {
                   </TableBody>
                 </Table>
               </div>
+
+              {projects.length > 0 && (
+                <PaginationControls
+                  className="mt-3"
+                  align="right"
+                  hideInfo={true}
+                  hidePageSize={true}
+                  currentPage={currentPage}
+                  totalPages={getTotalPages(projects.length)}
+                  pageSize={pageSize}
+                  totalItems={projects.length}
+                  onPageChange={handlePageChange}
+                  onPageSizeChange={handlePageSizeChange}
+                />
+              )}
+              </>
             )}
 <Dialog open={isDetailsOpen} onOpenChange={setIsDetailsOpen} >
   <DialogContent className="bg-gradient-to-br from-white via-gray-50 to-blue-50 rounded-xl shadow-2xl max-w-2xl w-full mx-4 max-h-[80vh] overflow-y-auto border border-gray-200">

@@ -22,6 +22,7 @@ const Holidays = () => {
   const [newLocationName, setNewLocationName] = useState('');
   const [selectedLocation, setSelectedLocation] = useState('');
   const [locations, setLocations] = useState([]);
+  const [editingLocation, setEditingLocation] = useState(null);
   const [holidays, setHolidays] = useState([]);
   const [filteredHolidays, setFilteredHolidays] = useState([]);
   const [formData, setFormData] = useState({
@@ -79,19 +80,50 @@ const Holidays = () => {
     if (!newLocationName.trim()) return;
 
     try {
-      const response = await locationsAPI.addLocation({
-        name: newLocationName.trim(),
-      });
-      if (response.status === "success") {
-        setLocations((prev) => [...prev, response.data]);
-        setNewLocationName("");
-        setShowLocationModal(false);
-        toast.success("Location added successfully");
+      if (editingLocation) {
+        // Update existing location
+        const response = await locationsAPI.updateLocation(editingLocation.id, {
+          name: newLocationName.trim(),
+        });
+        if (response.status === "success") {
+          setLocations((prev) =>
+            prev.map((loc) =>
+              loc.id === editingLocation.id ? response.data : loc
+            )
+          );
+          setNewLocationName("");
+          setEditingLocation(null);
+          setShowLocationModal(false);
+          toast.success("Location updated successfully");
+        }
+      } else {
+        // Add new location
+        const response = await locationsAPI.addLocation({
+          name: newLocationName.trim(),
+        });
+        if (response.status === "success") {
+          setLocations((prev) => [...prev, response.data]);
+          setNewLocationName("");
+          setShowLocationModal(false);
+          toast.success("Location added successfully");
+        }
       }
     } catch (error) {
-      console.error("Error adding location:", error);
-      toast.error("Failed to add location");
+      console.error("Error saving location:", error);
+      toast.error(`Failed to ${editingLocation ? 'update' : 'add'} location`);
     }
+  };
+
+  const handleEditLocation = (location) => {
+    setEditingLocation(location);
+    setNewLocationName(location.name);
+    setShowLocationModal(true);
+  };
+
+  const handleCloseLocationModal = () => {
+    setShowLocationModal(false);
+    setEditingLocation(null);
+    setNewLocationName("");
   };
 
 
@@ -427,49 +459,81 @@ const Holidays = () => {
         </div>
       )}
 
-      {/* Add Location Modal */}
+      {/* Add/Edit Location Modal */}
       {showLocationModal && (
         <div className="fixed inset-0 bg-transparent backdrop-blur-[2px] flex items-center justify-center z-50">
-          <div className="bg-gradient-to-br from-white via-gray-50 to-blue-50 rounded-xl shadow-2xl max-w-sm w-full mx-4 overflow-hidden border border-gray-200">
+          <div className="bg-gradient-to-br from-white via-gray-50 to-blue-50 rounded-xl shadow-2xl max-w-md w-full mx-4 max-h-[80vh] overflow-hidden border border-gray-200">
             <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-gradient-to-r from-gray-600 to-blue-600 rounded-t-xl">
-              <h3 className="text-lg font-semibold text-white">Add Location</h3>
+              <h3 className="text-lg font-semibold text-white">
+                {editingLocation ? 'Edit Location' : 'Add Location'}
+              </h3>
               <button
-                onClick={() => setShowLocationModal(false)}
+                onClick={handleCloseLocationModal}
                 className="text-blue-100 hover:text-white transition-colors p-1 rounded-full hover:bg-blue-500"
               >
                 <X size={20} />
               </button>
             </div>
-            <form onSubmit={handleAddLocation} className="p-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Location Name *
-                </label>
-                <input
-                  type="text"
-                  value={newLocationName}
-                  onChange={(e) => setNewLocationName(e.target.value)}
-                  required
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
-                  placeholder="Enter location name"
-                />
-              </div>
-              <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-gray-200">
-                <button
-                  type="button"
-                  onClick={() => setShowLocationModal(false)}
-                  className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 bg-orange-500 text-white rounded-md hover:bg-orange-600 transition-colors"
-                >
-                  Add Location
-                </button>
-              </div>
-            </form>
+            
+            <div className="overflow-y-auto max-h-[calc(80vh-80px)]">
+              <form onSubmit={handleAddLocation} className="p-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Location Name *
+                  </label>
+                  <input
+                    type="text"
+                    value={newLocationName}
+                    onChange={(e) => setNewLocationName(e.target.value)}
+                    required
+                    className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                    placeholder="Enter location name"
+                  />
+                </div>
+                <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-gray-200">
+                  <button
+                    type="button"
+                    onClick={handleCloseLocationModal}
+                    className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-2 bg-orange-500 text-white rounded-md hover:bg-orange-600 transition-colors"
+                  >
+                    {editingLocation ? 'Update Location' : 'Add Location'}
+                  </button>
+                </div>
+              </form>
+
+              {/* Existing Locations List */}
+              {locations.length > 0 && (
+                <div className="px-4 pb-4">
+                  <div className="border-t border-gray-200 pt-4">
+                    <h4 className="text-sm font-semibold text-gray-700 mb-3">Existing Locations</h4>
+                    <div className="space-y-2 max-h-48 overflow-y-auto">
+                      {locations.map((location) => (
+                        <div
+                          key={location.id}
+                          className="flex items-center justify-between p-2 bg-white border border-gray-200 rounded-md hover:bg-gray-50 transition-colors"
+                        >
+                          <span className="text-sm text-gray-700">{location.name}</span>
+                          <button
+                            type="button"
+                            onClick={() => handleEditLocation(location)}
+                            className="p-1 text-blue-600 hover:bg-blue-100 rounded transition-colors"
+                            title="Edit location"
+                          >
+                            <Edit size={16} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}

@@ -13,6 +13,8 @@ import {
   TableHead,
   TableCell,
 } from "@/components/ui/table";
+import { PaginationControls, usePagination } from '@/components/ui/pagination-controls';
+import PageSizeSelect from '@/components/ui/page-size-select';
 const ApplyLeave = () => {
   const formatStatus = (status) => {
     const s = String(status || '').toLowerCase();
@@ -98,6 +100,17 @@ const getLeaveTypeColor = (leaveType) => {
   const [pastLeavesLoading, setPastLeavesLoading] = useState(false);
   const [pastLeavesError, setPastLeavesError] = useState(null);
   const [selectedLeave, setSelectedLeave] = useState(null);
+
+  // Pagination for past leaves
+  const {
+    currentPage,
+    pageSize,
+    handlePageChange,
+    handlePageSizeChange,
+    getPaginatedData,
+    getTotalPages,
+    resetPagination,
+  } = usePagination(10);
 
   const leaveTypes = [
     'Annual Leave',
@@ -201,6 +214,11 @@ const getLeaveTypeColor = (leaveType) => {
 
     loadBalances();
   }, [user]);
+
+  // Reset pagination when data changes
+  useEffect(() => {
+    resetPagination();
+  }, [allLeaves]);
 
   // Lazy load past leaves when tab opened if not present
   useEffect(() => {
@@ -593,59 +611,80 @@ useEffect(() => {
               <div className="text-sm text-red-600 mb-3">{pastLeavesError}</div>
             )}
             {!pastLeavesLoading && !pastLeavesError && (
-              <div className="overflow-x-auto">
-                <Table className="border">
-        <TableHeader>
-          <TableRow className="bg-gray-50">
-            <TableHead  className=" text-left" >Leave Type</TableHead>
-            <TableHead>Start</TableHead>
-            <TableHead>End</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead>Action</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {allLeaves.length === 0 ? (
-            <TableRow>
-              <TableCell colSpan={5} className="text-center text-muted-foreground py-4">
-                No leave records found.
-              </TableCell>
-            </TableRow>
-          ) : (
-            [...allLeaves]
-              .sort((a, b) => new Date(b.start_date) - new Date(a.start_date))
-              .map((lv) => (
-                <TableRow key={lv.id} className="hover:bg-muted/30">
-                  <TableCell>
-                    <div className="flex items-center">
-                      <div className={`w-2 h-2 rounded-full mr-2 ${getLeaveTypeDot(lv.leave_type)}`}></div>
-                      <span className={`text-sm font-medium ${getLeaveTypeColor(lv.leave_type)}`}>
-                        {formatLeaveType(lv.leave_type)}
-                      </span>
-                    </div>
-                  </TableCell>
-                  <TableCell>{new Date(lv.start_date).toLocaleDateString()}</TableCell>
-                  <TableCell>{new Date(lv.end_date).toLocaleDateString()}</TableCell>
-                  <TableCell>
-                    <span className={`px-3 py-1 rounded-full text-xs font-medium border ${getStatusClass(lv.status)}`}>
-                      {formatStatus(lv.status)}
-                    </span>
-                  </TableCell>
-                  <TableCell>
-                    <button
-                      type="button"
-                      className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-700"
-                      onClick={() => setSelectedLeave(lv)}
-                    >
-                      <Eye className="h-4 w-4" /> View
-                    </button>
-                  </TableCell>
-                </TableRow>
-              ))
-          )}
-        </TableBody>
-      </Table>
-              </div>
+              <>
+                <div className="flex justify-end mb-2">
+                  <PageSizeSelect
+                    pageSize={pageSize}
+                    onChange={handlePageSizeChange}
+                    options={[10, 20, 30, 40, 50]}
+                  />
+                </div>
+                <div className="overflow-x-auto rounded-lg border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="bg-gray-50">
+                        <TableHead className="text-left">Leave Type</TableHead>
+                        <TableHead>Start</TableHead>
+                        <TableHead>End</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Action</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {allLeaves.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={5} className="text-center text-muted-foreground py-4">
+                            No leave records found.
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        getPaginatedData([...allLeaves].sort((a, b) => new Date(b.start_date) - new Date(a.start_date))).map((lv) => (
+                          <TableRow key={lv.id} className="hover:bg-muted/30">
+                            <TableCell>
+                              <div className="flex items-center">
+                                <div className={`w-2 h-2 rounded-full mr-2 ${getLeaveTypeDot(lv.leave_type)}`}></div>
+                                <span className={`text-sm font-medium ${getLeaveTypeColor(lv.leave_type)}`}>
+                                  {formatLeaveType(lv.leave_type)}
+                                </span>
+                              </div>
+                            </TableCell>
+                            <TableCell>{new Date(lv.start_date).toLocaleDateString()}</TableCell>
+                            <TableCell>{new Date(lv.end_date).toLocaleDateString()}</TableCell>
+                            <TableCell>
+                              <span className={`px-3 py-1 rounded-full text-xs font-medium border ${getStatusClass(lv.status)}`}>
+                                {formatStatus(lv.status)}
+                              </span>
+                            </TableCell>
+                            <TableCell>
+                              <button
+                                type="button"
+                                className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-700"
+                                onClick={() => setSelectedLeave(lv)}
+                              >
+                                <Eye className="h-4 w-4" /> View
+                              </button>
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+                {allLeaves.length > 0 && (
+                  <PaginationControls
+                    className="mt-3"
+                    align="right"
+                    hideInfo={true}
+                    hidePageSize={true}
+                    currentPage={currentPage}
+                    totalPages={getTotalPages(allLeaves.length)}
+                    pageSize={pageSize}
+                    totalItems={allLeaves.length}
+                    onPageChange={handlePageChange}
+                    onPageSizeChange={handlePageSizeChange}
+                  />
+                )}
+              </>
             )}
           </div>
         )}

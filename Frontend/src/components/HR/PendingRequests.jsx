@@ -6,6 +6,8 @@ import { avatarBg } from '../../lib/avatarColors';
 import { markDeleted, filterListByDeleted } from '../../lib/localDelete';
 import { toast } from "react-toastify";
 import api from "@/lib/api";
+import { PaginationControls, usePagination } from '@/components/ui/pagination-controls';
+import PageSizeSelect from '@/components/ui/page-size-select';
 
 
 const PendingRequests = () => {
@@ -23,6 +25,16 @@ const PendingRequests = () => {
   const [error, setError] = useState(null);
   const [actionLoading, setActionLoading] = useState({});
 
+  // Pagination
+  const {
+    currentPage,
+    pageSize,
+    handlePageChange,
+    handlePageSizeChange,
+    getPaginatedData,
+    getTotalPages,
+    resetPagination,
+  } = usePagination(10);
 
    const getAvatarColor = (name) => avatarBg(name);
   
@@ -150,6 +162,11 @@ const PendingRequests = () => {
     return sortableRequests;
   }, [pendingRequests, sortConfig]);
 
+  // Reset pagination when sorted data changes
+  useEffect(() => {
+    resetPagination();
+  }, [sortedRequests, sortConfig]);
+
   const getSortIcon = (columnName) => {
     if (sortConfig.key === columnName) {
       return sortConfig.direction === 'asc' ? 
@@ -274,8 +291,16 @@ const PendingRequests = () => {
             <p className="text-gray-600">All leave requests have been processed.</p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full">
+          <>
+            <div className="flex justify-end mb-2">
+              <PageSizeSelect
+                pageSize={pageSize}
+                onChange={handlePageSizeChange}
+                options={[10, 20, 30, 40, 50]}
+              />
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full">
               <thead className="bg-gray-50">
                 <tr>
                   <th 
@@ -347,7 +372,7 @@ const PendingRequests = () => {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {sortedRequests.map((request) => (
+                {getPaginatedData(sortedRequests).map((request) => (
                   <tr key={request.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
@@ -426,6 +451,19 @@ const PendingRequests = () => {
               </tbody>
             </table>
           </div>
+          <PaginationControls
+            className="mt-3"
+            align="right"
+            hideInfo={true}
+            hidePageSize={true}
+            currentPage={currentPage}
+            totalPages={getTotalPages(sortedRequests.length)}
+            pageSize={pageSize}
+            totalItems={sortedRequests.length}
+            onPageChange={handlePageChange}
+            onPageSizeChange={handlePageSizeChange}
+          />
+          </>
         )}
       </div>
 

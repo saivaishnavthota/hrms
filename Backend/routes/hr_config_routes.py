@@ -13,22 +13,22 @@ from datetime import datetime
 router = APIRouter(prefix="/hr-config", tags=["HR Configuration"])
 
 def check_hr(hr_id: int, db: Session) -> bool:
-    """Check if the user is an HR"""
+    """Check if the user is an HR or Admin"""
     if not hr_id:
         return False
     employee = db.query(User).filter(User.id == hr_id).first()
     if not employee:
         raise HTTPException(status_code=401, detail="User not found")
-    return employee.role == "HR"
+    return employee.role == "HR" or employee.role == "Admin"
 
 def check_super_hr(hr_id: int, db: Session) -> bool:
-    """Check if the user is a Super HR"""
+    """Check if the user is a Super HR or Admin"""
     if not hr_id:
         return False
     employee = db.query(User).filter(User.id == hr_id).first()
     if not employee:
         raise HTTPException(status_code=401, detail="User not found")
-    return employee.role == "HR" and employee.super_hr == True
+    return (employee.role == "HR" and employee.super_hr == True) or employee.role == "Admin"
 
 # ==================== LEAVE CATEGORIES ROUTES ====================
 

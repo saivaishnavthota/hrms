@@ -1,10 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { User, Eye, X, Search, CheckCircle, Home, CalendarDays } from 'lucide-react';
+import { User, Eye, X, Search, CheckCircle, Home, CalendarDays, Download, FileText, FileSpreadsheet } from 'lucide-react';
 import { avatarBg } from '../../lib/avatarColors';
 import api from "@/lib/api";
 import { toast } from 'react-toastify';
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
+import * as XLSX from 'xlsx';
 
-const ManagerEmployeeAttendance = () => {
+const ManagerEmployeeAttendance = ({ viewOnly = false }) => {
   const [attendanceRecords, setAttendanceRecords] = useState([]);
   const [selectedRecord, setSelectedRecord] = useState(null);
   const [showModal, setShowModal] = useState(false);
@@ -148,14 +151,175 @@ const ManagerEmployeeAttendance = () => {
     );
   };
 
+  // Download Attendance as PDF
+  const downloadAttendanceAsPDF = () => {
+    try {
+      const doc = new jsPDF('l', 'mm', 'a4'); // Landscape orientation
+      
+      // Header
+      doc.setFontSize(18);
+      doc.setFont(undefined, 'bold');
+      doc.text('Employee Attendance Report', 14, 15);
+      
+      doc.setFontSize(11);
+      doc.setFont(undefined, 'normal');
+      doc.text(`Period: ${getMonthName(month)} ${year}`, 14, 23);
+      doc.text(`Total Records: ${filteredRecords.length}`, 14, 29);
+      doc.text(`Generated: ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}`, 14, 35);
+      
+      // Summary statistics
+      doc.setFontSize(10);
+      doc.text(`Present: ${monthlyCounts.present} | WFH: ${monthlyCounts.wfh} | Leave: ${monthlyCounts.leave}`, 14, 41);
+      
+      // Table data
+      const tableData = filteredRecords.map(record => [
+        record.employee.name,
+        record.employee.email,
+        record.type,
+        record.role,
+        record.day,
+        record.date,
+        record.status,
+        `${record.hours}h`,
+        record.projects.length > 0 ? record.projects.map(p => p.name).join(', ') : 'No projects'
+      ]);
+      
+      doc.autoTable({
+        startY: 47,
+        head: [['Employee', 'Email', 'Type', 'Role', 'Day', 'Date', 'Status', 'Hours', 'Projects']],
+        body: tableData,
+        theme: 'striped',
+        headStyles: {
+          fillColor: [59, 130, 246],
+          textColor: 255,
+          fontSize: 9,
+          fontStyle: 'bold',
+          halign: 'center'
+        },
+        styles: {
+          fontSize: 8,
+          cellPadding: 2,
+          overflow: 'linebreak',
+          cellWidth: 'wrap'
+        },
+        columnStyles: {
+          0: { cellWidth: 30 },
+          1: { cellWidth: 40 },
+          2: { cellWidth: 20 },
+          3: { cellWidth: 20 },
+          4: { cellWidth: 20 },
+          5: { cellWidth: 25 },
+          6: { cellWidth: 20 },
+          7: { cellWidth: 15 },
+          8: { cellWidth: 'auto' }
+        },
+        alternateRowStyles: {
+          fillColor: [245, 247, 250]
+        },
+        margin: { left: 14, right: 14 }
+      });
+      
+      // Footer
+      const pageCount = doc.internal.getNumberOfPages();
+      doc.setFontSize(8);
+      for (let i = 1; i <= pageCount; i++) {
+        doc.setPage(i);
+        doc.text(`Page ${i} of ${pageCount}`, doc.internal.pageSize.getWidth() - 30, doc.internal.pageSize.getHeight() - 10);
+      }
+      
+      doc.save(`Attendance_Report_${month}_${year}.pdf`);
+      toast.success('PDF report downloaded successfully!');
+    } catch (error) {
+      console.error('PDF generation error:', error);
+      toast.error('Failed to generate PDF report.');
+    }
+  };
+
+  // Download Attendance as Excel
+  const downloadAttendanceAsExcel = () => {
+    try {
+      // Prepare data for Excel
+      const excelData = filteredRecords.map(record => ({
+        'Employee Name': record.employee.name,
+        'Email': record.employee.email,
+        'Type': record.type,
+        'Role': record.role,
+        'Day': record.day,
+        'Date': record.date,
+        'Status': record.status,
+        'Hours': record.hours,
+        'Projects': record.projects.length > 0 ? record.projects.map(p => p.name).join(', ') : 'No projects',
+        'Subtasks': record.projects.length > 0 
+          ? record.projects.map(p => p.subtasks.map(st => `${st.name} (${st.hours}h)`).join('; ')).join(' | ')
+          : 'None'
+      }));
+      
+      // Create summary data
+      const summaryData = [
+        { 'Summary': 'Period', 'Value': `${getMonthName(month)} ${year}` },
+        { 'Summary': 'Total Records', 'Value': filteredRecords.length },
+        { 'Summary': 'Present', 'Value': monthlyCounts.present },
+        { 'Summary': 'WFH', 'Value': monthlyCounts.wfh },
+        { 'Summary': 'Leave', 'Value': monthlyCounts.leave },
+        { 'Summary': 'Generated Date', 'Value': new Date().toLocaleDateString() }
+      ];
+      
+      // Create workbook with multiple sheets
+      const wb = XLSX.utils.book_new();
+      
+      // Add summary sheet
+      const wsSummary = XLSX.utils.json_to_sheet(summaryData);
+      XLSX.utils.book_append_sheet(wb, wsSummary, 'Summary');
+      
+      // Add attendance data sheet
+      const wsData = XLSX.utils.json_to_sheet(excelData);
+      
+      // Set column widths
+      const colWidths = [
+        { wch: 25 }, // Employee Name
+        { wch: 30 }, // Email
+        { wch: 12 }, // Type
+        { wch: 12 }, // Role
+        { wch: 12 }, // Day
+        { wch: 12 }, // Date
+        { wch: 10 }, // Status
+        { wch: 8 },  // Hours
+        { wch: 40 }, // Projects
+        { wch: 50 }  // Subtasks
+      ];
+      wsData['!cols'] = colWidths;
+      
+      XLSX.utils.book_append_sheet(wb, wsData, 'Attendance Data');
+      
+      // Write file
+      XLSX.writeFile(wb, `Attendance_Report_${month}_${year}.xlsx`);
+      toast.success('Excel report downloaded successfully!');
+    } catch (error) {
+      console.error('Excel generation error:', error);
+      toast.error('Failed to generate Excel report.');
+    }
+  };
+
+  // Helper function to get month name
+  const getMonthName = (monthNum) => {
+    const months = ['January', 'February', 'March', 'April', 'May', 'June', 
+                    'July', 'August', 'September', 'October', 'November', 'December'];
+    return months[parseInt(monthNum) - 1] || 'Unknown';
+  };
+
   return (
     <div className="min-h-screen  p-6">
       <div className="max-w-7xl mx-auto">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Employee Attendance</h1>
-          <p className="text-gray-600 mt-2">View and manage employee attendance records</p>
+          <h1 className="text-3xl font-bold text-gray-900">
+            Employee Attendance
+            {viewOnly && <span className="ml-3 text-sm font-medium text-blue-600 bg-blue-50 px-3 py-1 rounded-full">View Only</span>}
+          </h1>
+          <p className="text-gray-600 mt-2">
+            {viewOnly ? 'View all attendance records (read-only access)' : 'View and manage employee attendance records'}
+          </p>
         </div>
-        <div className="mb-6 flex flex-col sm:flex-row gap-4">
+        <div className="mb-6 flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
           <div className="flex gap-4">
             <input
               type="number"
@@ -173,6 +337,24 @@ const ManagerEmployeeAttendance = () => {
                 <option key={i + 1} value={i + 1}>{i + 1}</option>
               ))}
             </select>
+          </div>
+          <div className="flex gap-3">
+            <button
+              onClick={downloadAttendanceAsPDF}
+              className="inline-flex items-center px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 transition-colors duration-200 shadow-sm"
+              disabled={filteredRecords.length === 0}
+            >
+              <FileText className="h-4 w-4 mr-2" />
+              Download PDF
+            </button>
+            <button
+              onClick={downloadAttendanceAsExcel}
+              className="inline-flex items-center px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 transition-colors duration-200 shadow-sm"
+              disabled={filteredRecords.length === 0}
+            >
+              <FileSpreadsheet className="h-4 w-4 mr-2" />
+              Download Excel
+            </button>
           </div>
         </div>
         {/* Summary counts below filters */}

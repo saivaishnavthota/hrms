@@ -12,6 +12,96 @@ from schemas.attendance_schema import AttendanceCreate, AttendanceBase, Attendan
 import json
  
 router = APIRouter(prefix="/attendance", tags=["Attendance"])
+
+# ==================== ADMIN ROUTES ====================
+@router.get("/admin/all-attendance")
+def get_all_attendance_admin(
+    year: int,
+    month: int,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session)
+):
+    """
+    Admin route to get ALL employee attendance for a given month
+    No HR/Manager filtering - returns everything
+    """
+    # Check if user is Admin
+    if current_user.role != "Admin":
+        raise HTTPException(status_code=403, detail="Access denied: Admin only")
+    
+    query = text("""
+        SELECT
+            u.id as employee_id,
+            u.name,
+            u.company_email,
+            u.role,
+            u.employment_type as type,
+            a.id as attendance_id,
+            a.date,
+            a.action,
+            a.status,
+            a.hours as stored_hours,
+            psh.project_id,
+            psh.project_name,
+            psh.sub_task,
+            psh.hours as sub_task_hours,
+            psh.total_project_hours
+        FROM employees u
+        LEFT JOIN attendance a ON u.id = a.employee_id
+            AND EXTRACT(YEAR FROM a.date) = :year
+            AND EXTRACT(MONTH FROM a.date) = :month
+        LEFT JOIN project_subtask_hours psh ON a.id = psh.attendance_id
+        WHERE u.o_status = true
+        ORDER BY u.name, a.date, psh.project_name, psh.sub_task
+    """)
+    
+    result = session.execute(
+        query,
+        {"year": year, "month": month}
+    ).fetchall()
+    
+    attendance_list = []
+    attendance_by_employee_date = {}
+    
+    for row in result:
+        if not row.date:
+            continue
+        
+        key = (row.employee_id, str(row.date))
+        if key not in attendance_by_employee_date:
+            att = {
+                "employee_id": row.employee_id,
+                "name": row.name,
+                "email": row.company_email,
+                "role": row.role,
+                "type": row.type,
+                "date": str(row.date),
+                "day": row.date.strftime("%A"),
+                "status": row.action or row.status or "Not set",
+                "hours": 0.0,
+                "projects": [],
+                "subTasks": []
+            }
+            attendance_by_employee_date[key] = att
+            attendance_list.append(att)
+        
+        att = attendance_by_employee_date[key]
+        if row.project_name and {"label": row.project_name, "value": str(row.project_id), "total_hours": float(row.total_project_hours or 0)} not in att["projects"]:
+            att["projects"].append({
+                "label": row.project_name,
+                "value": str(row.project_id),
+                "total_hours": float(row.total_project_hours or 0)
+            })
+        
+        if row.sub_task and row.project_name:
+            att["subTasks"].append({
+                "project": row.project_name,
+                "subTask": row.sub_task,
+                "hours": float(row.sub_task_hours or 0)
+            })
+            att["hours"] += float(row.sub_task_hours or 0)
+    
+    return attendance_list
  
 VALID_ACTIONS = ["Present", "WFH", "Leave"]
  

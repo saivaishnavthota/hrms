@@ -37,6 +37,7 @@ export function Header({ menu }) {
   const isIntern = pathname.startsWith('/intern');
   const isManager = pathname.startsWith('/manager');
   const isAccountManager = pathname.startsWith('/account-manager');
+  const isAdmin = pathname.startsWith('/admin');
 
   const headingText = isEmployee
     ? 'Welcome to Employee Portal'
@@ -50,6 +51,8 @@ export function Header({ menu }) {
     ? 'Welcome to Super HR Portal'
     : isHR
     ? 'Welcome to HR Portal'
+    : isAdmin
+    ? 'Welcome to Admin Portal'
     : 'Welcome to IT Supporter Portal';
 
   // Close sheet when route changes

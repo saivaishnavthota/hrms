@@ -7,9 +7,10 @@ import { avatarBg } from '../../lib/avatarColors';
 import { markDeleted, filterListByDeleted } from '../../lib/localDelete';
 import api from '@/lib/api';
 import { toast } from "react-toastify";
+import { PaginationControls, usePagination } from '@/components/ui/pagination-controls';
 
 
-const LeaveRequests = () => {
+const LeaveRequests = ({ viewOnly = false }) => {
   const { user } = useUser();
   const hrId = useMemo(() => {
     return user?.employeeId || JSON.parse(localStorage.getItem('userData') || '{}')?.employeeId || 1; // fallback for dev
@@ -22,6 +23,17 @@ const LeaveRequests = () => {
   const [leaveRequests, setLeaveRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  // Pagination
+  const {
+    currentPage,
+    pageSize,
+    handlePageChange,
+    handlePageSizeChange,
+    getPaginatedData,
+    getTotalPages,
+    resetPagination
+  } = usePagination(10);
 
    const getAvatarColor = (name) => avatarBg(name);
 
@@ -141,8 +153,22 @@ const LeaveRequests = () => {
     return data;
   }, [leaveRequests, sortConfig]);
 
+  // Apply pagination
+  const paginatedRequests = getPaginatedData(sortedRequests);
+  const totalPages = getTotalPages(sortedRequests.length);
+
   return (
     <div className="p-6 bg-gray-50">
+      {/* Header */}
+      <div className="mb-6">
+        <h1 className="text-3xl font-bold text-gray-900">
+          Leave Requests
+          {viewOnly && <span className="ml-3 text-sm font-medium text-blue-600 bg-blue-50 px-3 py-1 rounded-full">View Only</span>}
+        </h1>
+        <p className="text-gray-600 mt-2">
+          {viewOnly ? 'View all leave requests (read-only access)' : 'Review and manage leave requests'}
+        </p>
+      </div>
       {/* Tab Navigation */}
       <div className="mb-6">
         <div className="border-b border-gray-200">
@@ -222,7 +248,7 @@ const LeaveRequests = () => {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {sortedRequests.map((request) => (
+              {paginatedRequests.map((request) => (
                 <tr key={request.id} className="hover:bg-gray-50">
                  
                   <td className="px-6 py-4 whitespace-nowrap">
@@ -275,20 +301,22 @@ const LeaveRequests = () => {
                       >
                         <Eye className="w-4 h-4" />
                       </button>
-                      <button 
-                        className="text-red-600 hover:text-red-900 p-1 rounded hover:bg-red-50"
-                        title="Delete"
-                        onClick={() => {
-                          try {
-                            markDeleted('leaveRequests', request.id);
-                          } catch (e) {
-                            console.error('Error marking leave request deleted locally:', e);
-                          }
-                          setLeaveRequests(prev => prev.filter(r => r.id !== request.id));
-                        }}
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                      {!viewOnly && (
+                        <button 
+                          className="text-red-600 hover:text-red-900 p-1 rounded hover:bg-red-50"
+                          title="Delete"
+                          onClick={() => {
+                            try {
+                              markDeleted('leaveRequests', request.id);
+                            } catch (e) {
+                              console.error('Error marking leave request deleted locally:', e);
+                            }
+                            setLeaveRequests(prev => prev.filter(r => r.id !== request.id));
+                          }}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -298,26 +326,18 @@ const LeaveRequests = () => {
         </div>
           )}
 
-        {/* Footer */}
-        <div className="px-6 py-4 border-t border-gray-200 bg-gray-50">
-          <div className="flex items-center justify-between">
-            <div className="text-sm text-gray-700">
-              Showing <span className="font-medium">1</span> to <span className="font-medium">9</span> of{' '}
-              <span className="font-medium">9</span> results
-            </div>
-            <div className="flex space-x-2">
-              <button className="px-3 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50" disabled>
-                Previous
-              </button>
-              <button className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700">
-                1
-              </button>
-              <button className="px-3 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50" disabled>
-                Next
-              </button>
-            </div>
-          </div>
-        </div>
+        {/* Pagination Controls */}
+        {!loading && !error && sortedRequests.length > 0 && (
+          <PaginationControls
+            currentPage={currentPage}
+            totalPages={totalPages}
+            pageSize={pageSize}
+            totalItems={sortedRequests.length}
+            onPageChange={handlePageChange}
+            onPageSizeChange={handlePageSizeChange}
+            pageSizeOptions={[10, 25, 50, 100]}
+          />
+        )}
         </div>
       )}
 

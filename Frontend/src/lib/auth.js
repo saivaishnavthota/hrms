@@ -20,16 +20,21 @@ export const getCurrentUser = () => {
   
   if (!token) return null;
   
+  const normalizedType = (userType || '').toLowerCase().replace(/\s+/g, '');
+  const isAdmin = normalizedType === 'admin' || userType === 'Admin';
+  
   return {
     token,
     userType,
     userId,
-    isEmployee: userType === 'Employee',
-    isHR: userType === 'Hr',
-    isManager: userType === 'Manager',
-    isIntern: userType === 'Intern',
-    isAccountManager: userType === 'AccountManager',
-    isITSupporter: userType === 'ITSupporter'
+    isAdmin: isAdmin,
+    isEmployee: userType === 'Employee' || isAdmin,
+    isHR: userType === 'Hr' || isAdmin,
+    isManager: userType === 'Manager' || isAdmin,
+    isIntern: userType === 'Intern' || isAdmin,
+    isAccountManager: userType === 'AccountManager' || isAdmin,
+    isITSupporter: userType === 'ITSupporter' || isAdmin,
+    isItAdmin: normalizedType === 'itadmin' || normalizedType === 'itsupporter' || userType === 'ITSupporter' || isAdmin
   };
 };
 
@@ -98,6 +103,8 @@ export const getRedirectPath = (userType) => {
     }
   } catch {}
   switch (norm) {
+    case 'admin':
+      return '/admin/dashboard';
     case 'employee':
       return '/employee';
     case 'intern':
@@ -109,6 +116,7 @@ export const getRedirectPath = (userType) => {
     case 'manager':
       return '/manager';
     case 'itsupporter':
+    case 'itadmin':
       return '/it-supporter';
     default:
       return '/login';

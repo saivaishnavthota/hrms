@@ -70,10 +70,10 @@ async def create_employee(
     current_user: User = Depends(get_current_user)
 ):
     # Only super-HR can create employees
-    if current_user.role != "HR" or not current_user.super_hr:
+    if (current_user.role != "HR" or not current_user.super_hr) and current_user.role != "Admin":
         raise HTTPException(
             status_code=403, 
-            detail="Access denied: Only Super-HR can create employees"
+            detail="Access denied: Only Super-HR or Admin can create employees"
         )
     
     db_user = session.exec(select(User).where(User.email == user.email)).first()
@@ -569,10 +569,10 @@ async def get_all_onboarding_employees(
     Retrieve all employees from the onboarding_employees table (Super-HR only)
     """
     # Only super-HR can view onboarding employees
-    if current_user.role != "HR" or not current_user.super_hr:
+    if (current_user.role != "HR" or not current_user.super_hr) and current_user.role != "Admin":
         raise HTTPException(
             status_code=403, 
-            detail="Access denied: Only Super-HR can view onboarding employees"
+            detail="Access denied: Only Super-HR or Admin can view onboarding employees"
         )
     
     try:
@@ -627,10 +627,10 @@ async def approve_employee(
     - Regenerates SAS tokens for all transferred documents
     """
     # Only super-HR can approve employees
-    if current_user.role != "HR" or not current_user.super_hr:
+    if (current_user.role != "HR" or not current_user.super_hr) and current_user.role != "Admin":
         raise HTTPException(
             status_code=403, 
-            detail="Access denied: Only Super-HR can approve onboarding employees"
+            detail="Access denied: Only Super-HR or Admin can approve onboarding employees"
         )
     
     try:
@@ -663,10 +663,10 @@ async def assign_employee(
     current_user: User = Depends(get_current_user)
 ):
     # Only super-HR can assign employees
-    if current_user.role != "HR" or not current_user.super_hr:
+    if (current_user.role != "HR" or not current_user.super_hr) and current_user.role != "Admin":
         raise HTTPException(
             status_code=403, 
-            detail="Access denied: Only Super-HR can assign employees"
+            detail="Access denied: Only Super-HR or Admin can assign employees"
         )
     
     try:
@@ -860,10 +860,10 @@ async def reject_employee(
     Reject an employee → delete from onboarding_employees (Super-HR only)
     """
     # Only super-HR can reject employees
-    if current_user.role != "HR" or not current_user.super_hr:
+    if (current_user.role != "HR" or not current_user.super_hr) and current_user.role != "Admin":
         raise HTTPException(
             status_code=403, 
-            detail="Access denied: Only Super-HR can reject onboarding employees"
+            detail="Access denied: Only Super-HR or Admin can reject onboarding employees"
         )
     
     try:
@@ -890,10 +890,10 @@ async def delete_employee(
     Delete an employee → same as reject (Super-HR only)
     """
     # Only super-HR can delete employees
-    if current_user.role != "HR" or not current_user.super_hr:
+    if (current_user.role != "HR" or not current_user.super_hr) and current_user.role != "Admin":
         raise HTTPException(
             status_code=403, 
-            detail="Access denied: Only Super-HR can delete onboarding employees"
+            detail="Access denied: Only Super-HR or Admin can delete onboarding employees"
         )
     
     try:

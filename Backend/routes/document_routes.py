@@ -216,7 +216,7 @@ def list_documents(
     doc_list = []
     for doc in documents:
         file_url = None
-        if current_user.role == "HR":
+        if current_user.role == "HR" or current_user.role == "Admin":
             file_url = doc.file_url  # Use stored URL from database
 
         doc_list.append(
@@ -247,7 +247,7 @@ def preview_document(
     if not document:
         raise HTTPException(status_code=404, detail=f"No {doc_type} found for this employee")
 
-    if current_user.role != "HR":
+    if current_user.role != "HR" and current_user.role != "Admin":
         raise HTTPException(status_code=403, detail="Access denied: HR only")
 
     file_url = document.file_url  # Use stored URL from database
@@ -317,7 +317,7 @@ async def request_document(
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user)
 ):
-    if current_user.role != "HR":
+    if current_user.role != "HR" and current_user.role != "Admin":
         raise HTTPException(status_code=403, detail="Access denied: HR only")
 
     body = await request.json()
@@ -367,7 +367,7 @@ def get_all_documents(
     current_user: User = Depends(get_current_user)
 ):
     """Get all employees with their uploaded documents (filtered by HR assignment for regular HRs)"""
-    if current_user.role != "HR":
+    if current_user.role != "HR" and current_user.role != "Admin":
         raise HTTPException(status_code=403, detail="Access denied: HR only")
 
     try:
@@ -434,7 +434,7 @@ def get_request_logs(
     current_user: User = Depends(get_current_user)
 ):
     """Get all document request logs"""
-    if current_user.role != "HR":
+    if current_user.role != "HR" and current_user.role != "Admin":
         raise HTTPException(status_code=403, detail="Access denied: HR only")
 
     try:
@@ -466,7 +466,7 @@ def delete_candidate(
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user)
 ):
-    if current_user.role != "HR":
+    if current_user.role != "HR" and current_user.role != "Admin":
         raise HTTPException(status_code=403, detail="Access denied: HR only")
 
     # Delete all blobs for employee

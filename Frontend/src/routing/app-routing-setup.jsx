@@ -8,11 +8,14 @@ import { MENU_SIDEBAR_INTERN } from '@/config/intern-layout.config';
 import { MENU_SIDEBAR_MANAGER } from '@/config/manager-layout.config';
 import { MENU_SIDEBAR_ACCOUNT_MANAGER } from '@/config/account-manager-layout.config';
 import { MENU_SIDEBAR_IT_SUPPORTER } from '@/config/it-supporter-layout.config';
+import { MENU_SIDEBAR_ADMIN } from '@/config/admin-layout.config';
+import { AdminLayoutWrapper } from '@/components/layouts/AdminLayoutWrapper';
 import EmployeeManagement from '@/components/HR/EmployeeManagement';
 import Dashboard from '@/components/HR/Dashboard';
 import ChangePassword from '@/components/HR/ChangePassword';
 import LeaveRequests from '@/components/HR/LeaveRequests';
 import AssignLeaves from '@/components/HR/AssignLeaves';
+import SoftwareRequestCompletion from '@/components/ITSupporter/SoftwareRequestCompletion';
 
 import EmployeeAttendance from '@/components/HR/EmployeeAttendance';
 import Holidays from '@/components/HR/Holidays';
@@ -38,6 +41,7 @@ import ManagerAddAttendance from '@/components/Employee/AddAttendance';
 import ApplyLeave from '@/components/Employee/ApplyLeave';
 import SubmitExpense from '@/components/Employee/SubmitExpense';
 import UploadDocuments from '@/components/Employee/UploadDocuments';
+import SoftwareRequest from '@/components/Employee/SoftwareRequest';
 import SetPassword from '@/components/Employee/SetPassword';
 // Manager components
 import AccountManagerDashboard from '@/components/AccountManager/Dashboard';
@@ -49,17 +53,21 @@ import Projects from '@/components/AccountManager/Projects';
 import ManagerDashboard from '@/components/Manager/Dashboard';
 import ManagerExpenseManagement from '@/components/Manager/ExpenseManagement';
 import ManagerEmployeeAttendance from '@/components/Manager/EmployeesAttendance';
+import SoftwareRequestApproval from '@/components/Manager/SoftwareRequestApproval';
 import ManagerAttendance from '@/components/Manager/Attendance';
 // Super HR components
 import HRConfig from '@/components/HR/HRConfig';
 import ITSupporterDashboard from '@/components/ITSupporter/Dashboard';
 import ITSupporterAssets from '@/components/ITSupporter/Assets';
 import ITSupporterVendors from '@/components/ITSupporter/Vendors';
+
 import ITSupporterAllocations from '@/components/ITSupporter/Allocations';
-
-
 import ITSupporterMaintanance from '@/components/ITSupporter/Maintanance';
 import ITSupporterMyActivity from '@/components/ITSupporter/MyActivity';
+import AdminDashboard from '@/components/Admin/Dashboard';
+import AdminEmployeeAttendance from '@/components/Admin/EmployeeAttendance';
+import AdminLeaveRequests from '@/components/Admin/LeaveRequests';
+import AdminExpenseManagement from '@/components/Admin/ExpenseManagement';
 
 export const AppRoutingSetup = () => {
   return (
@@ -69,7 +77,7 @@ export const AppRoutingSetup = () => {
       <Route path="/change-password-onboarding" element={<ChangePasswordOnboarding />} />
       <Route path="/new-user-details" element={<NewUserDetails />} />
       <Route path="/upload-documents" element={<NewUserUploadDocs />} />
-      
+
       {/* Protected HR routes */}
       <Route path="/hr" element={<ProtectedRoute allowedRoles={["Hr"]}><HRLayoutWrapper /></ProtectedRoute>}>
         <Route index element={<Dashboard />} />
@@ -82,14 +90,14 @@ export const AppRoutingSetup = () => {
         <Route path="document-collection" element={<DocumentCollection />} />
         <Route path="pending-requests" element={<PendingRequests />} />
         <Route path="view-leave-application" element={<ViewLeaveApplication />} />
-        <Route path="change-password" element={< ChangePassword/>} />
+        <Route path="change-password" element={< ChangePassword />} />
         <Route path="leave-requests" element={<LeaveRequests />} />
         <Route path="assign-leaves" element={<AssignLeaves />} />
         <Route path="add-attendance" element={<HRAddAttendance />} />
         <Route path="employees-attendance" element={<EmployeeAttendance />} />
         <Route path="holidays" element={<Holidays />} />
         <Route path="add-policies" element={<AddCompanyPolicy />} />
-        <Route path="reset-password" element={< ChangePassword/>} />
+        <Route path="reset-password" element={< ChangePassword />} />
         <Route path="my-activity" element={<MyActivity />} />
       </Route>
 
@@ -109,7 +117,7 @@ export const AppRoutingSetup = () => {
         <Route path="add-policies" element={<AddCompanyPolicy />} />
         <Route path="hr-config" element={<HRConfig />} />
       </Route>
-      
+
       {/* Protected Employee routes using Layout1 with employee menu */}
       <Route path="/employee" element={<ProtectedRoute allowedRoles={["Employee"]}><Layout1 menu={MENU_SIDEBAR_EMPLOYEE} /></ProtectedRoute>}>
         <Route index element={<EmployeePage />} />
@@ -117,9 +125,10 @@ export const AppRoutingSetup = () => {
         <Route path="apply-leave" element={<ApplyLeave />} />
         <Route path="submit-expense" element={<SubmitExpense />} />
         <Route path="upload-documents" element={<UploadDocuments />} />
+        <Route path="software-requests" element={<SoftwareRequest />} />
         <Route path="set-password" element={<SetPassword />} />
       </Route>
-      
+
       {/* Protected Intern routes using Layout1 with intern menu */}
       <Route path="/intern" element={<ProtectedRoute allowedRoles={["Intern"]}><Layout1 menu={MENU_SIDEBAR_INTERN} /></ProtectedRoute>}>
         <Route index element={<InternPage />} />
@@ -129,10 +138,10 @@ export const AppRoutingSetup = () => {
         <Route path="upload-documents" element={<UploadDocuments />} />
         <Route path="set-password" element={<SetPassword />} />
       </Route>
-      
+
       {/* Layout-1 route */}
       <Route path="/layout-1" element={<ProtectedRoute><Layout1Page /></ProtectedRoute>} />
-      
+
       {/* Protected Manager routes using Layout1 with manager menu */}
       <Route path="/manager" element={<ProtectedRoute allowedRoles={["Manager"]}><Layout1 menu={MENU_SIDEBAR_MANAGER} /></ProtectedRoute>}>
         <Route index element={<ManagerDashboard />} />
@@ -146,6 +155,7 @@ export const AppRoutingSetup = () => {
         <Route path="leave-requests" element={<ManagerLeaveManagement />} />
         <Route path="expense-management" element={<ManagerExpenseManagement />} />
         <Route path="upload-documents" element={<UploadDocuments />} />
+        <Route path="software-requests" element={<SoftwareRequestApproval />} />
         <Route path="change-password" element={<SetPassword />} />
       </Route>
 
@@ -164,19 +174,57 @@ export const AppRoutingSetup = () => {
 
       {/* My Profile route */}
       <Route path="/my-profile" element={<ProtectedRoute><MyProfile /></ProtectedRoute>} />
-      
+
       {/* Default route - redirect to login */}
       <Route path="/" element={<Navigate to="/login" replace />} />
 
       {/* Public IT Supporter demo routes using Layout1 with IT menu (no auth) */}
-      <Route path="/it-supporter" element={<ProtectedRoute allowedRoles={["itadmin"]}><Layout1 menu={MENU_SIDEBAR_IT_SUPPORTER} /></ProtectedRoute>}>
+      {/* <Route path="/it-supporter-demo" element={<Layout1 menu={MENU_SIDEBAR_IT_SUPPORTER.map(item => ({ ...item, path: item.path.replace('/it-supporter', '/it-supporter-demo') }))} />}>
         <Route index element={<ITSupporterDashboard />} />
         <Route path="dashboard" element={<ITSupporterDashboard />} />
         <Route path="assets" element={<ITSupporterAssets />} />
         <Route path="vendors" element={<ITSupporterVendors />} />
+        <Route path="employees" element={<ITSupporterEmployees />} />
         <Route path="allocations" element={<ITSupporterAllocations />} />
         <Route path="maintanance" element={<ITSupporterMaintanance />} />
         <Route path="my-activity" element={<ITSupporterMyActivity />} />
+      </Route> */}
+
+      {/* Protected IT Supporter routes using Layout1 with IT Supporter menu */}
+      <Route path="/it-supporter" element={<ProtectedRoute allowedRoles={["IT Admin"]}><Layout1 menu={MENU_SIDEBAR_IT_SUPPORTER} /></ProtectedRoute>}>
+        <Route index element={<ITSupporterDashboard />} />
+        <Route path="dashboard" element={<ITSupporterDashboard />} />
+        <Route path="assets" element={<ITSupporterAssets />} />
+        <Route path="vendors" element={<ITSupporterVendors />} />
+       
+        <Route path="allocations" element={<ITSupporterAllocations />} />
+        <Route path="maintanance" element={<ITSupporterMaintanance />} />
+        <Route path="software-requests" element={<SoftwareRequestCompletion />} />
+        <Route path="my-activity" element={<ITSupporterMyActivity />} />
+      </Route>
+
+      {/* Protected Admin routes - Full system access (View Only) */}
+      <Route path="/admin" element={<ProtectedRoute allowedRoles={["Admin"]}><AdminLayoutWrapper /></ProtectedRoute>}>
+        <Route index element={<AdminDashboard />} />
+        <Route path="dashboard" element={<AdminDashboard />} />
+        {/* HR Features - View Only with Admin-specific routes */}
+        <Route path="employee-management" element={<EmployeeManagement />} />
+        <Route path="onboarding-employees" element={<OnboardingEmployees />} />
+        <Route path="employees-attendance" element={<AdminEmployeeAttendance />} />
+        <Route path="leave-requests" element={<AdminLeaveRequests />} />
+        <Route path="assign-leaves" element={<AssignLeaves />} />
+        <Route path="expense-management" element={<AdminExpenseManagement />} />
+        <Route path="document-collection" element={<DocumentCollection />} />
+        <Route path="view-projects" element={<Projects viewOnly />} />
+        <Route path="holidays" element={<Holidays />} />
+        <Route path="add-policies" element={<AddCompanyPolicy />} />
+        <Route path="hr-config" element={<HRConfig />} />
+        {/* IT Features - View Only */}
+        <Route path="assets" element={<ITSupporterAssets />} />
+        <Route path="vendors" element={<ITSupporterVendors />} />
+        <Route path="allocations" element={<ITSupporterAllocations />} />
+        <Route path="maintanance" element={<ITSupporterMaintanance />} />
+        <Route path="software-requests" element={<SoftwareRequestCompletion />} />
       </Route>
     </Routes>
   );

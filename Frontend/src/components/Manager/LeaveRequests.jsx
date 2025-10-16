@@ -5,6 +5,7 @@ import ViewLeaveApplication from '../HR/ViewLeaveApplication';
 import { avatarBg } from '../../lib/avatarColors';
 import api from '@/lib/api';
 import { toast } from 'react-toastify';
+import { PaginationControls, usePagination } from '@/components/ui/pagination-controls';
 
 const ManagerLeaveRequests = () => {
   const { user } = useUser();
@@ -22,6 +23,17 @@ const ManagerLeaveRequests = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [actionLoading, setActionLoading] = useState({});
+
+  // Pagination
+  const {
+    currentPage,
+    pageSize,
+    handlePageChange,
+    handlePageSizeChange,
+    getPaginatedData,
+    getTotalPages,
+    resetPagination
+  } = usePagination(10);
 
   // Fetch manager pending requests
   const fetchPendingRequests = async () => {
@@ -87,6 +99,7 @@ const ManagerLeaveRequests = () => {
   useEffect(() => {
     if (activeTab === 'pending') fetchPendingRequests();
     else fetchLeaveRequests();
+    resetPagination(); // Reset pagination when tab changes
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, managerId]);
 
@@ -117,6 +130,16 @@ const ManagerLeaveRequests = () => {
       return 0;
     });
   };
+
+  // Get current data based on active tab
+  const currentData = activeTab === 'pending' 
+    ? pendingRequests 
+    : leaveRequests.filter(req => req.status !== 'pending');
+  
+  // Apply sorting and pagination
+  const sorted = sortedData(currentData);
+  const paginatedData = getPaginatedData(sorted);
+  const totalPages = getTotalPages(sorted.length);
 
   const handleViewLeave = (leave) => {
     setSelectedLeave(leave);
@@ -215,9 +238,9 @@ const getAvatarColor = (name) => avatarBg(name);
                 </tr>
               </thead>
               <tbody>
-                {sortedData(activeTab === 'pending' ? pendingRequests :leaveRequests.filter(req => req.status !== 'pending') ).map((req, idx) => (
+                {paginatedData.map((req, idx) => (
                   <tr key={req.id} className="border-b border-gray-200 hover:bg-gray-50">
-                    <td className="text-center text-gray-600 px-6 py-4">{idx + 1}</td>
+                    <td className="text-center text-gray-600 px-6 py-4">{(currentPage - 1) * pageSize + idx + 1}</td>
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
                         <div className={`w-10 h-10 rounded-full ${getAvatarColor(req.employee)} flex items-center justify-center text-white font-medium text-sm`}>
@@ -279,6 +302,19 @@ const getAvatarColor = (name) => avatarBg(name);
                 ))}
               </tbody>
             </table>
+
+            {/* Pagination Controls */}
+            {sorted.length > 0 && (
+              <PaginationControls
+                currentPage={currentPage}
+                totalPages={totalPages}
+                pageSize={pageSize}
+                totalItems={sorted.length}
+                onPageChange={handlePageChange}
+                onPageSizeChange={handlePageSizeChange}
+                pageSizeOptions={[10, 25, 50, 100]}
+              />
+            )}
           </div>
         )}
       </div>

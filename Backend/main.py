@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from contextlib import asynccontextmanager
 from database import create_tables_database
-from routes import user_routes, document_routes,locations_routes, attendance_routes,leave_routes,onboarding_routes, calendar_routes,expenses_routes, project_routes, weekoff_routes, expense_management_routes, policy_routes, hr_config_routes,asset_routes
+from routes import user_routes, document_routes,locations_routes, attendance_routes,leave_routes,onboarding_routes, calendar_routes,expenses_routes, project_routes, weekoff_routes, expense_management_routes, policy_routes, hr_config_routes,asset_routes, swreq_routes
 from middleware.cors import add_cors_middleware
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -58,6 +58,7 @@ app.include_router(policy_routes.router)
 app.include_router(hr_config_routes.router)
 
 app.include_router(asset_routes.router)
+app.include_router(swreq_routes.router)
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=PORT, reload=True)

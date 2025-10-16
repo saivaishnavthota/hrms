@@ -12,6 +12,7 @@ import {
 import { toast } from 'react-toastify' ;
 import api from '../../lib/api';
 import { useUser } from '@/contexts/UserContext';
+import { PaginationControls, usePagination } from '@/components/ui/pagination-controls';
 
 const getAvatarColor = (name) => {
   const colors = [
@@ -73,9 +74,25 @@ const EmployeeManagement = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
+  // Pagination
+  const {
+    currentPage,
+    pageSize,
+    handlePageChange,
+    handlePageSizeChange,
+    getPaginatedData,
+    getTotalPages,
+    resetPagination
+  } = usePagination(10);
+
   useEffect(() => {
     fetchAllData();
   }, []);
+
+  // Reset pagination when filters change
+  useEffect(() => {
+    resetPagination();
+  }, [searchTerm, statusFilter, typeFilter, locationFilter]);
 
   const fetchAllData = async () => {
     try {
@@ -142,6 +159,10 @@ const EmployeeManagement = () => {
     
     return matchesSearch && matchesStatus && matchesType && matchesLocation;
   });
+
+  // Apply pagination
+  const paginatedEmployees = getPaginatedData(filteredEmployees);
+  const totalPages = getTotalPages(filteredEmployees.length);
 
   const handleViewEmployee = (employee) => {
     setSelectedEmployee(employee);
@@ -428,10 +449,10 @@ const EmployeeManagement = () => {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {filteredEmployees.map((employee, index) => (
+                  {paginatedEmployees.map((employee, index) => (
                   <tr key={employee.id} className="hover:bg-gray-50 transition-colors">
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                      {index + 1}
+                      {(currentPage - 1) * pageSize + index + 1}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center gap-3">
@@ -501,13 +522,26 @@ const EmployeeManagement = () => {
                 ))}
                 </tbody>
               </table>
+
+              {/* Pagination Controls */}
+              {!loading && !error && filteredEmployees.length > 0 && (
+                <PaginationControls
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  pageSize={pageSize}
+                  totalItems={filteredEmployees.length}
+                  onPageChange={handlePageChange}
+                  onPageSizeChange={handlePageSizeChange}
+                  pageSizeOptions={[10, 25, 50, 100]}
+                />
+              )}
             </div>
           </div>
         )}
 
-        {!loading && !error && (
-          <div className="text-sm text-gray-600">
-            Showing {filteredEmployees.length} of {employees.length} employees
+        {!loading && !error && filteredEmployees.length === 0 && (
+          <div className="text-center py-8 text-gray-500">
+            No employees found matching your criteria
           </div>
         )}
 

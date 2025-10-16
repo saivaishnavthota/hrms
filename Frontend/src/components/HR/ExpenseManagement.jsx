@@ -10,7 +10,12 @@ import {
   Check,
   X,
   FileText,
+  FileSpreadsheet,
+  Download,
 } from 'lucide-react';
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
+import * as XLSX from 'xlsx';
 import Swal from 'sweetalert2';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -43,14 +48,14 @@ import HRExpenseForm from './HRExpenseForm';
 import NewExpenseForm from '../Manager/NewExpenseForm'; 
 import { toast } from 'react-toastify';
 import api from '@/lib/api';
+import { PaginationControls, usePagination } from '@/components/ui/pagination-controls';
 
-const ExpenseManagement = () => {
+const ExpenseManagement = ({ viewOnly = false }) => {
   const { user } = useUser();
   const [activeTab, setActiveTab] = useState('pending');
   const [expenses, setExpenses] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
-  const [perPage, setPerPage] = useState('10');
   const [selectedExpense, setSelectedExpense] = useState(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [isNewExpenseOpen, setIsNewExpenseOpen] = useState(false);
@@ -60,6 +65,20 @@ const ExpenseManagement = () => {
   const [myExpenses, setMyExpenses] = useState([]);
   const [myLoading, setMyLoading] = useState(false);
   const [myError, setMyError] = useState(null);
+
+  // Pagination for pending expenses
+  const {
+    currentPage,
+    pageSize,
+    handlePageChange,
+    handlePageSizeChange,
+    getPaginatedData,
+    getTotalPages,
+    resetPagination
+  } = usePagination(10);
+
+  // Pagination for my expenses
+  const myPagination = usePagination(10);
 
   // Filter states
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
@@ -379,6 +398,22 @@ const ExpenseManagement = () => {
     return matchesSearch && matchesStatus;
   });
 
+  // Reset pagination when filters change
+  useEffect(() => {
+    resetPagination();
+  }, [searchTerm, statusFilter, activeTab]);
+
+  useEffect(() => {
+    myPagination.resetPagination();
+  }, [activeTab]);
+
+  // Apply pagination
+  const paginatedExpenses = getPaginatedData(filteredExpenses);
+  const totalPages = getTotalPages(filteredExpenses.length);
+
+  const paginatedMyExpenses = myPagination.getPaginatedData(myExpenses);
+  const myTotalPages = myPagination.getTotalPages(myExpenses.length);
+
   const getStatusBadge = (status) => {
     switch ((status || '').toLowerCase()) {
       case 'approved':
@@ -407,29 +442,210 @@ const ExpenseManagement = () => {
     }
   };
 
+  // Download Expense Report as PDF
+  const downloadExpenseAsPDF = () => {
+    try {
+      const doc = new jsPDF('l', 'mm', 'a4'); // Landscape orientation
+      
+      // Header
+      doc.setFontSize(18);
+      doc.setFont(undefined, 'bold');
+      doc.text('Expense Report', 14, 15);
+      
+      doc.setFontSize(11);
+      doc.setFont(undefined, 'normal');
+      doc.text(`Period: ${getMonthName(selectedMonth)} ${selectedYear}`, 14, 23);
+      doc.text(`Status Filter: ${statusFilter === 'all' ? 'All' : statusFilter}`, 14, 29);
+      doc.text(`Total Expenses: ${filteredExpenses.length}`, 14, 35);
+      
+      // Calculate totals
+      const totalAmount = filteredExpenses.reduce((sum, exp) => sum + (exp.final_amount || exp.amount), 0);
+      doc.text(`Total Amount: ${filteredExpenses[0]?.currency || 'INR'} ${totalAmount.toFixed(2)}`, 14, 41);
+      doc.text(`Generated: ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}`, 14, 47);
+      
+      // Table data
+      const tableData = filteredExpenses.map(expense => [
+        expense.employee.name,
+        expense.category,
+        expense.details.substring(0, 30) + (expense.details.length > 30 ? '...' : ''),
+        `${expense.currency} ${expense.amount.toFixed(2)}`,
+        `${expense.discount_percentage || 0}%`,
+        `${(expense.cgst_percentage || 0) + (expense.sgst_percentage || 0)}%`,
+        `${expense.currency} ${(expense.final_amount || expense.amount).toFixed(2)}`,
+        expense.submittedOn,
+        expense.status
+      ]);
+      
+      doc.autoTable({
+        startY: 53,
+        head: [['Employee', 'Category', 'Description', 'Amount', 'Discount', 'Tax', 'Final Amount', 'Date', 'Status']],
+        body: tableData,
+        theme: 'striped',
+        headStyles: {
+          fillColor: [59, 130, 246],
+          textColor: 255,
+          fontSize: 8,
+          fontStyle: 'bold',
+          halign: 'center'
+        },
+        styles: {
+          fontSize: 7,
+          cellPadding: 2,
+          overflow: 'linebreak',
+          cellWidth: 'wrap'
+        },
+        columnStyles: {
+          0: { cellWidth: 30 },
+          1: { cellWidth: 25 },
+          2: { cellWidth: 40 },
+          3: { cellWidth: 25 },
+          4: { cellWidth: 18 },
+          5: { cellWidth: 15 },
+          6: { cellWidth: 28 },
+          7: { cellWidth: 22 },
+          8: { cellWidth: 20 }
+        },
+        alternateRowStyles: {
+          fillColor: [245, 247, 250]
+        },
+        margin: { left: 14, right: 14 }
+      });
+      
+      // Footer
+      const pageCount = doc.internal.getNumberOfPages();
+      doc.setFontSize(8);
+      for (let i = 1; i <= pageCount; i++) {
+        doc.setPage(i);
+        doc.text(`Page ${i} of ${pageCount}`, doc.internal.pageSize.getWidth() - 30, doc.internal.pageSize.getHeight() - 10);
+      }
+      
+      doc.save(`Expense_Report_${selectedMonth}_${selectedYear}.pdf`);
+      toast.success('PDF report downloaded successfully!');
+    } catch (error) {
+      console.error('PDF generation error:', error);
+      toast.error('Failed to generate PDF report.');
+    }
+  };
+
+  // Download Expense Report as Excel
+  const downloadExpenseAsExcel = () => {
+    try {
+      // Prepare data for Excel
+      const excelData = filteredExpenses.map(expense => ({
+        'Employee Name': expense.employee.name,
+        'Employee Email': expense.employee.email,
+        'Category': expense.category,
+        'Description': expense.details,
+        'Amount': expense.amount,
+        'Currency': expense.currency,
+        'Discount (%)': expense.discount_percentage || 0,
+        'CGST (%)': expense.cgst_percentage || 0,
+        'SGST (%)': expense.sgst_percentage || 0,
+        'Total Tax (%)': (expense.cgst_percentage || 0) + (expense.sgst_percentage || 0),
+        'Final Amount': expense.final_amount || expense.amount,
+        'Tax Included': expense.taxIncluded ? 'Yes' : 'No',
+        'Submitted Date': expense.submittedOn,
+        'Status': expense.status,
+        'Attachments': expense.attachments.length > 0 ? expense.attachments.join(', ') : 'None'
+      }));
+      
+      // Calculate summary
+      const totalAmount = filteredExpenses.reduce((sum, exp) => sum + (exp.amount || 0), 0);
+      const totalFinalAmount = filteredExpenses.reduce((sum, exp) => sum + (exp.final_amount || exp.amount), 0);
+      const avgDiscount = filteredExpenses.length > 0 
+        ? filteredExpenses.reduce((sum, exp) => sum + (exp.discount_percentage || 0), 0) / filteredExpenses.length 
+        : 0;
+      
+      const summaryData = [
+        { 'Summary': 'Period', 'Value': `${getMonthName(selectedMonth)} ${selectedYear}` },
+        { 'Summary': 'Total Expenses', 'Value': filteredExpenses.length },
+        { 'Summary': 'Total Amount (before discount/tax)', 'Value': totalAmount.toFixed(2) },
+        { 'Summary': 'Total Final Amount', 'Value': totalFinalAmount.toFixed(2) },
+        { 'Summary': 'Average Discount %', 'Value': avgDiscount.toFixed(2) },
+        { 'Summary': 'Pending', 'Value': filteredExpenses.filter(e => e.status.toLowerCase() === 'pending').length },
+        { 'Summary': 'Approved', 'Value': filteredExpenses.filter(e => e.status.toLowerCase() === 'approved').length },
+        { 'Summary': 'Rejected', 'Value': filteredExpenses.filter(e => e.status.toLowerCase() === 'rejected').length },
+        { 'Summary': 'Generated Date', 'Value': new Date().toLocaleDateString() }
+      ];
+      
+      // Create workbook with multiple sheets
+      const wb = XLSX.utils.book_new();
+      
+      // Add summary sheet
+      const wsSummary = XLSX.utils.json_to_sheet(summaryData);
+      XLSX.utils.book_append_sheet(wb, wsSummary, 'Summary');
+      
+      // Add expense data sheet
+      const wsData = XLSX.utils.json_to_sheet(excelData);
+      
+      // Set column widths
+      const colWidths = [
+        { wch: 25 }, // Employee Name
+        { wch: 30 }, // Employee Email
+        { wch: 20 }, // Category
+        { wch: 50 }, // Description
+        { wch: 12 }, // Amount
+        { wch: 10 }, // Currency
+        { wch: 12 }, // Discount
+        { wch: 10 }, // CGST
+        { wch: 10 }, // SGST
+        { wch: 12 }, // Total Tax
+        { wch: 15 }, // Final Amount
+        { wch: 12 }, // Tax Included
+        { wch: 15 }, // Submitted Date
+        { wch: 12 }, // Status
+        { wch: 40 }  // Attachments
+      ];
+      wsData['!cols'] = colWidths;
+      
+      XLSX.utils.book_append_sheet(wb, wsData, 'Expense Data');
+      
+      // Write file
+      XLSX.writeFile(wb, `Expense_Report_${selectedMonth}_${selectedYear}.xlsx`);
+      toast.success('Excel report downloaded successfully!');
+    } catch (error) {
+      console.error('Excel generation error:', error);
+      toast.error('Failed to generate Excel report.');
+    }
+  };
+
+  // Helper function to get month name
+  const getMonthName = (monthNum) => {
+    const months = ['January', 'February', 'March', 'April', 'May', 'June', 
+                    'July', 'August', 'September', 'October', 'November', 'December'];
+    return months[parseInt(monthNum) - 1] || 'Unknown';
+  };
+
   return (
     <div className="p-6 space-y-6 bg-gray-50">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-gray-900">Expense Management</h1>
-          <p className="text-gray-600 mt-1">Review and approve team expense claims</p>
+          <h1 className="text-2xl font-semibold text-gray-900">
+            Expense Management
+            {viewOnly && <span className="ml-3 text-sm font-medium text-blue-600 bg-blue-50 px-3 py-1 rounded-full">View Only</span>}
+          </h1>
+          <p className="text-gray-600 mt-1">
+            {viewOnly ? 'View all expense claims (read-only access)' : 'Review and approve team expense claims'}
+          </p>
         </div>
-        <div className="flex gap-2">
-          {/* <Button
-            className="bg-blue-500 hover:bg-blue-600 text-white"
-            onClick={() => setIsNewExpenseOpen(true)}
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            Add Expense for Employee
-          </Button> */}
-          <Button
-            className="bg-blue-500 hover:bg-blue-600 text-white"
-            onClick={() => setIsOwnExpenseOpen(true)}
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            Add My Expense
-          </Button>
-        </div>
+        {!viewOnly && (
+          <div className="flex gap-2">
+            {/* <Button
+              className="bg-blue-500 hover:bg-blue-600 text-white"
+              onClick={() => setIsNewExpenseOpen(true)}
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Add Expense for Employee
+            </Button> */}
+            <Button
+              className="bg-blue-500 hover:bg-blue-600 text-white"
+              onClick={() => setIsOwnExpenseOpen(true)}
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Add My Expense
+            </Button>
+          </div>
+        )}
       </div>
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-4 flex-1">
@@ -453,6 +669,24 @@ const ExpenseManagement = () => {
               <SelectItem value="rejected">Rejected</SelectItem>
             </SelectContent>
           </Select>
+        </div>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={downloadExpenseAsPDF}
+            className="inline-flex items-center px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 transition-colors duration-200 shadow-sm"
+            disabled={filteredExpenses.length === 0}
+          >
+            <FileText className="h-4 w-4 mr-2" />
+            Download PDF
+          </button>
+          <button
+            onClick={downloadExpenseAsExcel}
+            className="inline-flex items-center px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 transition-colors duration-200 shadow-sm"
+            disabled={filteredExpenses.length === 0}
+          >
+            <FileSpreadsheet className="h-4 w-4 mr-2" />
+            Download Excel
+          </button>
         </div>
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2 text-sm text-gray-600">
@@ -529,9 +763,9 @@ const ExpenseManagement = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {myExpenses.map((item, index) => (
+                {paginatedMyExpenses.map((item, index) => (
                   <TableRow key={item.id} className="border-b border-gray-200 hover:bg-gray-50">
-                    <TableCell className="text-center text-gray-600 px-6 py-4">{index + 1}</TableCell>
+                    <TableCell className="text-center text-gray-600 px-6 py-4">{(myPagination.currentPage - 1) * myPagination.pageSize + index + 1}</TableCell>
                     <TableCell className="px-6 py-4 text-gray-700">{item.category}</TableCell>
                     <TableCell className="px-6 py-4 text-gray-700">{item.date}</TableCell>
                     <TableCell className="px-6 py-4 text-gray-700">
@@ -725,9 +959,9 @@ const ExpenseManagement = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredExpenses.map((expense, index) => (
+                {paginatedExpenses.map((expense, index) => (
                   <TableRow key={expense.id} className="border-b border-gray-200 hover:bg-gray-50">
-                    <TableCell className="text-center text-gray-600 px-6 py-4">{index + 1}</TableCell>
+                    <TableCell className="text-center text-gray-600 px-6 py-4">{(currentPage - 1) * pageSize + index + 1}</TableCell>
                     <TableCell className="px-6 py-4">
                       <div className="flex items-center gap-3">
                         <div
@@ -774,24 +1008,28 @@ const ExpenseManagement = () => {
                         >
                           <Eye className="h-4 w-4" />
                         </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-8 w-8 p-0 text-green-600 hover:bg-green-50"
-                          onClick={() => handleApprove(expense)}
-                          disabled={expense.status !== 'Pending'}
-                        >
-                          <Check className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-8 w-8 p-0 text-red-600 hover:bg-red-50"
-                          onClick={() => handleReject(expense)}
-                          disabled={expense.status !== 'Pending'}
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
+                        {!viewOnly && (
+                          <>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 w-8 p-0 text-green-600 hover:bg-green-50"
+                              onClick={() => handleApprove(expense)}
+                              disabled={expense.status !== 'Pending'}
+                            >
+                              <Check className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 w-8 p-0 text-red-600 hover:bg-red-50"
+                              onClick={() => handleReject(expense)}
+                              disabled={expense.status !== 'Pending'}
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </>
+                        )}
                       </div>
                     </TableCell>
                   </TableRow>
@@ -802,23 +1040,32 @@ const ExpenseManagement = () => {
         </div>
       )}
 
-      <div className="flex items-center justify-between text-sm text-gray-600">
-        <span>
-          Showing {activeTab === 'my' ? myExpenses.length : filteredExpenses.length} of{' '}
-          {activeTab === 'my' ? myExpenses.length : expenses.length} expenses
-        </span>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" disabled>
-            Previous
-          </Button>
-          <Button variant="outline" size="sm" className="bg-blue-50 text-blue-600">
-            1
-          </Button>
-          <Button variant="outline" size="sm" disabled>
-            Next
-          </Button>
-        </div>
-      </div>
+      {/* Pagination Controls */}
+      {activeTab === 'my' ? (
+        myExpenses.length > 0 && (
+          <PaginationControls
+            currentPage={myPagination.currentPage}
+            totalPages={myTotalPages}
+            pageSize={myPagination.pageSize}
+            totalItems={myExpenses.length}
+            onPageChange={myPagination.handlePageChange}
+            onPageSizeChange={myPagination.handlePageSizeChange}
+            pageSizeOptions={[10, 25, 50, 100]}
+          />
+        )
+      ) : (
+        filteredExpenses.length > 0 && (
+          <PaginationControls
+            currentPage={currentPage}
+            totalPages={totalPages}
+            pageSize={pageSize}
+            totalItems={filteredExpenses.length}
+            onPageChange={handlePageChange}
+            onPageSizeChange={handlePageSizeChange}
+            pageSizeOptions={[10, 25, 50, 100]}
+          />
+        )
+      )}
 
       <Dialog open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
         <DialogContent className="max-w-md">

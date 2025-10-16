@@ -657,7 +657,94 @@ export const deleteMaintenance = async (id) => {
   await api.delete(`/api/assets/maintenance/${id}`);
 };
 
+// Software request API endpoints
+export const softwareRequestAPI = {
+  createSoftwareRequest: async (data) => {
+   
+    const response = await api.post('/software_requests/', {
+      ...data,
+      business_unit_id: data.business_unit_id || null, 
+      software_duration: data.software_duration || null, 
+    });
+    return response.data;
+  },
 
+  getEmployeeManagers: async (employeeId) => {
+    const response = await api.get(`/software_requests/employees/${employeeId}/managers`);
+    return response.data;
+  },
+
+  getItAdmins: async () => {
+    const response = await api.get('/software_requests/it_admins/');
+    return response.data;
+  },
+
+
+  getLocations: async () => {
+    const response = await api.get('/software_requests/locations/');
+    return response.data;
+  }, 
+
+  getSoftwareRequests: async (status = null) => {
+    const response = await api.get('/software_requests/', {
+      params: { status }
+    });
+    return response.data;
+  },
+
+  managerAction: async (requestId, action, comments) => {
+    const response = await api.get(`/software_requests/${requestId}/manager-action`, {
+      params: { action, comments }
+    });
+    return response.data;
+  },
+
+  completeSoftwareRequest: async (requestId) => {
+    const response = await api.get(`/software_requests/${requestId}/complete`);
+    return response.data;
+  },
+
+
+  getComplianceQuestions: async (requestId) => {
+    const response = await api.get(`/software_requests/${requestId}/compliance_questions`);
+    return response.data;
+  },
+
+  submitComplianceAnswers: async (requestId, answers) => {
+    const response = await api.post(`/software_requests/${requestId}/compliance_answers`, answers);
+    return response.data;
+  },
+
+  getComplianceAnswers: async (requestId) => {
+    const response = await api.get(`/software_requests/${requestId}/compliance_answers`);
+    return response.data;
+  },
+
+  sendComplianceEmails: async (requestIds) => {
+    const response = await api.post('/software_requests/send_compliance', { request_ids: requestIds });
+    return response.data;
+  },
+
+  getAllComplianceQuestions: async () => {
+    const response = await api.get('/software_requests/compliance_questions/');
+    return response.data;
+  },
+
+  createComplianceQuestion: async (data) => {
+    const response = await api.post('/software_requests/compliance_questions/', data);
+    return response.data;
+  },
+
+  updateComplianceQuestion: async (questionId, data) => {
+    const response = await api.put(`/software_requests/compliance_questions/${questionId}`, data);
+    return response.data;
+  },
+
+  deleteComplianceQuestion: async (questionId) => {
+    const response = await api.delete(`/software_requests/compliance_questions/${questionId}`);
+    return response.data;
+  },
+};
 
 // Export the axios instance for custom requests
 export default api;

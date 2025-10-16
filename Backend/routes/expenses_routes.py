@@ -24,6 +24,110 @@ import logging
 
 router = APIRouter(prefix="/expenses", tags=["Expenses"])
 
+# ==================== ADMIN ROUTES ====================
+@router.get("/admin/all-expense-requests")
+def get_all_expense_requests_admin(
+    status: Optional[str] = None,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session)
+):
+    """
+    Admin route to get ALL expense requests (pending, approved, rejected)
+    No HR/Manager filtering - returns everything
+    Status filter: 'Pending', 'Approved', 'Rejected', or None for all
+    """
+    # Check if user is Admin
+    if current_user.role != "Admin":
+        raise HTTPException(status_code=403, detail="Access denied: Admin only")
+    
+    query = text("""
+        SELECT
+            er.request_id,
+            er.request_code,
+            er.employee_id,
+            e.name AS employee_name,
+            e.company_email AS employee_email,
+            e.role,
+            e.employment_type,
+            er.category,
+            er.amount,
+            er.currency,
+            er.description,
+            er.expense_date,
+            er.tax_included,
+            er.status,
+            er.discount_percentage,
+            er.cgst_percentage,
+            er.sgst_percentage,
+            er.final_amount,
+            er.created_at,
+            er.updated_at,
+            COALESCE(
+                jsonb_agg(
+                    jsonb_build_object(
+                        'id', ea.attachment_id,
+                        'file_name', ea.file_name,
+                        'file_url', ea.file_url,
+                        'file_type', ea.file_type,
+                        'uploaded_at', ea.uploaded_at
+                    )
+                ) FILTER (WHERE ea.attachment_id IS NOT NULL),
+                '[]'
+            ) AS attachments
+        FROM expense_requests er
+        INNER JOIN employees e ON er.employee_id = e.id
+        LEFT JOIN expense_attachments ea ON er.request_id = ea.request_id
+        WHERE e.o_status = true AND er.deleted_at IS NULL
+    """)
+    
+    # Add status filter if provided
+    if status:
+        query = text(str(query) + " AND er.status = :status")
+    
+    query = text(str(query) + """
+        GROUP BY
+            er.request_id, er.request_code, er.employee_id, e.name, e.company_email,
+            e.role, e.employment_type, er.category, er.amount, er.currency,
+            er.description, er.expense_date, er.tax_included, er.status, 
+            er.discount_percentage, er.cgst_percentage, er.sgst_percentage, 
+            er.final_amount, er.created_at, er.updated_at
+        ORDER BY er.created_at DESC
+    """)
+    
+    params = {}
+    if status:
+        params["status"] = status
+    
+    result = session.execute(query, params).fetchall()
+    
+    expenses = []
+    for row in result:
+        expenses.append({
+            "request_id": row.request_id,
+            "request_code": row.request_code,
+            "employee_id": row.employee_id,
+            "employee_name": row.employee_name,
+            "employee_email": row.employee_email,
+            "role": row.role,
+            "employment_type": row.employment_type,
+            "category": row.category,
+            "amount": float(row.amount) if row.amount else 0.0,
+            "currency": row.currency,
+            "description": row.description,
+            "expense_date": str(row.expense_date) if row.expense_date else None,
+            "tax_included": row.tax_included,
+            "status": row.status,
+            "discount_percentage": float(row.discount_percentage) if row.discount_percentage else 0.0,
+            "cgst_percentage": float(row.cgst_percentage) if row.cgst_percentage else 0.0,
+            "sgst_percentage": float(row.sgst_percentage) if row.sgst_percentage else 0.0,
+            "final_amount": float(row.final_amount) if row.final_amount else 0.0,
+            "created_at": str(row.created_at) if row.created_at else None,
+            "updated_at": str(row.updated_at) if row.updated_at else None,
+            "attachments": row.attachments if row.attachments else []
+        })
+    
+    return expenses
+
 load_dotenv()
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -1175,7 +1279,7 @@ async def delete_expense(
  
         # Check authorization
         is_employee = user.id == expense.employee_id
-        is_hr = user.role == "HR"
+        is_hr = user.role == "HR" or user.role == "Admin"
         is_account_manager = user.role == "Account Manager"
         can_delete = (
             (is_employee and expense.status in ["pending_manager_approval"]) or

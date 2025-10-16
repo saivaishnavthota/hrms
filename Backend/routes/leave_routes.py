@@ -13,7 +13,7 @@ from typing import Literal
 import os
 from dotenv import load_dotenv
 import logging
- 
+from auth import get_current_user
 load_dotenv()
  
 # Configure logging
@@ -21,6 +21,72 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
  
 router = APIRouter(prefix="/leave", tags=["Leaves"])
+
+# ==================== ADMIN ROUTES ====================
+@router.get("/admin/all-leave-requests")
+def get_all_leave_requests_admin(
+    status: str = None,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session)
+):
+    """
+    Admin route to get ALL leave requests (pending, approved, rejected)
+    No HR/Manager filtering - returns everything
+    Status filter: 'pending', 'approved', 'rejected', or None for all
+    """
+    # Check if user is Admin
+    if current_user.role != "Admin":
+        raise HTTPException(status_code=403, detail="Access denied: Admin only")
+    
+    query = (
+        select(LeaveManagement, User)
+        .join(User, LeaveManagement.employee_id == User.id)
+        .where(User.o_status == True)
+    )
+    
+    # Apply status filter if provided
+    if status:
+        status_lower = status.lower()
+        if status_lower == "pending":
+            query = query.where(
+                (LeaveManagement.manager_status == "Pending") | 
+                (LeaveManagement.hr_status == "Pending")
+            )
+        elif status_lower == "approved":
+            query = query.where(
+                (LeaveManagement.manager_status == "Approved") & 
+                (LeaveManagement.hr_status == "Approved")
+            )
+        elif status_lower == "rejected":
+            query = query.where(
+                (LeaveManagement.manager_status == "Rejected") | 
+                (LeaveManagement.hr_status == "Rejected")
+            )
+    
+    results = session.exec(query).all()
+    
+    leave_requests = []
+    for leave, employee in results:
+        leave_requests.append({
+            "id": leave.id,
+            "employee_id": leave.employee_id,
+            "employee_name": employee.name,
+            "employee_email": employee.company_email,
+            "leave_type": leave.leave_type,
+            "start_date": str(leave.start_date),
+            "end_date": str(leave.end_date),
+            "no_of_days": leave.no_of_days,
+            "reason": leave.reason,
+            "status": leave.status,
+            "manager_status": leave.manager_status,
+            "hr_status": leave.hr_status,
+            "manager_remarks": getattr(leave, 'manager_remarks', None),
+            "hr_remarks": getattr(leave, 'hr_remarks', None),
+            "created_at": str(leave.created_at) if leave.created_at else None,
+            "updated_at": str(leave.updated_at) if leave.updated_at else None,
+        })
+    
+    return leave_requests
  
 @router.post("/apply_leave")
 async def apply_leave(leave: dict, session: Session = Depends(get_session)):

@@ -43,6 +43,7 @@ import {
 import { useUser } from '@/contexts/UserContext';
 import NewExpenseForm from '@/components/Manager/NewExpenseForm';
 import { avatarBg } from '../../lib/avatarColors';
+import { PaginationControls, usePagination } from '@/components/ui/pagination-controls';
 
 const ManagerExpenseManagement = () => {
   const { user } = useUser();
@@ -50,7 +51,6 @@ const ManagerExpenseManagement = () => {
   const [expenses, setExpenses] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
-  const [perPage, setPerPage] = useState('10');
   const [selectedExpense, setSelectedExpense] = useState(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [isNewExpenseOpen, setIsNewExpenseOpen] = useState(false);
@@ -59,6 +59,20 @@ const ManagerExpenseManagement = () => {
   const [myExpenses, setMyExpenses] = useState([]);
   const [myLoading, setMyLoading] = useState(false);
   const [myError, setMyError] = useState(null);
+
+  // Pagination for pending expenses
+  const {
+    currentPage,
+    pageSize,
+    handlePageChange,
+    handlePageSizeChange,
+    getPaginatedData,
+    getTotalPages,
+    resetPagination
+  } = usePagination(10);
+
+  // Pagination for my expenses
+  const myPagination = usePagination(10);
 
   // Filter states
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
@@ -306,6 +320,22 @@ const ManagerExpenseManagement = () => {
     return matchesSearch && matchesStatus && excludePendingInAll;
   });
 
+  // Reset pagination when filters change
+  useEffect(() => {
+    resetPagination();
+  }, [searchTerm, statusFilter, activeTab]);
+
+  useEffect(() => {
+    myPagination.resetPagination();
+  }, [activeTab]);
+
+  // Apply pagination
+  const paginatedExpenses = getPaginatedData(filteredExpenses);
+  const totalPages = getTotalPages(filteredExpenses.length);
+
+  const paginatedMyExpenses = myPagination.getPaginatedData(myExpenses);
+  const myTotalPages = myPagination.getTotalPages(myExpenses.length);
+
   const getStatusBadge = (status) => {
     switch ((status || '').toLowerCase()) {
       case 'approved':
@@ -439,9 +469,9 @@ const ManagerExpenseManagement = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {myExpenses.map((item, index) => (
+                {paginatedMyExpenses.map((item, index) => (
                   <TableRow key={item.id} className="border-b border-gray-200 hover:bg-gray-50">
-                    <TableCell className="text-center text-gray-600 px-6 py-4">{index + 1}</TableCell>
+                    <TableCell className="text-center text-gray-600 px-6 py-4">{(myPagination.currentPage - 1) * myPagination.pageSize + index + 1}</TableCell>
                     <TableCell className="px-6 py-4 text-gray-700">{item.category}</TableCell>
                     <TableCell className="px-6 py-4 text-gray-700">{item.date}</TableCell>
                     <TableCell className="px-6 py-4 text-gray-700">
@@ -613,9 +643,9 @@ const ManagerExpenseManagement = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredExpenses.map((expense, index) => (
+                {paginatedExpenses.map((expense, index) => (
                   <TableRow key={expense.id} className="border-b border-gray-200 hover:bg-gray-50">
-                    <TableCell className="text-center text-gray-600 px-6 py-4">{index + 1}</TableCell>
+                    <TableCell className="text-center text-gray-600 px-6 py-4">{(currentPage - 1) * pageSize + index + 1}</TableCell>
                     <TableCell className="px-6 py-4">
                       <div className="flex items-center gap-3">
                         <div
@@ -686,22 +716,32 @@ const ManagerExpenseManagement = () => {
         </div>
       )}
 
-      <div className="flex items-center justify-between text-sm text-gray-600">
-        <span>
-          Showing {activeTab === 'my' ? myExpenses.length : filteredExpenses.length} of {activeTab === 'my' ? myExpenses.length : expenses.length} expenses
-        </span>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" disabled>
-            Previous
-          </Button>
-          <Button variant="outline" size="sm" className="bg-blue-50 text-blue-600">
-            1
-          </Button>
-          <Button variant="outline" size="sm" disabled>
-            Next
-          </Button>
-        </div>
-      </div>
+      {/* Pagination Controls */}
+      {activeTab === 'my' ? (
+        myExpenses.length > 0 && (
+          <PaginationControls
+            currentPage={myPagination.currentPage}
+            totalPages={myTotalPages}
+            pageSize={myPagination.pageSize}
+            totalItems={myExpenses.length}
+            onPageChange={myPagination.handlePageChange}
+            onPageSizeChange={myPagination.handlePageSizeChange}
+            pageSizeOptions={[10, 25, 50, 100]}
+          />
+        )
+      ) : (
+        filteredExpenses.length > 0 && (
+          <PaginationControls
+            currentPage={currentPage}
+            totalPages={totalPages}
+            pageSize={pageSize}
+            totalItems={filteredExpenses.length}
+            onPageChange={handlePageChange}
+            onPageSizeChange={handlePageSizeChange}
+            pageSizeOptions={[10, 25, 50, 100]}
+          />
+        )
+      )}
 
       <Dialog open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
         <DialogContent className="bg-white rounded-xl shadow-lg border border-gray-200 p-6 max-w-md w-full">

@@ -361,7 +361,7 @@ const [policies, setPolicies] = useState([]); // policies grouped by cat
               className="flex items-center gap-2 bg-gradient-to-r from-green-500 to-emerald-600 text-white px-6 py-3 rounded-lg hover:from-green-600 hover:to-emerald-700 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
             >
               <Settings className="h-5 w-5" />
-              Manage Categories
+              Add Categories
             </button>
           </div>
         )}
@@ -374,7 +374,7 @@ const [policies, setPolicies] = useState([]); // policies grouped by cat
                 <div className="flex items-center gap-3">
                   <div className="w-3 h-3 bg-white rounded-full animate-pulse"></div>
                   <h2 className="text-xl font-bold text-white">
-                    {editingCategory ? 'Edit Category' : 'Manage Categories'}
+                    {editingCategory ? 'Edit Category' : 'Add Categories'}
                   </h2>
                 </div>
                 <button

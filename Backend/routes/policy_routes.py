@@ -53,7 +53,7 @@ def check_hr(hr_id: int, db: Session) -> bool:
     if not employee:
         raise HTTPException(status_code=401, detail="HR not found")
 
-    return employee.role == "HR"
+    return employee.role == "HR" or employee.role == "Admin"
 
 @router.get("/categories", response_model=List[PolicyCategoryWithCount])
 def get_categories(

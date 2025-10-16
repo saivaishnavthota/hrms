@@ -292,8 +292,8 @@ async def display_employees(
 
         # Determine HR filter logic
         filter_hr_id = None
-        if current_user.role == "HR":
-            if getattr(current_user, "super_hr", False):
+        if current_user.role == "HR" or current_user.role == "Admin":
+            if getattr(current_user, "super_hr", False) or current_user.role == "Admin":
                 # Super-HR can filter by hr_id if given
                 filter_hr_id = hr_id
             else:

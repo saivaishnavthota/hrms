@@ -49,7 +49,7 @@ const ManagerEmployeeAttendance = ({ viewOnly = false }) => {
         setAttendanceRecords(transformData(response.data));
       } catch (error) {
         console.error('Error fetching attendance:', error);
-        setError(`Failed to fetch attendance records: ${error.message}. Please try again.`);
+        // setError(`Failed to fetch attendance records: ${error.message}. Please try again.`);
         setAttendanceRecords([]);
       }
     };

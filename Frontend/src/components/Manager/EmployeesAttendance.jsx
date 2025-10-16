@@ -3,6 +3,8 @@ import { User, Eye, X, Search, CheckCircle, Home, CalendarDays } from 'lucide-re
 import { avatarBg } from '../../lib/avatarColors';
 import api from '@/lib/api';
 import { toast } from 'react-toastify';
+import { PaginationControls, usePagination } from '@/components/ui/pagination-controls';
+import PageSizeSelect from '@/components/ui/page-size-select';
 
 const ManagerEmployeeAttendance = () => {
   const [attendanceRecords, setAttendanceRecords] = useState([]);
@@ -17,6 +19,17 @@ const ManagerEmployeeAttendance = () => {
   const [month, setMonth] = useState(new Date().getMonth() + 1); // Default to current month (10 for October)
   const [userId, setUserId] = useState(null);
   const [error, setError] = useState(null);
+
+  // Pagination state
+  const {
+    currentPage,
+    pageSize,
+    handlePageChange,
+    handlePageSizeChange,
+    getPaginatedData,
+    getTotalPages,
+    resetPagination,
+  } = usePagination(10);
 
   // Fetch userId from localStorage on component mount
   useEffect(() => {
@@ -41,7 +54,7 @@ const ManagerEmployeeAttendance = () => {
         setAttendanceRecords(transformData(response.data));
       } catch (error) {
         console.error('Error fetching attendance:', error);
-        toast.error(`Failed to fetch attendance records: ${error.message}. Please try again.`);
+        // toast.error(`Failed to fetch attendance records: ${error.message}. Please try again.`);
         setAttendanceRecords([]);
       }
     };
@@ -104,6 +117,11 @@ const ManagerEmployeeAttendance = () => {
     const matchesRole = roleFilter === 'all' || record.role === roleFilter;
     return matchesSearch && matchesType && matchesRole;
   });
+
+  // Reset pagination on data or filter changes
+  useEffect(() => {
+    resetPagination();
+  }, [attendanceRecords, searchTerm, typeFilter, roleFilter, year, month]);
 
   const getCounts = (records) => {
     let present = 0, wfh = 0, leave = 0;
@@ -257,6 +275,11 @@ const ManagerEmployeeAttendance = () => {
                   <option value="Employee">Employee</option>
                   <option value="Manager">Manager</option>
                 </select>
+                <PageSizeSelect
+                  pageSize={pageSize}
+                  onChange={handlePageSizeChange}
+                  options={[10, 20, 30, 40, 50]}
+                />
               </div>
             </div>
           </div>
@@ -276,7 +299,7 @@ const ManagerEmployeeAttendance = () => {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {filteredRecords.map((record) => (
+                {getPaginatedData(filteredRecords).map((record) => (
                   <tr key={record.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center gap-3">
@@ -352,6 +375,19 @@ const ManagerEmployeeAttendance = () => {
                 </p>
               </div>
             )}
+            {/* Bottom-right pagination */}
+            <PaginationControls
+              className="mt-3 px-6"
+              align="right"
+              hideInfo={true}
+              hidePageSize={true}
+              currentPage={currentPage}
+              totalPages={getTotalPages(filteredRecords.length)}
+              pageSize={pageSize}
+              totalItems={filteredRecords.length}
+              onPageChange={handlePageChange}
+              onPageSizeChange={handlePageSizeChange}
+            />
           </div>
         </div>
       </div>

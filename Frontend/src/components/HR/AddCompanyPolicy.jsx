@@ -12,8 +12,7 @@ import {
   Edit,
   Trash2,
   Download,
-  Settings,
-  Palette
+  Settings
 } from 'lucide-react';
 import { policiesAPI, locationsAPI, categoriesAPI } from '@/lib/api';
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion";
@@ -39,9 +38,7 @@ const [policies, setPolicies] = useState([]); // policies grouped by cat
 
   // Form state for categories
   const [categoryFormData, setCategoryFormData] = useState({
-    name: '',
-    color: '#000000',
-    icon: '📄'
+    name: ''
   });
 
   // Assume hr_id is stored in localStorage after login
@@ -90,8 +87,14 @@ const [policies, setPolicies] = useState([]); // policies grouped by cat
   setLoading(true);
   try {
     const response = await policiesAPI.getPoliciesByLocation(selectedLocation, userIdObj);
-    // Assuming response.categories is already grouped by category
-    setPolicies(response.categories || []);
+    // Sort policies within each category by created_at DESC (newest first)
+    const sortedCategories = (response.categories || []).map((cat) => ({
+      ...cat,
+      policies: (cat.policies || [])
+        .slice()
+        .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+    }));
+    setPolicies(sortedCategories);
   } catch (error) {
     console.error('Error fetching policies:', error);
     toast.error(error.response?.data?.detail || 'Failed to fetch policies');
@@ -169,7 +172,7 @@ const [policies, setPolicies] = useState([]); // policies grouped by cat
 
   const handleCategorySubmit = async (e) => {
     e.preventDefault();
-    if (!categoryFormData.name || !categoryFormData.color || !categoryFormData.icon) {
+    if (!categoryFormData.name) {
       toast.error('Please fill in all required fields');
       return;
     }
@@ -181,10 +184,10 @@ const [policies, setPolicies] = useState([]); // policies grouped by cat
     setLoading(true);
     try {
       if (editingCategory) {
-        await categoriesAPI.updateCategory(editingCategory.id, categoryFormData, hrId);
+        await categoriesAPI.updateCategory(editingCategory.id, { name: categoryFormData.name }, hrId);
         toast.success('Category updated successfully!');
       } else {
-        await categoriesAPI.createCategory(categoryFormData, hrId);
+        await categoriesAPI.createCategory({ name: categoryFormData.name }, hrId);
         toast.success('Category created successfully!');
       }
       resetCategoryForm();
@@ -212,9 +215,7 @@ const [policies, setPolicies] = useState([]); // policies grouped by cat
   const handleEditCategory = (category) => {
     setEditingCategory(category);
     setCategoryFormData({
-      name: category.name,
-      color: category.color,
-      icon: category.icon
+      name: category.name
     });
     setShowCategoryForm(true);
   };
@@ -281,9 +282,7 @@ const [policies, setPolicies] = useState([]); // policies grouped by cat
 
   const resetCategoryForm = () => {
     setCategoryFormData({
-      name: '',
-      color: '#000000',
-      icon: '📄'
+      name: ''
     });
     setEditingCategory(null);
     setShowCategoryForm(false);
@@ -316,7 +315,7 @@ const [policies, setPolicies] = useState([]); // policies grouped by cat
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
             Company Policies Management
           </h1>
           <p className="text-gray-600 dark:text-gray-400">
@@ -397,43 +396,6 @@ const [policies, setPolicies] = useState([]); // policies grouped by cat
                       onChange={handleCategoryInputChange}
                       required
                       placeholder="Enter category name"
-                      className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      Color *
-                    </label>
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="color"
-                        name="color"
-                        value={categoryFormData.color}
-                        onChange={handleCategoryInputChange}
-                        required
-                        className="w-12 h-12 p-1 border border-gray-300 dark:border-gray-600 rounded-lg"
-                      />
-                      <input
-                        type="text"
-                        name="color"
-                        value={categoryFormData.color}
-                        onChange={handleCategoryInputChange}
-                        placeholder="#000000"
-                        className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      />
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      Icon *
-                    </label>
-                    <input
-                      type="text"
-                      name="icon"
-                      value={categoryFormData.icon}
-                      onChange={handleCategoryInputChange}
-                      required
-                      placeholder="Enter emoji or icon (e.g., 📄)"
                       className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     />
                   </div>

@@ -31,7 +31,7 @@ export const MENU_SIDEBAR_ADMIN = [
     path: '/admin/employee-management',
   },
   {
-    title: 'Onboarding',
+    title: 'Onboarding Employees',
     icon: UserPlus,
     path: '/admin/onboarding-employees',
   },
@@ -61,7 +61,7 @@ export const MENU_SIDEBAR_ADMIN = [
     path: '/admin/document-collection',
   },
   {
-    title: 'Projects',
+    title: 'View Projects',
     icon: Briefcase,
     path: '/admin/view-projects',
   },
@@ -103,7 +103,7 @@ export const MENU_SIDEBAR_ADMIN = [
   },
   // Configuration Section
   {
-    title: 'HR Configuration',
+    title: 'HR Config',
     icon: Settings,
     path: '/admin/hr-config',
   },

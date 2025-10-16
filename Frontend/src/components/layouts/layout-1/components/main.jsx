@@ -7,6 +7,7 @@ import { Header } from './header';
 import { Footer } from './footer';
 import { Navbar } from '@/components/layouts/layout-1/shared/navbar/navbar';
 import { NavbarMenu } from '@/components/layouts/layout-1/shared/navbar/navbar-menu';
+import { MENU_SIDEBAR_ADMIN } from '@/config/admin-layout.config';
 import {
   Users,
   FileText,
@@ -35,7 +36,8 @@ export function Main({ menu }) {
   const isAccountManager = pathname.startsWith('/account-manager');
   const isSuperHRPath = pathname.startsWith('/super-hr');
   const isITSupporter = pathname.startsWith('/it-supporter') || pathname.startsWith('/it-supporter-demo');
-  const showTopNavbar = isHR || isSuperHRPath || isEmployee || isIntern || isManager || isAccountManager || isITSupporter;
+  const isAdmin = pathname.startsWith('/admin');
+  const showTopNavbar = isHR || isSuperHRPath || isEmployee || isIntern || isManager || isAccountManager || isITSupporter || isAdmin;
   const showSidebar = !showTopNavbar && !isMobile; // remove sidebar for HR + other roles including IT Supporter
   const [activeParent, setActiveParent] = useState(null);
 
@@ -109,6 +111,39 @@ export function Main({ menu }) {
     { label: 'MANAGEMENT & ANALYTICS', items: MANAGEMENT_ANALYTICS },
   ];
 
+  // Admin grouped navbar using Admin menu config, EXACTLY two sections like HR
+  const findAdminItem = (title) => MENU_SIDEBAR_ADMIN.find((i) => i.title === title);
+  const ADMIN_EMPLOYEE_OPERATIONS = [
+    findAdminItem('Employee Management'),
+    findAdminItem('Onboarding Employees'),
+    findAdminItem('Document Collection'),
+    findAdminItem('Assign Leaves'),
+    findAdminItem('Company Policies'),
+  ].filter(Boolean);
+
+  // Merge Admin’s management and IT items into a single second section
+  const ADMIN_MANAGEMENT_ANALYTICS = [
+    findAdminItem('Dashboard'),
+    findAdminItem('Leave Requests'),
+    findAdminItem('Expense Management'),
+    findAdminItem('Employee Attendance'),
+    findAdminItem('Holidays'),
+    findAdminItem('View Projects'),
+    // IT items appended to match two-section structure
+    findAdminItem('Assets'),
+    findAdminItem('Vendors'),
+    findAdminItem('Allocations'),
+    findAdminItem('Maintenance'),
+    findAdminItem('Software Requests'),
+    // Config last
+    findAdminItem('HR Config'),
+  ].filter(Boolean);
+
+  const ADMIN_GROUPS = [
+    { label: 'EMPLOYEE OPERATIONS', items: ADMIN_EMPLOYEE_OPERATIONS },
+    { label: 'MANAGEMENT & ANALYTICS', items: ADMIN_MANAGEMENT_ANALYTICS },
+  ];
+
   const renderSubNavbar = () => {
     if (!activeParent?.children?.length) return null;
     return (
@@ -128,15 +163,15 @@ export function Main({ menu }) {
       <div className="wrapper flex grow flex-col">
         <Header menu={menu} />
 
-        {/* HR Top Navbar with labels */}
-        {(isHR || isSuperHRPath) && (
+        {/* HR/Super HR/Admin Top Navbar with labels */}
+        {(isHR || isSuperHRPath || isAdmin) && (
           <div className="max-w-8xl mx-auto px-4 sm:px-6 lg:px-8">
             <Navbar>
               <div className="flex flex-col gap-1">
-                {GROUPS.map((group, idx) => (
+                {(isAdmin ? ADMIN_GROUPS : GROUPS).map((group, idx) => (
                   <div
                     key={idx}
-                    className="flex space-x-6 overflow-x-auto scrollbar-hide py-2 border-b border-gray-100 w-full"
+                    className={`flex ${isAdmin ? 'flex-wrap gap-x-6 gap-y-2' : 'space-x-6 overflow-x-auto scrollbar-hide'} py-2 border-b border-gray-100 w-full`}
                   >
                     <div className="flex items-center">
                       <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
@@ -157,7 +192,7 @@ export function Main({ menu }) {
         )}
 
         {/* Non-HR roles top navbar: single line, no labels */}
-        {!isHR && (isEmployee || isIntern || isManager || isAccountManager || isITSupporter) && (
+        {!isHR && !isAdmin && (isEmployee || isIntern || isManager || isAccountManager || isITSupporter) && (
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <Navbar>
               <div className="flex space-x-6 overflow-x-auto scrollbar-hide py-2 border-b border-gray-100 w-full">
@@ -175,9 +210,10 @@ export function Main({ menu }) {
         {/* Sub Navbar for children (e.g., Leave Management) */}
         {showTopNavbar && renderSubNavbar()}
 
+        {/* Main content: remove extra left space for Admin */}
         <main className="grow pt-5 bg-gray-50" role="content">
           {showTopNavbar ? (
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className={`${isAdmin ? 'max-w-8xl mx-auto px-0 sm:px-0 lg:px-0' : 'max-w-7xl mx-auto px-4 sm:px-6 lg:px-8'}`}>
               <Outlet />
             </div>
           ) : (

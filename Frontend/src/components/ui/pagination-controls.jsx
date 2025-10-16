@@ -21,8 +21,11 @@ export function PaginationControls({
   totalItems = 0,
   onPageChange,
   onPageSizeChange,
-  pageSizeOptions = [10, 25, 50, 100],
-  className = ''
+  pageSizeOptions = [10, 20, 30, 40, 50],
+  className = '',
+  hideInfo = false,
+  hidePageSize = false,
+  align = 'between' // 'left' | 'right' | 'between'
 }) {
   const startItem = totalItems === 0 ? 0 : (currentPage - 1) * pageSize + 1;
   const endItem = Math.min(currentPage * pageSize, totalItems);
@@ -88,35 +91,42 @@ export function PaginationControls({
     return pages;
   };
 
+  const justifyClass = align === 'right' ? 'justify-end' : align === 'left' ? 'justify-start' : 'justify-between';
+
   return (
-    <div className={`flex flex-col sm:flex-row items-center justify-between gap-4 py-4 ${className}`}>
+    <div className={`flex flex-col sm:flex-row items-center ${justifyClass} gap-4 py-4 ${className}`}>
       {/* Left side: Items info and page size selector */}
-      <div className="flex items-center gap-4">
-        <div className="text-sm text-gray-600">
-          Showing <span className="font-medium">{startItem}</span> to{' '}
-          <span className="font-medium">{endItem}</span> of{' '}
-          <span className="font-medium">{totalItems}</span> results
+      {(!hideInfo || !hidePageSize) && (
+        <div className="flex items-center gap-4">
+          {!hideInfo && (
+            <div className="text-sm text-gray-600">
+              Showing <span className="font-medium">{startItem}</span> to{' '}
+              <span className="font-medium">{endItem}</span> of{' '}
+              <span className="font-medium">{totalItems}</span> results
+            </div>
+          )}
+          {!hidePageSize && (
+            <div className="flex items-center gap-2">
+              <label htmlFor="pageSize" className="text-sm text-gray-600">
+                Show:
+              </label>
+              <select
+                id="pageSize"
+                value={pageSize}
+                onChange={handlePageSizeChange}
+                className="px-2 py-1 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                {pageSizeOptions.map((size) => (
+                  <option key={size} value={size}>
+                    {size}
+                  </option>
+                ))}
+              </select>
+              <span className="text-sm text-gray-600">per page</span>
+            </div>
+          )}
         </div>
-        
-        <div className="flex items-center gap-2">
-          <label htmlFor="pageSize" className="text-sm text-gray-600">
-            Show:
-          </label>
-          <select
-            id="pageSize"
-            value={pageSize}
-            onChange={handlePageSizeChange}
-            className="px-2 py-1 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            {pageSizeOptions.map((size) => (
-              <option key={size} value={size}>
-                {size}
-              </option>
-            ))}
-          </select>
-          <span className="text-sm text-gray-600">per page</span>
-        </div>
-      </div>
+      )}
 
       {/* Right side: Pagination controls */}
       <div className="flex items-center gap-1">

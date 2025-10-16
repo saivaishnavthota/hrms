@@ -16,6 +16,8 @@ import { Input } from '@/components/ui/input';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import * as XLSX from 'xlsx';
+import { PaginationControls, usePagination } from '@/components/ui/pagination-controls';
+import PageSizeSelect from '@/components/ui/page-size-select';
 
 const AdminExpenseManagement = () => {
   const [expenses, setExpenses] = useState([]);
@@ -23,6 +25,15 @@ const AdminExpenseManagement = () => {
   const [loading, setLoading] = useState(false);
   const [statusFilter, setStatusFilter] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
+  const {
+    currentPage,
+    pageSize,
+    handlePageChange,
+    handlePageSizeChange,
+    getPaginatedData,
+    getTotalPages,
+    resetPagination,
+  } = usePagination(10);
 
   useEffect(() => {
     fetchExpenses();
@@ -61,6 +72,11 @@ const AdminExpenseManagement = () => {
     );
     setFilteredExpenses(filtered);
   };
+
+  useEffect(() => {
+    // Reset to first page when filters/search change
+    resetPagination();
+  }, [statusFilter, searchTerm, expenses]);
 
   const getStatusColor = (status) => {
     if (!status) return 'secondary';
@@ -131,6 +147,9 @@ const AdminExpenseManagement = () => {
   const pendingCount = expenses.filter(e => e.status?.toLowerCase().includes('pending')).length;
   const approvedCount = expenses.filter(e => e.status?.toLowerCase() === 'approved').length;
   const rejectedCount = expenses.filter(e => e.status?.toLowerCase().includes('rejected')).length;
+
+  const paginatedData = getPaginatedData(filteredExpenses);
+  const totalPages = getTotalPages(filteredExpenses.length);
 
   return (
     <div className="min-h-screen bg-gray-50 p-6">
@@ -227,6 +246,15 @@ const AdminExpenseManagement = () => {
             />
           </div>
 
+          {/* Top-right page size selector */}
+          <div className="flex justify-end mb-2">
+            <PageSizeSelect
+              pageSize={pageSize}
+              onChange={handlePageSizeChange}
+              options={[10, 20, 30, 40, 50]}
+            />
+          </div>
+
           {/* Table */}
           <div className="rounded-md border">
             <Table>
@@ -251,7 +279,7 @@ const AdminExpenseManagement = () => {
                     <TableCell colSpan={7} className="text-center">No expenses found</TableCell>
                   </TableRow>
                 ) : (
-                  filteredExpenses.map((item) => (
+                  paginatedData.map((item) => (
                     <TableRow key={item.request_id}>
                       <TableCell>{item.request_code}</TableCell>
                       <TableCell>{item.employee_name}</TableCell>
@@ -270,6 +298,20 @@ const AdminExpenseManagement = () => {
               </TableBody>
             </Table>
           </div>
+
+          {/* Bottom-right pagination */}
+          <PaginationControls
+            className="mt-3"
+            align="right"
+            hideInfo={true}
+            hidePageSize={true}
+            currentPage={currentPage}
+            totalPages={totalPages}
+            pageSize={pageSize}
+            totalItems={filteredExpenses.length}
+            onPageChange={handlePageChange}
+            onPageSizeChange={handlePageSizeChange}
+          />
         </div>
       </div>
     </div>

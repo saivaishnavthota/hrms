@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Eye, Trash2, X, FileText, Download, Check, XCircle, User } from 'lucide-react';
 import Swal from 'sweetalert2';
 import { onboardingAPI } from '../../lib/api';
+import { PaginationControls, usePagination } from '@/components/ui/pagination-controls';
+import PageSizeSelect from '@/components/ui/page-size-select';
 
 const OnboardingEmployees = () => {
   console.log("OnboardedEmployees component mounted");
@@ -19,6 +21,17 @@ const OnboardingEmployees = () => {
   const [employeeDetails, setEmployeeDetails] = useState(null);
   const [loadingEmployeeDetails, setLoadingEmployeeDetails] = useState(false);
 
+  // Pagination state
+  const {
+    currentPage,
+    pageSize,
+    handlePageChange,
+    handlePageSizeChange,
+    getPaginatedData,
+    getTotalPages,
+    resetPagination,
+  } = usePagination(10);
+
   // Avatar color generator
   const getAvatarColor = (name) => {
     const colors = [
@@ -32,6 +45,10 @@ const OnboardingEmployees = () => {
   useEffect(() => {
     fetchOnboardedEmployees();
   }, []);
+
+  useEffect(() => {
+    resetPagination();
+  }, [employees]);
 
   // Fetch employees from /onboarding/all
   const fetchOnboardedEmployees = async () => {
@@ -257,6 +274,15 @@ const OnboardingEmployees = () => {
           <h2 className="text-xl font-semibold text-gray-900">Onboarding Employees</h2>
         </div>
 
+        {/* Top-right page size selector */}
+        <div className="flex justify-end px-6 py-2">
+          <PageSizeSelect
+            pageSize={pageSize}
+            onChange={handlePageSizeChange}
+            options={[10, 20, 30, 40, 50]}
+          />
+        </div>
+
         {/* Table */}
         <div className="overflow-x-auto">
           <table className="w-full">
@@ -275,7 +301,7 @@ const OnboardingEmployees = () => {
                 <tr><td colSpan="6" className="px-6 py-8 text-center">Loading...</td></tr>
               ) : employees.length === 0 ? (
                 <tr><td colSpan="6" className="px-6 py-8 text-center">No employees found</td></tr>
-              ) : employees.map(emp => (
+              ) : getPaginatedData(employees).map(emp => (
                 <tr key={emp.id} className="hover:bg-gray-50 transition-colors">
                   <td className="px-6 py-4 whitespace-nowrap flex items-center">
                     <div className={`${getAvatarColor(emp.name)} w-10 h-10 rounded-full flex items-center justify-center text-white font-medium text-sm mr-4`}>
@@ -312,6 +338,19 @@ const OnboardingEmployees = () => {
               ))}
             </tbody>
           </table>
+          {/* Bottom-right pagination */}
+          <PaginationControls
+            className="mt-3 px-6"
+            align="right"
+            hideInfo={true}
+            hidePageSize={true}
+            currentPage={currentPage}
+            totalPages={getTotalPages(employees.length)}
+            pageSize={pageSize}
+            totalItems={employees.length}
+            onPageChange={handlePageChange}
+            onPageSizeChange={handlePageSizeChange}
+          />
         </div>
       </div>
 

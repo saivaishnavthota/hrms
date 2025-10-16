@@ -15,12 +15,23 @@ import { Select } from '@/components/ui/select';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import * as XLSX from 'xlsx';
+import { PaginationControls, usePagination } from '@/components/ui/pagination-controls';
+import PageSizeSelect from '@/components/ui/page-size-select';
 
 const AdminEmployeeAttendance = () => {
   const [attendanceData, setAttendanceData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
+  const {
+    currentPage,
+    pageSize,
+    handlePageChange,
+    handlePageSizeChange,
+    getPaginatedData,
+    getTotalPages,
+    resetPagination,
+  } = usePagination(10);
 
   const months = [
     { value: 1, label: 'January' }, { value: 2, label: 'February' },
@@ -46,7 +57,7 @@ const AdminEmployeeAttendance = () => {
       setAttendanceData(response.data || []);
     } catch (error) {
       console.error('Error fetching attendance:', error);
-      toast.error('Failed to load attendance data');
+      // toast.error('Failed to load attendance data');
     } finally {
       setLoading(false);
     }
@@ -129,6 +140,14 @@ const AdminEmployeeAttendance = () => {
   const totalEmployees = useMemo(() => {
     return new Set(attendanceData.map(att => att.employee_id)).size;
   }, [attendanceData]);
+
+  // Reset pagination on data updates or filter changes
+  useEffect(() => {
+    resetPagination();
+  }, [attendanceData, selectedMonth, selectedYear]);
+
+  const paginatedData = getPaginatedData(attendanceData);
+  const totalPages = getTotalPages(attendanceData.length);
 
   return (
     <div className="min-h-screen bg-gray-50 p-6">
@@ -228,6 +247,15 @@ const AdminEmployeeAttendance = () => {
             </div>
           </div>
 
+          {/* Top-right page size selector */}
+          <div className="flex justify-end mb-2">
+            <PageSizeSelect
+              pageSize={pageSize}
+              onChange={handlePageSizeChange}
+              options={[10, 20, 30, 40, 50]}
+            />
+          </div>
+
           {/* Table */}
           <div className="rounded-md border">
             <Table>
@@ -253,7 +281,7 @@ const AdminEmployeeAttendance = () => {
                     <TableCell colSpan={8} className="text-center">No attendance records found</TableCell>
                   </TableRow>
                 ) : (
-                  attendanceData.map((item, idx) => (
+                  paginatedData.map((item, idx) => (
                     <TableRow key={`${item.employee_id}-${item.date}-${idx}`}>
                       <TableCell>{item.name}</TableCell>
                       <TableCell>{item.email}</TableCell>
@@ -269,6 +297,20 @@ const AdminEmployeeAttendance = () => {
               </TableBody>
             </Table>
           </div>
+
+          {/* Bottom-right pagination */}
+          <PaginationControls
+            className="mt-3"
+            align="right"
+            hideInfo={true}
+            hidePageSize={true}
+            currentPage={currentPage}
+            totalPages={totalPages}
+            pageSize={pageSize}
+            totalItems={attendanceData.length}
+            onPageChange={handlePageChange}
+            onPageSizeChange={handlePageSizeChange}
+          />
         </div>
       </div>
     </div>

@@ -3,6 +3,8 @@ import { toast } from 'react-toastify';
 import api from '@/lib/api';
 
 import { CheckCircle, Clock, AlertCircle, FileText, Eye, Send, X, Download } from 'lucide-react';
+import { PaginationControls, usePagination } from '@/components/ui/pagination-controls';
+import PageSizeSelect from '@/components/ui/page-size-select';
 
 const DocumentCollection = () => {
   const [employeesData, setEmployeesData] = useState([]);
@@ -16,6 +18,17 @@ const DocumentCollection = () => {
   const [showDocumentsModal, setShowDocumentsModal] = useState(false);
   const [showDocumentRequestModal, setShowDocumentRequestModal] = useState(false);
   const [showRequestLogs, setShowRequestLogs] = useState(false);
+
+  // Pagination state
+  const {
+    currentPage,
+    pageSize,
+    handlePageChange,
+    handlePageSizeChange,
+    getPaginatedData,
+    getTotalPages,
+    resetPagination,
+  } = usePagination(10);
 
   // ------------------ API Functions ------------------
   const fetchEmployeesData = async () => {
@@ -41,7 +54,7 @@ const DocumentCollection = () => {
     } catch (error) {
       console.error('Error fetching employees data:', error);
       setEmployeesData([]);
-      toast.error('Failed to fetch employees data');
+      // toast.error('Failed to fetch employees data');
     } finally {
       setLoadingEmployees(false);
     }
@@ -71,7 +84,7 @@ const DocumentCollection = () => {
     } catch (error) {
       console.error('Error fetching employee documents:', error);
       setEmployeeDocuments(getEmptyDocumentsList());
-      toast.error('Failed to fetch employee documents');
+      // toast.error('Failed to fetch employee documents');
     } finally {
       setLoadingDocuments(false);
     }
@@ -146,7 +159,7 @@ const DocumentCollection = () => {
       setRequestLogs(transformedLogs);
     } catch (error) {
       console.error('Error fetching request logs:', error);
-      toast.error('Failed to fetch document request logs');
+      // toast.error('Failed to fetch document request logs');
     }
   };
 
@@ -301,6 +314,11 @@ const DocumentCollection = () => {
     fetchRequestLogs();
   }, []);
 
+  // Reset pagination when employees data changes
+  useEffect(() => {
+    resetPagination();
+  }, [employeesData]);
+
   return (
     <div className="p-6 bg-gray-50 min-h-screen">
       <div className="bg-white rounded-xl shadow-sm border border-gray-200">
@@ -308,7 +326,7 @@ const DocumentCollection = () => {
         <div className="px-6 py-4 border-b border-gray-200">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">Documents Collection</h1>
+              <h1 className="text-xl font-bold text-gray-900">Documents Collection</h1>
               <p className="text-sm text-gray-600 mt-1">Manage employee document uploads and verification</p>
             </div>
             <div className="flex items-center space-x-3">
@@ -358,6 +376,15 @@ const DocumentCollection = () => {
           </div>
         )}
 
+        {/* Top-right page size selector */}
+        <div className="flex justify-end px-6 py-2">
+          <PageSizeSelect
+            pageSize={pageSize}
+            onChange={handlePageSizeChange}
+            options={[10, 20, 30, 40, 50]}
+          />
+        </div>
+
         {/* Table */}
         <div className="overflow-x-auto">
           {loadingEmployees ? (
@@ -390,7 +417,7 @@ const DocumentCollection = () => {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {employeesData.map((employee) => (
+                {getPaginatedData(employeesData).map((employee) => (
                   <tr key={employee.id} className="hover:bg-gray-50 transition-colors">
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
@@ -456,6 +483,19 @@ const DocumentCollection = () => {
               </tbody>
             </table>
           )}
+          {/* Bottom-right pagination */}
+          <PaginationControls
+            className="mt-3 px-6"
+            align="right"
+            hideInfo={true}
+            hidePageSize={true}
+            currentPage={currentPage}
+            totalPages={getTotalPages(employeesData.length)}
+            pageSize={pageSize}
+            totalItems={employeesData.length}
+            onPageChange={handlePageChange}
+            onPageSizeChange={handlePageSizeChange}
+          />
         </div>
 
         {/* Empty State */}

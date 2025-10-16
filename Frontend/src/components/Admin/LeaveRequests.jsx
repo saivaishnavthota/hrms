@@ -16,6 +16,8 @@ import { Input } from '@/components/ui/input';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import * as XLSX from 'xlsx';
+import { PaginationControls, usePagination } from '@/components/ui/pagination-controls';
+import PageSizeSelect from '@/components/ui/page-size-select';
 
 const AdminLeaveRequests = () => {
   const [leaveRequests, setLeaveRequests] = useState([]);
@@ -23,6 +25,15 @@ const AdminLeaveRequests = () => {
   const [loading, setLoading] = useState(false);
   const [statusFilter, setStatusFilter] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
+  const {
+    currentPage,
+    pageSize,
+    handlePageChange,
+    handlePageSizeChange,
+    getPaginatedData,
+    getTotalPages,
+    resetPagination,
+  } = usePagination(10);
 
   useEffect(() => {
     fetchLeaveRequests();
@@ -60,6 +71,11 @@ const AdminLeaveRequests = () => {
     );
     setFilteredRequests(filtered);
   };
+
+  useEffect(() => {
+    // Reset to first page when filters/search change
+    resetPagination();
+  }, [statusFilter, searchTerm, leaveRequests]);
 
   const getStatusColor = (status) => {
     if (!status) return 'secondary';
@@ -131,6 +147,9 @@ const AdminLeaveRequests = () => {
   const rejectedCount = leaveRequests.filter(
     r => r.manager_status === 'Rejected' || r.hr_status === 'Rejected'
   ).length;
+
+  const paginatedData = getPaginatedData(filteredRequests);
+  const totalPages = getTotalPages(filteredRequests.length);
 
   return (
     <div className="min-h-screen bg-gray-50 p-6">
@@ -217,6 +236,15 @@ const AdminLeaveRequests = () => {
             />
           </div>
 
+          {/* Top-right page size selector */}
+          <div className="flex justify-end mb-2">
+            <PageSizeSelect
+              pageSize={pageSize}
+              onChange={handlePageSizeChange}
+              options={[10, 20, 30, 40, 50]}
+            />
+          </div>
+
           {/* Table */}
           <div className="rounded-md border">
             <Table>
@@ -241,7 +269,7 @@ const AdminLeaveRequests = () => {
                     <TableCell colSpan={7} className="text-center">No leave requests found</TableCell>
                   </TableRow>
                 ) : (
-                  filteredRequests.map((item) => (
+                  paginatedData.map((item) => (
                     <TableRow key={item.id}>
                       <TableCell>{item.employee_name}</TableCell>
                       <TableCell>{item.leave_type}</TableCell>
@@ -264,6 +292,20 @@ const AdminLeaveRequests = () => {
               </TableBody>
             </Table>
           </div>
+
+          {/* Bottom-right pagination */}
+          <PaginationControls
+            className="mt-3"
+            align="right"
+            hideInfo={true}
+            hidePageSize={true}
+            currentPage={currentPage}
+            totalPages={totalPages}
+            pageSize={pageSize}
+            totalItems={filteredRequests.length}
+            onPageChange={handlePageChange}
+            onPageSizeChange={handlePageSizeChange}
+          />
         </div>
       </div>
     </div>

@@ -13,6 +13,7 @@ import { toast } from 'react-toastify' ;
 import api from '../../lib/api';
 import { useUser } from '@/contexts/UserContext';
 import { PaginationControls, usePagination } from '@/components/ui/pagination-controls';
+import PageSizeSelect from '@/components/ui/page-size-select';
 
 const getAvatarColor = (name) => {
   const colors = [
@@ -335,7 +336,7 @@ const EmployeeManagement = () => {
     <div className="min-h-screen p-6">
       <div className="max-w-7xl mx-auto space-y-6">
         <div className="flex items-center justify-between">
-          <h1 className="text-3xl font-bold text-gray-900">Employee Management</h1>
+          <h1 className="text-2xl font-bold text-gray-900">Employee Management</h1>
           {isSuperHR && (
             <button 
               onClick={() => setIsModalOpen(true)}
@@ -433,6 +434,14 @@ const EmployeeManagement = () => {
 
         {!loading && !error && (
           <div className="bg-white rounded-lg shadow overflow-hidden">
+            {/* Top-right page size selector */}
+            <div className="flex justify-end p-3">
+              <PageSizeSelect
+                pageSize={pageSize}
+                onChange={handlePageSizeChange}
+                options={[10, 20, 30, 40, 50]}
+              />
+            </div>
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead className="bg-gray-50 border-b border-gray-200">
@@ -526,13 +535,16 @@ const EmployeeManagement = () => {
               {/* Pagination Controls */}
               {!loading && !error && filteredEmployees.length > 0 && (
                 <PaginationControls
+                  className="mt-2"
+                  align="right"
+                  hideInfo={true}
+                  hidePageSize={true}
                   currentPage={currentPage}
                   totalPages={totalPages}
                   pageSize={pageSize}
                   totalItems={filteredEmployees.length}
                   onPageChange={handlePageChange}
                   onPageSizeChange={handlePageSizeChange}
-                  pageSizeOptions={[10, 25, 50, 100]}
                 />
               )}
             </div>
@@ -658,9 +670,9 @@ const EmployeeManagement = () => {
         )}
 
         {isEditModalOpen && selectedEmployee && (
-          <div className="fixed inset-0 bg-transparent backdrop-blur-md flex items-center justify-center z-50 p-4">
-            <div className="bg-gradient-to-br from-white via-blue-50 to-indigo-50 rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto border border-blue-200">
-              <div className="flex items-center justify-between p-6 border-b border-blue-200 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-t-2xl">
+          <div className="fixed inset-0 bg-transparent backdrop-blur-[2px] flex items-center justify-center z-50 p-4">
+            <div className="bg-gradient-to-br from-white via-gray-50 to-blue-50 rounded-xl shadow-2xl max-w-3xl w-full mx-4 max-h-[80vh] overflow-y-auto border border-gray-200">
+              <div className="flex items-center justify-between p-6 border-b border-blue-200 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-t-xl">
                 <div className="flex items-center gap-3">
                   <div className="w-3 h-3 bg-white rounded-full animate-pulse"></div>
                   <h2 className="text-xl font-bold text-white">
@@ -893,9 +905,9 @@ const EmployeeManagement = () => {
         )}
 
         {isViewModalOpen && selectedEmployee && (
-          <div className="fixed inset-0 bg-transparent backdrop-blur-md flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-              <div className="p-6 border-b border-gray-200 flex items-center justify-between">
+          <div className="fixed inset-0 bg-transparent backdrop-blur-[2px] flex items-center justify-center z-50 p-4">
+            <div className="bg-gradient-to-br from-white via-gray-50 to-blue-50 rounded-xl shadow-2xl max-w-3xl w-full mx-4 max-h-[80vh] overflow-y-auto border border-gray-200">
+              <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-gradient-to-r from-gray-600 to-blue-600 rounded-t-xl">
                 <h2 className="text-2xl font-bold text-white">Employee Details</h2>
                 <button
                   onClick={() => setIsViewModalOpen(false)}

@@ -1176,7 +1176,6 @@ const AddAttendance = () => {
                                 <div className="text-xs text-gray-600 flex items-center gap-1">
                                   <Clock className="h-3 w-3" />
                                   {attendanceRecord.hours}h
-                                  {attendanceRecord.hours}h
                                 </div>
                               )}
                               {attendanceRecord.projects && attendanceRecord.projects.length > 0 && (
@@ -1464,7 +1463,7 @@ const AddAttendance = () => {
                             <div key={subIndex} className="flex items-center text-sm text-gray-600">
                               <div className="w-2 h-2 bg-blue-400 rounded-full mr-2"></div>
                               {subtask.name} - {subtask.hours} hours
-                              {subtask.name} - {subtask.hours} hours
+                             
                             </div>
                           ))}
                         </div>

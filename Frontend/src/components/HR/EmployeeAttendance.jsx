@@ -106,11 +106,6 @@ const ManagerEmployeeAttendance = ({ viewOnly = false }) => {
     fetchAttendance();
   }, [userId, year, month]);
 
-  // Reset pagination when data changes
-  useEffect(() => {
-    resetPagination();
-  }, [filteredRecords]);
-
 
   const handleShowProjects = (record) => {
     setSelectedRecord(record);
@@ -139,6 +134,11 @@ const ManagerEmployeeAttendance = ({ viewOnly = false }) => {
     const matchesRole = roleFilter === 'all' || record.role === roleFilter;
     return matchesSearch && matchesType && matchesRole;
   });
+
+  // Reset pagination when filters change
+  useEffect(() => {
+    resetPagination();
+  }, [searchTerm, typeFilter, roleFilter, attendanceRecords.length, resetPagination]);
 
   // Helpers to compute counts
   const getCounts = (records) => {

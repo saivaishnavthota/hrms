@@ -14,8 +14,7 @@ const NavbarMenu = ({ items, onItemWithChildrenClick = () => {} }) => {
 
   const buildRow = (rowItems, isFirstRow = false) => {
     return (
-      <Menubar className="flex w-full justify-center flex-nowrap items-center gap-4 border-none bg-transparent p-0 h-auto">
-        {rowItems.map((item, index) => {
+      <Menubar className="flex w-full justify-start flex-wrap items-center gap-x-4 gap-y-2 border-none bg-transparent p-0 h-auto">        {rowItems.map((item, index) => {
           const active = isActive(item.path) || hasActiveChild(item.children);
           // remove defaultActive behavior across groups; only highlight real active items
 

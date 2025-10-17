@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState, useCallback } from 'react';
 import { LineChart, Line, CartesianGrid, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { 
@@ -242,7 +243,7 @@ const AdminDashboard = () => {
             <circle
               cx="50"
               cy="50"
-              r="35"
+              r="25"
               fill="none"
               stroke="#3b82f6"
               strokeWidth="12"
@@ -252,7 +253,7 @@ const AdminDashboard = () => {
             <circle
               cx="50"
               cy="50"
-              r="35"
+              r="25"
               fill="none"
               stroke="#f59e0b"
               strokeWidth="12"
@@ -262,7 +263,7 @@ const AdminDashboard = () => {
             <circle
               cx="50"
               cy="50"
-              r="35"
+              r="25"
               fill="none"
               stroke="#8b5cf6"
               strokeWidth="12"
@@ -270,7 +271,7 @@ const AdminDashboard = () => {
               strokeDashoffset={`-${Math.round(2 * Math.PI * 35 * ((employeeTypeCounts.total ? (employeeTypeCounts.fullTime + employeeTypeCounts.contract) / employeeTypeCounts.total : 0)))}`}
             />
           </svg>
-          <div className="absolute -right-22 top-0 space-y-2 text-sm">
+          <div className="absolute -right-13 top-0 space-y-2 text-sm">
             <div className="flex items-center gap-2">
               <div className="w-3 h-3 bg-blue-500 rounded"></div>
               <span>Full-time ({employeeTypeCounts.total ? Math.round((employeeTypeCounts.fullTime / employeeTypeCounts.total) * 100) : 0}%)</span>

@@ -1,0 +1,510 @@
+# Microsoft Entra ID Authentication Flow Diagram
+
+## Complete Authentication Flow
+
+================================================================================
+                    MICROSOFT ENTRA ID AUTHENTICATION FLOW
+================================================================================
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                            PHASE 1: INITIATION                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+   ┌─────────┐                  ┌──────────┐                  ┌──────────┐
+   │ Browser │                  │ Frontend │                  │ Backend  │
+   └────┬────┘                  └─────┬────┘                  └────┬─────┘
+        │                              │                            │
+        │  1. User visits login page   │                            │
+        ├─────────────────────────────>│                            │
+        │                              │                            │
+        │  2. User clicks              │                            │
+        │     "Sign in with Microsoft" │                            │
+        ├─────────────────────────────>│                            │
+        │                              │                            │
+        │                              │  3. GET /auth/entra/login  │
+        │                              ├───────────────────────────>│
+        │                              │                            │
+        │                              │  4. Generate auth URL      │
+        │                              │     & state parameter      │
+        │                              │                            │
+        │                              │ 5. Return {auth_url, state}│
+        │                              │<───────────────────────────┤
+        │                              │                            │
+        │  6. Store state in           │                            │
+        │     sessionStorage           │                            │
+        │                              │                            │
+        │  7. window.location.href =   │                            │
+        │     auth_url                 │                            │
+        │<─────────────────────────────┤                            │
+        │                              │                            │
+
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    PHASE 2: MICROSOFT AUTHENTICATION                        │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+   ┌─────────┐                                      ┌─────────────────────┐
+   │ Browser │                                      │ Microsoft Entra ID  │
+   └────┬────┘                                      └──────────┬──────────┘
+        │                                                      │
+        │  8. Redirected to Microsoft login page              │
+        ├────────────────────────────────────────────────────>│
+        │                                                      │
+        │  9. Display Microsoft login form                    │
+        │<────────────────────────────────────────────────────┤
+        │                                                      │
+        │  10. User enters email & password                   │
+        ├────────────────────────────────────────────────────>│
+        │                                                      │
+        │  11. Multi-factor authentication (if enabled)       │
+        │<───────────────────────────────────────────────────>│
+        │                                                      │
+        │  12. User consents to permissions (first time only) │
+        │<───────────────────────────────────────────────────>│
+        │                                                      │
+        │  13. Authentication successful                      │
+        │                                                      │
+        │  14. Redirect to callback URL with:                 │
+        │      - Authorization code                           │
+        │      - State parameter                              │
+        │<────────────────────────────────────────────────────┤
+        │                                                      │
+        │  URL: http://localhost:5173/auth/callback           │
+        │       ?code=AUTH_CODE&state=STATE_VALUE             │
+        │                                                      │
+
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                     PHASE 3: CALLBACK PROCESSING                            │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+   ┌─────────┐              ┌──────────┐              ┌──────────┐
+   │ Browser │              │ Frontend │              │ Backend  │
+   └────┬────┘              └─────┬────┘              └────┬─────┘
+        │                         │                        │
+        │  15. Load /auth/callback│                        │
+        │     component           │                        │
+        ├────────────────────────>│                        │
+        │                         │                        │
+        │                         │  16. Extract code &    │
+        │                         │      state from URL    │
+        │                         │                        │
+        │                         │  17. Validate state    │
+        │                         │      from sessionStorage│
+        │                         │                        │
+        │                         │  18. POST /auth/entra/callback
+        │                         │      Body: {code, state}
+        │                         ├───────────────────────>│
+        │                         │                        │
+
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    PHASE 4: TOKEN EXCHANGE & VALIDATION                     │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+                                          ┌──────────┐         ┌─────────────┐
+                                          │ Backend  │         │ Microsoft   │
+                                          └────┬─────┘         │ Token API   │
+                                               │               └──────┬──────┘
+                                               │                      │
+                                               │  19. Validate state  │
+                                               │                      │
+                                               │  20. Exchange auth code
+                                               │      for tokens      │
+                                               │  POST to Microsoft   │
+                                               │  Token Endpoint      │
+                                               ├─────────────────────>│
+                                               │                      │
+                                               │  21. Return tokens:  │
+                                               │   - access_token     │
+                                               │   - id_token         │
+                                               │   - refresh_token    │
+                                               │<─────────────────────┤
+                                               │                      │
+
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    PHASE 5: USER PROFILE RETRIEVAL                          │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+                                          ┌──────────┐         ┌─────────────┐
+                                          │ Backend  │         │ Microsoft   │
+                                          └────┬─────┘         │ Graph API   │
+                                               │               └──────┬──────┘
+                                               │                      │
+                                               │  22. GET /v1.0/me    │
+                                               │      with Bearer token│
+                                               ├─────────────────────>│
+                                               │                      │
+                                               │  23. Return profile: │
+                                               │   - email           │
+                                               │   - displayName     │
+                                               │   - jobTitle        │
+                                               │   - department      │
+                                               │   - officeLocation  │
+                                               │<─────────────────────┤
+                                               │                      │
+                                               │  24. GET /v1.0/me/   │
+                                               │      manager         │
+                                               ├─────────────────────>│
+                                               │                      │
+                                               │  25. Return manager  │
+                                               │      info (optional) │
+                                               │<─────────────────────┤
+                                               │                      │
+
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                   PHASE 6: USER PROVISIONING IN DATABASE                    │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+                                          ┌──────────┐         ┌──────────────┐
+                                          │ Backend  │         │ PostgreSQL   │
+                                          └────┬─────┘         │   Database   │
+                                               │               └──────┬───────┘
+                                               │                      │
+                                               │  26. Check if user exists
+                                               │      SELECT * FROM employees
+                                               │      WHERE company_email = ?
+                                               ├─────────────────────>│
+                                               │                      │
+                                               │  27. Return user or NULL
+                                               │<─────────────────────┤
+                                               │                      │
+                                               │  IF USER EXISTS:     │
+                                               │  28. Update user     │
+                                               │      UPDATE employees│
+                                               │      SET entra_id = ?,│
+                                               │          job_title = ?,│
+                                               │          department = ?,│
+                                               │          login_status = true│
+                                               │      WHERE id = ?    │
+                                               ├─────────────────────>│
+                                               │                      │
+                                               │  IF USER NOT EXISTS: │
+                                               │  29. Create user     │
+                                               │      INSERT INTO     │
+                                               │      employees       │
+                                               ├─────────────────────>│
+                                               │                      │
+                                               │  30. Return user data│
+                                               │<─────────────────────┤
+                                               │                      │
+
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                   PHASE 7: INTERNAL JWT TOKEN GENERATION                    │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+                                                 ┌──────────┐
+                                                 │ Backend  │
+                                                 └────┬─────┘
+                                                      │
+                                                      │  31. Generate YOUR
+                                                      │      internal JWT
+                                                      │      token using
+                                                      │      create_access_token()
+                                                      │
+                                                      │  Token contains:
+                                                      │  - sub: user email
+                                                      │  - role: user role
+                                                      │  - exp: expiration
+                                                      │
+                                                      │  32. Create UserResponse
+                                                      │      with ALL fields:
+                                                      │      - employeeId
+                                                      │      - name
+                                                      │      - role
+                                                      │      - email
+                                                      │      - company_employee_id
+                                                      │      - access_token
+                                                      │      - onboarding_status
+                                                      │      - login_status
+                                                      │      - type
+                                                      │      - location_id
+                                                      │      - super_hr
+                                                      │      - reassignment
+                                                      │      - message
+                                                      │
+
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    PHASE 8: RESPONSE TO FRONTEND                            │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+   ┌─────────┐              ┌──────────┐              ┌──────────┐
+   │ Browser │              │ Frontend │              │ Backend  │
+   └────┬────┘              └─────┬────┘              └────┬─────┘
+        │                         │                        │
+        │                         │  33. Return UserResponse
+        │                         │<───────────────────────┤
+        │                         │                        │
+        │                         │  {                     │
+        │                         │    access_token,       │
+        │                         │    employeeId,         │
+        │                         │    name,               │
+        │                         │    role,               │
+        │                         │    ...all fields       │
+        │                         │  }                     │
+        │                         │                        │
+        │                         │  34. Store in          │
+        │                         │      localStorage:     │
+        │                         │   - authToken          │
+        │                         │   - userType           │
+        │                         │   - userId             │
+        │                         │   - userData           │
+        │                         │                        │
+        │  35. Show success       │                        │
+        │      message            │                        │
+        │<────────────────────────┤                        │
+        │                         │                        │
+        │                         │  36. Get redirect path │
+        │                         │      based on userType │
+        │                         │                        │
+        │  37. Navigate to        │                        │
+        │      dashboard          │                        │
+        │<────────────────────────┤                        │
+        │                         │                        │
+
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    PHASE 9: AUTHENTICATED ACCESS                            │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+   ┌─────────┐              ┌──────────┐              ┌──────────┐
+   │ Browser │              │ Frontend │              │ Backend  │
+   └────┬────┘              └─────┬────┘              └────┬─────┘
+        │                         │                        │
+        │  38. Access protected   │                        │
+        │      routes             │                        │
+        ├────────────────────────>│                        │
+        │                         │                        │
+        │                         │  39. API calls with    │
+        │                         │      Authorization:    │
+        │                         │      Bearer {token}    │
+        │                         ├───────────────────────>│
+        │                         │                        │
+        │                         │  40. Verify JWT token  │
+        │                         │      Same as           │
+        │                         │      traditional login │
+        │                         │                        │
+        │                         │  41. Return data       │
+        │                         │<───────────────────────┤
+        │                         │                        │
+        │  42. Display data       │                        │
+        │<────────────────────────┤                        │
+        │                         │                        │
+
+
+================================================================================
+                               KEY COMPONENTS
+================================================================================
+
+┌───────────────────────────────────────────────────────────────────────────┐
+│                          MICROSOFT COMPONENTS                             │
+├───────────────────────────────────────────────────────────────────────────┤
+│                                                                           │
+│  • Microsoft Entra ID (Azure AD)                                          │
+│    - Handles user authentication                                          │
+│    - Issues authorization codes and tokens                                │
+│    - Manages organizational accounts                                      │
+│    - Provides multi-factor authentication                                 │
+│                                                                           │
+│  • Microsoft Graph API                                                    │
+│    - Provides user profile information                                    │
+│    - Returns email, name, job title, department                           │
+│    - Optional: manager info, photo, groups                                │
+│                                                                           │
+│  • Microsoft Token Endpoint                                               │
+│    - Exchanges authorization codes for tokens                             │
+│    - Issues access tokens and refresh tokens                              │
+│                                                                           │
+└───────────────────────────────────────────────────────────────────────────┘
+
+┌───────────────────────────────────────────────────────────────────────────┐
+│                           YOUR COMPONENTS                                 │
+├───────────────────────────────────────────────────────────────────────────┤
+│                                                                           │
+│  Backend:                                                                 │
+│    • entra_service.py - MSAL integration                                  │
+│    • entra_auth_routes.py - API endpoints                                 │
+│    • config.py - Configuration                                            │
+│    • create_access_token() - JWT generation                               │
+│    • PostgreSQL database - User storage                                   │
+│                                                                           │
+│  Frontend:                                                                │
+│    • entraAuthService.js - API client                                     │
+│    • EntraLoginButton.jsx - Login button                                  │
+│    • EntraCallback.jsx - Callback handler                                 │
+│    • Login.jsx - Login page                                               │
+│    • localStorage - Token storage                                         │
+│                                                                           │
+└───────────────────────────────────────────────────────────────────────────┘
+
+
+================================================================================
+                            TOKEN COMPARISON
+================================================================================
+
+┌──────────────────────────────────────────────────────────────────────────┐
+│                        MICROSOFT TOKENS                                  │
+│                        (Backend Only)                                    │
+├──────────────────────────────────────────────────────────────────────────┤
+│                                                                          │
+│  Microsoft Access Token:                                                 │
+│    • Used to call Microsoft Graph API                                    │
+│    • Contains permissions to read user profile                           │
+│    • Valid for 1 hour (typically)                                        │
+│    • NOT sent to frontend                                                │
+│    • Discarded after fetching profile                                    │
+│                                                                          │
+│  Microsoft ID Token:                                                     │
+│    • Contains user claims (email, name, etc.)                            │
+│    • JWT format                                                          │
+│    • Validated by backend                                                │
+│    • NOT sent to frontend                                                │
+│    • Discarded after validation                                          │
+│                                                                          │
+│  Microsoft Refresh Token:                                                │
+│    • Optional, can be used to get new tokens                             │
+│    • Long-lived (months)                                                 │
+│    • Can be stored for future use                                        │
+│                                                                          │
+└──────────────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────────────┐
+│                         YOUR JWT TOKEN                                   │
+│                    (Sent to Frontend)                                    │
+├──────────────────────────────────────────────────────────────────────────┤
+│                                                                          │
+│  Your Internal JWT Token:                                                │
+│    • Generated by create_access_token()                                  │
+│    • Contains: sub (email), role, exp (expiration)                       │
+│    • Valid for 60 minutes                                                │
+│    • SENT to frontend as "access_token"                                  │
+│    • Used for ALL subsequent API calls                                   │
+│    • Same structure as traditional login                                 │
+│    • Validated by your existing middleware                               │
+│                                                                          │
+│  Example:                                                                │
+│    eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.                                 │
+│    eyJzdWIiOiJockBueHplbi5jb20iLCJyb2xlIjoiSFIiLC                          │
+│    JleHAiOjE3NjA2Mjc2NjF9.                                                │
+│    xc-62SXqmV_tnmzLDPc0kLmjUTMAZDKP-cwPtlyYLCI                             │
+│                                                                          │
+└──────────────────────────────────────────────────────────────────────────┘
+
+
+================================================================================
+                          ROLE DETERMINATION
+================================================================================
+
+When a new user logs in via Entra ID, their role is determined by:
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│  Job Title Contains:              →  Assigned Role:                     │
+├─────────────────────────────────────────────────────────────────────────┤
+│  "hr", "human resources"          →  HR                                 │
+│  "manager", "director", "head"    →  Manager                            │
+│  "account manager"                →  Account Manager                    │
+│  "it support", "it admin"         →  ITSupporter                        │
+│  (default)                        →  Employee                           │
+└─────────────────────────────────────────────────────────────────────────┘
+
+This logic is in: Backend/routes/entra_auth_routes.py → determine_user_role()
+
+You can customize this function to match your organization's structure!
+
+
+================================================================================
+                          DATABASE CHANGES
+================================================================================
+
+New fields added to `employees` table:
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│  Field Name       │ Type    │ Description                               │
+├───────────────────┼─────────┼───────────────────────────────────────────┤
+│  entra_id         │ VARCHAR │ Microsoft unique identifier (UUID)        │
+│  job_title        │ VARCHAR │ Job title from Entra ID profile           │
+│  department       │ VARCHAR │ Department from Entra ID profile          │
+│  auth_provider    │ VARCHAR │ 'local' or 'entra'                        │
+└─────────────────────────────────────────────────────────────────────────┘
+
+Index created: UNIQUE INDEX on entra_id for fast lookups
+
+
+================================================================================
+                          SECURITY FEATURES
+================================================================================
+
+✓ CSRF Protection:
+    • State parameter generated and validated
+    • Prevents cross-site request forgery
+
+✓ Secure Token Exchange:
+    • Client secret never exposed to frontend
+    • Authorization code used only once
+
+✓ Token Validation:
+    • Microsoft tokens validated before use
+    • Your JWT tokens validated on each API call
+
+✓ Role-Based Access Control:
+    • User roles preserved from database
+    • Permissions enforced by existing middleware
+
+✓ Audit Trail:
+    • All logins logged
+    • Authentication provider tracked
+
+
+================================================================================
+                          BACKWARD COMPATIBILITY
+================================================================================
+
+  Traditional Login               Entra ID Login
+        ↓                                ↓
+   [Email + Password]           [Microsoft SSO]
+        ↓                                ↓
+   Validate Password            Exchange Auth Code
+        ↓                                ↓
+   Query Database               Query Database
+        ↓                                ↓
+   Generate JWT                 Generate JWT
+        ↓                                ↓
+   ╔═══════════════════════════════════════╗
+   ║     SAME UserResponse Object          ║
+   ║     SAME access_token (JWT)           ║
+   ║     SAME fields and structure         ║
+   ║     SAME API authorization            ║
+   ║     SAME frontend behavior            ║
+   ╚═══════════════════════════════════════╝
+        ↓                                ↓
+   User Dashboard               User Dashboard
+
+
+================================================================================
+                          SUCCESS CRITERIA
+================================================================================
+
+✓ User can click "Sign in with Microsoft"
+✓ User is redirected to Microsoft login
+✓ User enters organizational credentials
+✓ User is redirected back to application
+✓ User is automatically logged in
+✓ User sees their appropriate dashboard
+✓ User's role and permissions are correct
+✓ API calls work with the token
+✓ Traditional login still works
+✓ No errors in console or logs
+
+
+================================================================================
+                          END OF FLOW DIAGRAM
+================================================================================
+
+For implementation instructions, see: ENTRA_ID_QUICK_START.md
+For detailed documentation, see: ENTRA_ID_INTEGRATION_GUIDE.md
+For response comparison, see: ENTRA_ID_RESPONSE_COMPARISON.md
+

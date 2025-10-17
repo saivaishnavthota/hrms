@@ -203,8 +203,8 @@ export const AppRoutingSetup = () => {
         <Route path="my-activity" element={<ITSupporterMyActivity />} />
       </Route>
 
-      {/* Protected Admin routes - Full system access (View Only) */}
-      <Route path="/admin" element={<ProtectedRoute allowedRoles={["Admin"]}><AdminLayoutWrapper /></ProtectedRoute>}>
+      {/* Protected Admin routes - Full system access (View Only) using Layout1 */}
+      <Route path="/admin" element={<ProtectedRoute allowedRoles={["Admin"]}><Layout1 menu={MENU_SIDEBAR_ADMIN} /></ProtectedRoute>}>
         <Route index element={<AdminDashboard />} />
         <Route path="dashboard" element={<AdminDashboard />} />
         {/* HR Features - View Only with Admin-specific routes */}

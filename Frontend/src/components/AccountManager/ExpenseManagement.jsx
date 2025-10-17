@@ -45,6 +45,8 @@ import { useNavigate } from 'react-router-dom';
 import api from '@/lib/api';
 import { avatarBg } from '../../lib/avatarColors';
 import NewExpenseForm from '../Manager/NewExpenseForm';
+import { PaginationControls, usePagination } from '@/components/ui/pagination-controls';
+import PageSizeSelect from '@/components/ui/page-size-select';
 
 // Formatter for INR currency
 const formatINR = (amount) => {
@@ -66,13 +68,25 @@ const AccountManagerExpenseManagement = () => {
   const [myError, setMyError] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
-  const [perPage, setPerPage] = useState('10');
-  const [page, setPage] = useState(1);
   const [selectedExpense, setSelectedExpense] = useState(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [isNewExpenseOpen, setIsNewExpenseOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+
+  // Pagination for pending expenses
+  const {
+    currentPage,
+    pageSize,
+    handlePageChange,
+    handlePageSizeChange,
+    getPaginatedData,
+    getTotalPages,
+    resetPagination
+  } = usePagination(10);
+
+  // Pagination for my expenses
+  const myPagination = usePagination(10);
 
   const now = new Date();
   const year = now.getFullYear();
@@ -394,17 +408,13 @@ const AccountManagerExpenseManagement = () => {
     return filtered;
   }, [expenses, searchTerm, statusFilter]);
 
-  const totalPages = Math.ceil(filteredExpenses.length / Number(perPage));
-  const paginatedExpenses = filteredExpenses.slice(
-    (page - 1) * Number(perPage),
-    page * Number(perPage)
-  );
+  // Use pagination hook for filtered expenses
+  const paginatedExpenses = getPaginatedData(filteredExpenses);
 
-  const handlePageChange = (newPage) => {
-    if (newPage >= 1 && newPage <= totalPages) {
-      setPage(newPage);
-    }
-  };
+  // Reset pagination when filters change
+  useEffect(() => {
+    resetPagination();
+  }, [filteredExpenses, searchTerm, statusFilter]);
 
   const getStatusBadge = (status) => {
     switch ((status || '').toLowerCase()) {
@@ -745,7 +755,7 @@ const AccountManagerExpenseManagement = () => {
                 {paginatedExpenses.map((expense, index) => (
                   <TableRow key={expense.id} className="border-b border-gray-200 hover:bg-gray-50">
                     <TableCell className="text-center text-gray-600 px-6 py-4">
-                      {(page - 1) * Number(perPage) + index + 1}
+                      {(currentPage - 1) * pageSize + index + 1}
                     </TableCell>
                     <TableCell className="px-6 py-4">
                       <div className="flex items-center gap-3">
@@ -810,31 +820,28 @@ const AccountManagerExpenseManagement = () => {
         </div>
       )}
 
-      {activeTab !== 'my' && (
-        <div className="flex items-center justify-between text-sm text-gray-600">
-          <span>Showing {paginatedExpenses.length} of {filteredExpenses.length} expenses</span>
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={page === 1}
-              onClick={() => handlePageChange(page - 1)}
-              aria-label="Previous page"
-            >
-              Previous
-            </Button>
-            <span>Page {page} of {totalPages}</span>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={page === totalPages}
-              onClick={() => handlePageChange(page + 1)}
-              aria-label="Next page"
-            >
-              Next
-            </Button>
+      {activeTab !== 'my' && filteredExpenses.length > 0 && (
+        <>
+          <div className="flex justify-end mb-2">
+            <PageSizeSelect
+              pageSize={pageSize}
+              onChange={handlePageSizeChange}
+              options={[10, 20, 30, 40, 50]}
+            />
           </div>
-        </div>
+          <PaginationControls
+            className="mt-3"
+            align="right"
+            hideInfo={true}
+            hidePageSize={true}
+            currentPage={currentPage}
+            totalPages={getTotalPages(filteredExpenses.length)}
+            pageSize={pageSize}
+            totalItems={filteredExpenses.length}
+            onPageChange={handlePageChange}
+            onPageSizeChange={handlePageSizeChange}
+          />
+        </>
       )}
 
       <Dialog open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>

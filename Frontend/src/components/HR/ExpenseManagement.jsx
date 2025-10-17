@@ -49,6 +49,7 @@ import NewExpenseForm from '../Manager/NewExpenseForm';
 import { toast } from 'react-toastify';
 import api from '@/lib/api';
 import { PaginationControls, usePagination } from '@/components/ui/pagination-controls';
+import PageSizeSelect from '@/components/ui/page-size-select';
 
 const ExpenseManagement = ({ viewOnly = false }) => {
   const { user } = useUser();
@@ -688,22 +689,7 @@ const ExpenseManagement = ({ viewOnly = false }) => {
             Download Excel
           </button>
         </div>
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2 text-sm text-gray-600">
-            <span>Per Page:</span>
-            <Select value={perPage} onValueChange={setPerPage}>
-              <SelectTrigger className="w-16 h-8">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="5">5</SelectItem>
-                <SelectItem value="10">10</SelectItem>
-                <SelectItem value="20">20</SelectItem>
-                <SelectItem value="50">50</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
+        {/* Removed old per-page selector; using PageSizeSelect above each table */}
       </div>
       <div className="mb-2">
         <div className="border-b border-gray-200">
@@ -744,6 +730,10 @@ const ExpenseManagement = ({ viewOnly = false }) => {
 
       {activeTab === 'my' && (
         <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+          <PageSizeSelect
+            pageSize={myPagination.pageSize}
+            onPageSizeChange={myPagination.handlePageSizeChange}
+          />
           {myLoading ? (
             <div className="px-6 py-10 text-center text-gray-600">Loading expenses...</div>
           ) : myError ? (
@@ -945,6 +935,11 @@ const ExpenseManagement = ({ viewOnly = false }) => {
           ) : filteredExpenses.length === 0 ? (
             <div className="px-6 py-4 text-gray-600">No expenses found.</div>
           ) : (
+            <>
+            <PageSizeSelect
+              pageSize={pageSize}
+              onPageSizeChange={handlePageSizeChange}
+            />
             <Table>
               <TableHeader>
                 <TableRow className="bg-gray-50 border-b border-gray-200">
@@ -1036,6 +1031,7 @@ const ExpenseManagement = ({ viewOnly = false }) => {
                 ))}
               </TableBody>
             </Table>
+            </>
           )}
         </div>
       )}
@@ -1050,7 +1046,9 @@ const ExpenseManagement = ({ viewOnly = false }) => {
             totalItems={myExpenses.length}
             onPageChange={myPagination.handlePageChange}
             onPageSizeChange={myPagination.handlePageSizeChange}
-            pageSizeOptions={[10, 25, 50, 100]}
+            align="right"
+            hideInfo
+            hidePageSize
           />
         )
       ) : (
@@ -1062,7 +1060,9 @@ const ExpenseManagement = ({ viewOnly = false }) => {
             totalItems={filteredExpenses.length}
             onPageChange={handlePageChange}
             onPageSizeChange={handlePageSizeChange}
-            pageSizeOptions={[10, 25, 50, 100]}
+            align="right"
+            hideInfo
+            hidePageSize
           />
         )
       )}

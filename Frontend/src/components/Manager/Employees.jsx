@@ -3,6 +3,8 @@ import { Eye, Edit, Plus, X } from 'lucide-react';
 import { avatarBg } from '../../lib/avatarColors';
 import api from '@/lib/api'; 
 import { toast } from 'react-toastify';
+import { PaginationControls, usePagination } from '@/components/ui/pagination-controls';
+import PageSizeSelect from '@/components/ui/page-size-select';
 const getCurrentUser = () => {
   try {
     const userId = localStorage.getItem('userId');
@@ -49,6 +51,17 @@ const ManagerEmployees = () => {
   const [projectsSummaryOpen, setProjectsSummaryOpen] = useState(false);
   const [projectsSummary, setProjectsSummary] = useState({ employeeName: '', projects: [] });
 
+  // Pagination
+  const {
+    currentPage,
+    pageSize,
+    handlePageChange,
+    handlePageSizeChange,
+    getPaginatedData,
+    getTotalPages,
+    resetPagination,
+  } = usePagination(10);
+
    useEffect(() => {
     if (!managerId) return;
 
@@ -92,6 +105,11 @@ const ManagerEmployees = () => {
 
     fetchData();
   }, [managerId]);
+
+  // Reset pagination when data changes
+  useEffect(() => {
+    resetPagination();
+  }, [employees]);
 
   const openView = async (emp) => {
     setSelectedEmployee(emp);
@@ -166,6 +184,16 @@ const ManagerEmployees = () => {
         {/* Removed Add Employee button as requested */}
       </div>
 
+      {!loading && !error && tableRows.length > 0 && (
+        <div className="flex justify-end mb-2">
+          <PageSizeSelect
+            pageSize={pageSize}
+            onChange={handlePageSizeChange}
+            options={[10, 20, 30, 40, 50]}
+          />
+        </div>
+      )}
+
       <div className="mt-4 overflow-x-auto bg-white rounded-lg border border-gray-200">
         <table className="min-w-full">
           <thead>
@@ -195,9 +223,9 @@ const ManagerEmployees = () => {
                 <td className={cellCls} colSpan={5}>No employees found for this manager.</td>
               </tr>
             )}
-            {!loading && !error && tableRows.map((emp) => (
+            {!loading && !error && getPaginatedData(tableRows).map((emp, index) => (
               <tr key={emp.id} className="hover:bg-gray-50">
-                <td className={cellCls}>{emp.sNo}</td>
+                <td className={cellCls}>{(currentPage - 1) * pageSize + index + 1}</td>
                 <td className={cellCls}>
                   <div className="flex items-center gap-3">
                     <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-medium text-sm ${getAvatarColor(emp.name)}`}>
@@ -243,6 +271,21 @@ const ManagerEmployees = () => {
           </tbody>
         </table>
       </div>
+
+      {!loading && !error && tableRows.length > 0 && (
+        <PaginationControls
+          className="mt-3"
+          align="right"
+          hideInfo={true}
+          hidePageSize={true}
+          currentPage={currentPage}
+          totalPages={getTotalPages(tableRows.length)}
+          pageSize={pageSize}
+          totalItems={tableRows.length}
+          onPageChange={handlePageChange}
+          onPageSizeChange={handlePageSizeChange}
+        />
+      )}
 
       {/* View Modal */}
       {viewOpen && selectedEmployee && (

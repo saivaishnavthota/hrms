@@ -17,6 +17,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { avatarBg } from '../../lib/avatarColors';
 import { useNavigate } from 'react-router-dom';
+import { PaginationControls, usePagination } from '@/components/ui/pagination-controls';
+import PageSizeSelect from '@/components/ui/page-size-select';
 
 const SoftwareRequestApproval = () => {
   const [requests, setRequests] = useState([]);
@@ -30,6 +32,17 @@ const SoftwareRequestApproval = () => {
   const currentUser = getCurrentUser();
   const managerId = currentUser?.userId;
   const navigate = useNavigate();
+
+  // Pagination
+  const {
+    currentPage,
+    pageSize,
+    handlePageChange,
+    handlePageSizeChange,
+    getPaginatedData,
+    getTotalPages,
+    resetPagination,
+  } = usePagination(10);
 
   const getAvatarColor = (name) => avatarBg(name);
 
@@ -96,6 +109,11 @@ const SoftwareRequestApproval = () => {
     };
     fetchRequests();
   }, [managerId, navigate]);
+
+  // Reset pagination when data changes
+  useEffect(() => {
+    resetPagination();
+  }, [requests]);
 
   const handleCommentChange = (requestId, value) => {
     setComments((prev) => ({ ...prev, [requestId]: value }));
@@ -182,6 +200,16 @@ const SoftwareRequestApproval = () => {
           <p className="text-gray-600 mt-1">Review and manage pending software requests</p>
         </div>
       </div>
+      {!loading && requests.length > 0 && (
+        <div className="flex justify-end mb-2">
+          <PageSizeSelect
+            pageSize={pageSize}
+            onChange={handlePageSizeChange}
+            options={[10, 20, 30, 40, 50]}
+          />
+        </div>
+      )}
+
       <div className="bg-white rounded-lg shadow-sm border border-gray-200">
         {loading ? (
           <div className="px-6 py-10 text-center text-gray-600">Loading requests...</div>
@@ -203,9 +231,9 @@ const SoftwareRequestApproval = () => {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {requests.map((req) => (
+              {getPaginatedData(requests).map((req, index) => (
                 <TableRow key={req.id} className="border-b border-gray-200 hover:bg-gray-50">
-                  <TableCell className="text-center text-gray-600 px-6 py-4">{req.id}</TableCell>
+                  <TableCell className="text-center text-gray-600 px-6 py-4">{(currentPage - 1) * pageSize + index + 1}</TableCell>
                   <TableCell className="px-6 py-4">
                     <div className="flex items-center gap-3">
                       <div
@@ -271,6 +299,21 @@ const SoftwareRequestApproval = () => {
           </Table>
         )}
       </div>
+
+      {!loading && requests.length > 0 && (
+        <PaginationControls
+          className="mt-3"
+          align="right"
+          hideInfo={true}
+          hidePageSize={true}
+          currentPage={currentPage}
+          totalPages={getTotalPages(requests.length)}
+          pageSize={pageSize}
+          totalItems={requests.length}
+          onPageChange={handlePageChange}
+          onPageSizeChange={handlePageSizeChange}
+        />
+      )}
 
       <Dialog open={answersDialogOpen} onOpenChange={setAnswersDialogOpen}>
         <DialogContent>

@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Eye, Edit, Plus, Trash2, X } from 'lucide-react';
 import { getVendors, createVendor, updateVendor, deleteVendor, getVendorById } from '../../lib/api';
+import { PaginationControls, usePagination } from '@/components/ui/pagination-controls';
+import PageSizeSelect from '@/components/ui/page-size-select';
 
 const vendorTypeOptions = ['Purchased', 'Rental'];
 
@@ -16,6 +18,17 @@ const Vendors = () => {
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
 
+  // Pagination
+  const {
+    currentPage,
+    pageSize,
+    handlePageChange,
+    handlePageSizeChange,
+    getPaginatedData,
+    getTotalPages,
+    resetPagination,
+  } = usePagination(10);
+
   const [formData, setFormData] = useState({
     vendor_name: '',
     vendor_type: vendorTypeOptions[0],
@@ -27,6 +40,11 @@ const Vendors = () => {
   useEffect(() => {
     fetchVendors();
   }, []);
+
+  // Reset pagination when data changes
+  useEffect(() => {
+    resetPagination();
+  }, [vendors]);
 
   const fetchVendors = async () => {
     setLoading(true);
@@ -153,22 +171,30 @@ const Vendors = () => {
         )}
 
         {Array.isArray(vendors) && vendors.length > 0 && (
-          <div className="bg-white rounded-lg shadow-sm overflow-hidden">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">S.No</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Phone</th>
-                  <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {vendors.map((vendor, index) => (
-                  <tr key={vendor.vendor_id} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{index + 1}</td>
+          <>
+            <div className="flex justify-end mb-2">
+              <PageSizeSelect
+                pageSize={pageSize}
+                onChange={handlePageSizeChange}
+                options={[10, 20, 30, 40, 50]}
+              />
+            </div>
+            <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">S.No</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Phone</th>
+                    <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {getPaginatedData(vendors).map((vendor, index) => (
+                    <tr key={vendor.vendor_id} className="hover:bg-gray-50 transition-colors">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{(currentPage - 1) * pageSize + index + 1}</td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="font-medium text-gray-900">{vendor.vendor_name}</div>
                     </td>
@@ -203,10 +229,23 @@ const Vendors = () => {
                       </div>
                     </td>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <PaginationControls
+              className="mt-3"
+              align="right"
+              hideInfo={true}
+              hidePageSize={true}
+              currentPage={currentPage}
+              totalPages={getTotalPages(vendors.length)}
+              pageSize={pageSize}
+              totalItems={vendors.length}
+              onPageChange={handlePageChange}
+              onPageSizeChange={handlePageSizeChange}
+            />
+          </>
         )}
       </div>
 

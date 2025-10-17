@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Eye, Edit, Plus, Trash2, X } from 'lucide-react';
 import { getAssets, getEmployees, getAllocations, createAllocation, updateAllocation, deleteAllocation } from '../../lib/api';
+import { PaginationControls, usePagination } from '@/components/ui/pagination-controls';
+import PageSizeSelect from '@/components/ui/page-size-select';
 
 const display = (val) => (val === undefined || val === null || val === '' ? '-' : val);
 
@@ -43,6 +45,17 @@ const Allocations = () => {
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
 
+  // Pagination
+  const {
+    currentPage,
+    pageSize,
+    handlePageChange,
+    handlePageSizeChange,
+    getPaginatedData,
+    getTotalPages,
+    resetPagination,
+  } = usePagination(10);
+
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
@@ -69,6 +82,11 @@ const Allocations = () => {
     };
     fetchData();
   }, []);
+
+  // Reset pagination when data changes
+  useEffect(() => {
+    resetPagination();
+  }, [allocations]);
 
   const resetForm = () => {
     setFormData({
@@ -256,22 +274,30 @@ const Allocations = () => {
         )}
 
         {allocations.length > 0 && (
-          <div className="bg-white rounded-lg shadow-sm overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">S.No</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Asset</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Employee</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Allocation Date</th>
-                    <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {allocations.map((al, index) => (
-                    <tr key={al.allocation_id} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{index + 1}</td>
+          <>
+            <div className="flex justify-end mb-2">
+              <PageSizeSelect
+                pageSize={pageSize}
+                onChange={handlePageSizeChange}
+                options={[10, 20, 30, 40, 50]}
+              />
+            </div>
+            <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">S.No</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Asset</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Employee</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Allocation Date</th>
+                      <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {getPaginatedData(allocations).map((al, index) => (
+                      <tr key={al.allocation_id} className="hover:bg-gray-50 transition-colors">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{(currentPage - 1) * pageSize + index + 1}</td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="font-medium text-gray-900">
                           {assets.find(a => a.asset_id === al.asset_id)?.asset_name || 'Unknown Asset'}
@@ -307,11 +333,24 @@ const Allocations = () => {
                         </div>
                       </td>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
-          </div>
+            <PaginationControls
+              className="mt-3"
+              align="right"
+              hideInfo={true}
+              hidePageSize={true}
+              currentPage={currentPage}
+              totalPages={getTotalPages(allocations.length)}
+              pageSize={pageSize}
+              totalItems={allocations.length}
+              onPageChange={handlePageChange}
+              onPageSizeChange={handlePageSizeChange}
+            />
+          </>
         )}
 
         {/* Add/Edit Allocation Modal */}

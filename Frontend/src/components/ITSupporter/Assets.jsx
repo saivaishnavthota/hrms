@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Eye, Edit, Plus, Trash2, X } from 'lucide-react';
 import { getAssets, getAssetById, createAsset, updateAsset, deleteAsset, getVendors } from '../../lib/api';
+import { PaginationControls, usePagination } from '@/components/ui/pagination-controls';
+import PageSizeSelect from '@/components/ui/page-size-select';
 
 const statusBadgeClasses = (status) => {
   switch (status) {
@@ -57,6 +59,17 @@ const Assets = () => {
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
 
+  // Pagination
+  const {
+    currentPage,
+    pageSize,
+    handlePageChange,
+    handlePageSizeChange,
+    getPaginatedData,
+    getTotalPages,
+    resetPagination,
+  } = usePagination(10);
+
   const [formData, setFormData] = useState({
     asset_name: '',
     asset_tag: '',
@@ -86,6 +99,11 @@ const Assets = () => {
     fetchAssets();
     fetchVendors();
   }, []);
+
+  // Reset pagination when data changes
+  useEffect(() => {
+    resetPagination();
+  }, [assets]);
 
   const fetchAssets = async () => {
     setLoading(true);
@@ -313,23 +331,31 @@ const Assets = () => {
         )}
 
         {Array.isArray(assets) && assets.length > 0 && (
-          <div className="bg-white rounded-lg shadow overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-50 border-b border-gray-200">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">S.No</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Asset Details</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tag</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                    <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {assets.map((asset, index) => (
+          <>
+            <div className="flex justify-end mb-2">
+              <PageSizeSelect
+                pageSize={pageSize}
+                onChange={handlePageSizeChange}
+                options={[10, 20, 30, 40, 50]}
+              />
+            </div>
+            <div className="bg-white rounded-lg shadow overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-gray-50 border-b border-gray-200">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">S.No</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Asset Details</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tag</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                      <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {getPaginatedData(assets).map((asset, index) => (
                     <tr key={asset.asset_id} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{index + 1}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{(currentPage - 1) * pageSize + index + 1}</td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div>
                           <div className="font-medium text-gray-900">{asset.asset_name}</div>
@@ -375,11 +401,24 @@ const Assets = () => {
                         </div>
                       </td>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
-          </div>
+            <PaginationControls
+              className="mt-3"
+              align="right"
+              hideInfo={true}
+              hidePageSize={true}
+              currentPage={currentPage}
+              totalPages={getTotalPages(assets.length)}
+              pageSize={pageSize}
+              totalItems={assets.length}
+              onPageChange={handlePageChange}
+              onPageSizeChange={handlePageSizeChange}
+            />
+          </>
         )}
 
         {/* Modal: Add/Edit Asset */}

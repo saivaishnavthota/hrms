@@ -22,7 +22,7 @@ export default function OnboardingHeader() {
                 />
               </div>
               <div>
-                <h1 className="text-xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                <h1 className="text-xl font-bold bg-gradient-to-r from-black to-black bg-clip-text text-transparent">
                   Employee Onboarding Portal
                 </h1>
               </div>

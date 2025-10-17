@@ -59,3 +59,38 @@ async def add_location(location: LocationCreate, session: Session = Depends(get_
             status_code=500,
             detail=f"Error adding location: {str(e)}"
         )
+
+@router.put("/{location_id}")
+async def update_location(location_id: int, location: LocationCreate, session: Session = Depends(get_session)):
+    try:
+        with session.connection().connection.cursor() as cur:
+            # Check if location exists
+            cur.execute("SELECT id FROM locations WHERE id = %s", (location_id,))
+            if not cur.fetchone():
+                raise HTTPException(status_code=404, detail="Location not found")
+            
+            # Update location
+            cur.execute(
+                "UPDATE locations SET name = %s WHERE id = %s RETURNING id, name",
+                (location.name, location_id)
+            )
+            result = cur.fetchone()
+            session.commit()
+
+        updated_location = {"id": result[0], "name": result[1]}
+
+        return {
+            "status": "success",
+            "message": "Location updated successfully",
+            "data": updated_location
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        session.rollback()
+        logger.error(f"Error updating location: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error updating location: {str(e)}"
+        )

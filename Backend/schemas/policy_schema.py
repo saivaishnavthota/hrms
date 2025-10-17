@@ -4,16 +4,12 @@ from datetime import datetime
 
 class PolicyCategoryBase(BaseModel):
     name: str
-    color: Optional[str] = '#3B82F6'
-    icon: Optional[str] = '📄'
 
 class PolicyCategoryCreate(PolicyCategoryBase):
     pass
 
-class PolicyCategoryUpdate(PolicyCategoryBase):
+class PolicyCategoryUpdate(BaseModel):
     name: Optional[str] = None
-    color: Optional[str] = None
-    icon: Optional[str] = None
 
 class PolicyCategoryOut(PolicyCategoryBase):
     id: int
@@ -51,8 +47,6 @@ class PolicyOut(PolicyBase):
     updated_at: datetime
     location_name: Optional[str] = None
     category_name: Optional[str] = None
-    category_icon: Optional[str] = None
-    category_color: Optional[str] = None
     uploader_name: Optional[str] = None
 
     class Config:
@@ -61,8 +55,6 @@ class PolicyOut(PolicyBase):
 class PoliciesByCategory(BaseModel):
     category_id: int
     category_name: str
-    category_icon: str
-    category_color: str
     count: int
     policies: List[PolicyOut]
 

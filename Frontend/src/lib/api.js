@@ -423,6 +423,12 @@ export const locationsAPI = {
   addLocation: async (locationData) => {
     const response = await api.post('/locations/', locationData);
     return response.data;
+  },
+
+  // PUT /locations/:id - Update location
+  updateLocation: async (locationId, locationData) => {
+    const response = await api.put(`/locations/${locationId}`, locationData);
+    return response.data;
   }
 };
 

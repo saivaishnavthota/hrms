@@ -711,10 +711,7 @@ const [policies, setPolicies] = useState([]); // policies grouped by cat
                   <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
                     Category
                   </h3>
-                  <div className="flex items-center gap-2">
-                    <span className="text-2xl">{viewingPolicy.category_icon}</span>
-                    <p className="text-gray-600 dark:text-gray-400">{viewingPolicy.category_name}</p>
-                  </div>
+                  <p className="text-gray-600 dark:text-gray-400">{viewingPolicy.category_name}</p>
                 </div>
                 <div>
                   <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">

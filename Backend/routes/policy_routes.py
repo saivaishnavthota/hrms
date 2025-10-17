@@ -63,7 +63,7 @@ def get_categories(
     hr_id: int = Query(None)
 ):
     query = text("""
-        SELECT id, name, color, icon, created_at, updated_at, policy_count
+        SELECT id, name, created_at, updated_at, policy_count
         FROM categories_with_policy_count
         ORDER BY name
     """)
@@ -86,8 +86,6 @@ def create_category(
     # Insert with created_by
     new_category = PolicyCategory(
         name=category.name,
-        color=category.color,
-        icon=category.icon,
         created_by=hr_id
     )
     try:
@@ -164,8 +162,6 @@ def get_policies_by_location(
         SELECT 
             pc.id AS category_id,
             pc.name AS category_name,
-            pc.icon AS category_icon,
-            pc.color AS category_color,
             COALESCE(COUNT(p.id), 0) AS count,
             COALESCE(
                 json_agg(
@@ -182,9 +178,7 @@ def get_policies_by_location(
                         'category_id', p.category_id,
                         'uploader_id', p.uploader_id,
                         'location_name', l.name,
-                        'category_name', pc.name,
-                        'category_icon', pc.icon,
-                        'category_color', pc.color
+                        'category_name', pc.name
                     )
                 ) FILTER (WHERE p.id IS NOT NULL), '[]'
             ) AS policies
@@ -193,7 +187,7 @@ def get_policies_by_location(
             ON pc.id = p.category_id AND p.location_id = :location_id
         LEFT JOIN employees e ON p.uploader_id = e.id
         LEFT JOIN locations l ON p.location_id = l.id
-        GROUP BY pc.id, pc.name, pc.icon, pc.color
+        GROUP BY pc.id, pc.name
         ORDER BY pc.name
     """)
 
@@ -203,8 +197,6 @@ def get_policies_by_location(
             {
                 "category_id": row.category_id,
                 "category_name": row.category_name,
-                "category_icon": row.category_icon,
-                "category_color": row.category_color,
                 "count": row.count,
                 "policies": row.policies
             }

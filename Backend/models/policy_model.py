@@ -6,8 +6,6 @@ class PolicyCategory(SQLModel, table=True):
     __tablename__ = "policy_categories"
     id: Optional[int] = Field(default=None, primary_key=True)
     name: str
-    color: Optional[str] = Field(default="#3B82F6")
-    icon: Optional[str] = Field(default="📄")
     created_by: int = Field(foreign_key="employees.id")
     created_at: datetime = Field(default_factory=datetime.now)
     updated_at: datetime = Field(default_factory=datetime.now)

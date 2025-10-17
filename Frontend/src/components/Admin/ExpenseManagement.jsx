@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { DollarSign, Eye, Filter, FileText, FileSpreadsheet, TrendingUp, Calendar } from 'lucide-react';
+import {  Eye, Filter, FileText, FileSpreadsheet, TrendingUp, Calendar } from 'lucide-react';
 import api from '@/lib/api';
 import { toast } from 'react-toastify';
 import { Button } from '@/components/ui/button';
@@ -16,6 +16,8 @@ import { Input } from '@/components/ui/input';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import * as XLSX from 'xlsx';
+import { PaginationControls, usePagination } from '@/components/ui/pagination-controls';
+import PageSizeSelect from '@/components/ui/page-size-select';
 
 const AdminExpenseManagement = () => {
   const [expenses, setExpenses] = useState([]);
@@ -23,6 +25,15 @@ const AdminExpenseManagement = () => {
   const [loading, setLoading] = useState(false);
   const [statusFilter, setStatusFilter] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
+  const {
+    currentPage,
+    pageSize,
+    handlePageChange,
+    handlePageSizeChange,
+    getPaginatedData,
+    getTotalPages,
+    resetPagination,
+  } = usePagination(10);
 
   useEffect(() => {
     fetchExpenses();
@@ -61,6 +72,11 @@ const AdminExpenseManagement = () => {
     );
     setFilteredExpenses(filtered);
   };
+
+  useEffect(() => {
+    // Reset to first page when filters/search change
+    resetPagination();
+  }, [statusFilter, searchTerm, expenses]);
 
   const getStatusColor = (status) => {
     if (!status) return 'secondary';
@@ -132,6 +148,9 @@ const AdminExpenseManagement = () => {
   const approvedCount = expenses.filter(e => e.status?.toLowerCase() === 'approved').length;
   const rejectedCount = expenses.filter(e => e.status?.toLowerCase().includes('rejected')).length;
 
+  const paginatedData = getPaginatedData(filteredExpenses);
+  const totalPages = getTotalPages(filteredExpenses.length);
+
   return (
     <div className="min-h-screen bg-gray-50 p-6">
       <div className="max-w-7xl mx-auto">
@@ -139,7 +158,7 @@ const AdminExpenseManagement = () => {
           {/* Header */}
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-3">
-              <DollarSign className="h-8 w-8 text-green-600" />
+             
               <div>
                 <h1 className="text-2xl font-bold text-gray-900">Expense Management (Admin View)</h1>
                 <p className="text-sm text-gray-600">View-only access to all employee expenses</p>
@@ -169,7 +188,7 @@ const AdminExpenseManagement = () => {
           <div className="grid grid-cols-5 gap-4 mb-6">
             <div className="bg-blue-50 rounded-lg p-4">
               <div className="flex items-center gap-2 mb-2">
-                <DollarSign className="h-5 w-5 text-blue-600" />
+                
                 <span className="text-sm font-medium text-blue-900">Total Expenses</span>
               </div>
               <p className="text-2xl font-bold text-blue-600">{expenses.length}</p>
@@ -179,7 +198,7 @@ const AdminExpenseManagement = () => {
                 <TrendingUp className="h-5 w-5 text-purple-600" />
                 <span className="text-sm font-medium text-purple-900">Total Amount</span>
               </div>
-              <p className="text-2xl font-bold text-purple-600">${totalAmount.toFixed(2)}</p>
+              <p className="text-2xl font-bold text-purple-600">{totalAmount.toFixed(2)}</p>
             </div>
             <div className="bg-yellow-50 rounded-lg p-4">
               <div className="flex items-center gap-2 mb-2">
@@ -227,6 +246,15 @@ const AdminExpenseManagement = () => {
             />
           </div>
 
+          {/* Top-right page size selector */}
+          <div className="flex justify-end mb-2">
+            <PageSizeSelect
+              pageSize={pageSize}
+              onChange={handlePageSizeChange}
+              options={[10, 20, 30, 40, 50]}
+            />
+          </div>
+
           {/* Table */}
           <div className="rounded-md border">
             <Table>
@@ -251,7 +279,7 @@ const AdminExpenseManagement = () => {
                     <TableCell colSpan={7} className="text-center">No expenses found</TableCell>
                   </TableRow>
                 ) : (
-                  filteredExpenses.map((item) => (
+                  paginatedData.map((item) => (
                     <TableRow key={item.request_id}>
                       <TableCell>{item.request_code}</TableCell>
                       <TableCell>{item.employee_name}</TableCell>
@@ -270,6 +298,20 @@ const AdminExpenseManagement = () => {
               </TableBody>
             </Table>
           </div>
+
+          {/* Bottom-right pagination */}
+          <PaginationControls
+            className="mt-3"
+            align="right"
+            hideInfo={true}
+            hidePageSize={true}
+            currentPage={currentPage}
+            totalPages={totalPages}
+            pageSize={pageSize}
+            totalItems={filteredExpenses.length}
+            onPageChange={handlePageChange}
+            onPageSizeChange={handlePageSizeChange}
+          />
         </div>
       </div>
     </div>

@@ -30,6 +30,8 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog';
+import { PaginationControls, usePagination } from '@/components/ui/pagination-controls';
+import PageSizeSelect from '@/components/ui/page-size-select';
 
 const SoftwareRequest = () => {
   const [requests, setRequests] = useState([]);
@@ -59,6 +61,17 @@ const SoftwareRequest = () => {
 
   const currentUser = getCurrentUser();
   const employeeId = currentUser?.userId;
+
+  // Pagination
+  const {
+    currentPage,
+    pageSize,
+    handlePageChange,
+    handlePageSizeChange,
+    getPaginatedData,
+    getTotalPages,
+    resetPagination,
+  } = usePagination(10);
 
   const formatDate = (iso) => {
     if (!iso) return '';
@@ -266,6 +279,11 @@ const SoftwareRequest = () => {
     return matchesSearch && matchesStatus;
   });
 
+  // Reset pagination when filtered data changes
+  useEffect(() => {
+    resetPagination();
+  }, [filteredRequests.length, searchTerm, statusFilter]);
+
   const getStatusBadge = (status) => {
     switch ((status || '').toLowerCase()) {
       case 'approved':
@@ -352,9 +370,22 @@ const SoftwareRequest = () => {
               </Select>
             </div>
           </div>
+
+          {!loading && filteredRequests.length > 0 && (
+            <div className="flex justify-end mb-2">
+              <PageSizeSelect
+                pageSize={pageSize}
+                onChange={handlePageSizeChange}
+                options={[10, 20, 30, 40, 50]}
+              />
+            </div>
+          )}
+
           <div className="bg-white rounded-lg shadow-sm border border-gray-200">
             {loading ? (
               <div className="px-6 py-10 text-center text-gray-600">Loading requests...</div>
+            ) : filteredRequests.length === 0 ? (
+              <div className="px-6 py-10 text-center text-gray-600">No software requests found.</div>
             ) : (
               <Table>
                 <TableHeader>
@@ -370,9 +401,9 @@ const SoftwareRequest = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredRequests.map((request) => (
+                  {getPaginatedData(filteredRequests).map((request, index) => (
                     <TableRow key={request.id} className="border-b border-gray-200 hover:bg-gray-50">
-                      <TableCell className="text-center text-gray-600 px-6 py-4">{request.id}</TableCell>
+                      <TableCell className="text-center text-gray-600 px-6 py-4">{(currentPage - 1) * pageSize + index + 1}</TableCell>
                       <TableCell className="px-6 py-4 text-gray-700">{request.software_name}</TableCell>
                       <TableCell className="px-6 py-4 text-gray-700">{request.software_version}</TableCell>
                       <TableCell className="px-6 py-4 text-gray-700">{request.business_unit_name}</TableCell>
@@ -409,22 +440,20 @@ const SoftwareRequest = () => {
               </Table>
             )}
           </div>
-          <div className="flex items-center justify-between text-sm text-gray-600 mt-4">
-            <span>
-              Showing {filteredRequests.length} of {requests.length} requests
-            </span>
-            <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm" disabled>
-                Previous
-              </Button>
-              <Button variant="outline" size="sm" className="bg-blue-50 text-blue-600">
-                1
-              </Button>
-              <Button variant="outline" size="sm" disabled>
-                Next
-              </Button>
-            </div>
-          </div>
+          {filteredRequests.length > 0 && (
+            <PaginationControls
+              className="mt-3"
+              align="right"
+              hideInfo={true}
+              hidePageSize={true}
+              currentPage={currentPage}
+              totalPages={getTotalPages(filteredRequests.length)}
+              pageSize={pageSize}
+              totalItems={filteredRequests.length}
+              onPageChange={handlePageChange}
+              onPageSizeChange={handlePageSizeChange}
+            />
+          )}
         </TabsContent>
 
         <TabsContent value="new-request">

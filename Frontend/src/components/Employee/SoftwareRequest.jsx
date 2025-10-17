@@ -49,7 +49,6 @@ const SoftwareRequest = () => {
   });
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
-  const [perPage, setPerPage] = useState('10');
   const [loading, setLoading] = useState(false);
   const [formSubmitting, setFormSubmitting] = useState(false);
   const [selectedRequestId, setSelectedRequestId] = useState(null);
@@ -357,7 +356,7 @@ const SoftwareRequest = () => {
             </div>
             <div className="flex items-center gap-2 text-sm text-gray-600">
               <span>Per Page:</span>
-              <Select value={perPage} onValueChange={setPerPage}>
+              <Select value={String(pageSize)} onValueChange={(value) => handlePageSizeChange(Number(value))}>
                 <SelectTrigger className="w-16 h-8">
                   <SelectValue />
                 </SelectTrigger>

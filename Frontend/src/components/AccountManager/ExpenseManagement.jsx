@@ -579,7 +579,7 @@ const AccountManagerExpenseManagement = () => {
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2 text-sm text-gray-600">
             <span>Per Page:</span>
-            <Select value={perPage} onValueChange={setPerPage}>
+            <Select value={String(pageSize)} onValueChange={(value) => handlePageSizeChange(Number(value))}>
               <SelectTrigger className="w-16 h-8" aria-label="Items per page">
                 <SelectValue />
               </SelectTrigger>

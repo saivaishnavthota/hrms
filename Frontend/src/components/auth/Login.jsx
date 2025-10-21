@@ -3,6 +3,7 @@ import { Eye, EyeOff, Mail, Lock } from 'lucide-react';
 import { authAPI } from '@/lib/api';
 import { useNavigate } from 'react-router-dom';
 import { useUser } from '@/contexts/UserContext';
+import EntraLoginButton from './EntraLoginButton';
 const API_URL = import.meta.env.VITE_API_URL;
 export default function Login() {
   const navigate = useNavigate();
@@ -313,6 +314,14 @@ export default function Login() {
               alt="Nxzen logo" 
               className="w-28 h-16 object-contain rounded-2xl"
             />
+          </div>
+        </div>
+
+        {/* Microsoft Entra ID Login */}
+        <div className="mb-6">
+          <EntraLoginButton />
+          <div className="auth-divider my-6">
+            <span>OR</span>
           </div>
         </div>
 

@@ -16,6 +16,11 @@ services:
     environment:
       PORT: ${BACKEND_PORT}  # 👈 pass env to container
       DATABASE_URL: postgresql://admin:nxzen%40123@db:5432/Nxzen
+      # Microsoft Entra ID Configuration
+      ENTRA_CLIENT_ID: ${ENTRA_CLIENT_ID}
+      ENTRA_CLIENT_SECRET: ${ENTRA_CLIENT_SECRET}
+      ENTRA_TENANT_ID: ${ENTRA_TENANT_ID}
+      ENTRA_REDIRECT_URI: ${ENTRA_REDIRECT_URI}
     networks:
       - app-network
 
@@ -23,6 +28,11 @@ services:
     build:
       context: ./Frontend
       dockerfile: Dockerfile
+      args:
+        # Pass environment variables as build arguments for Vite
+        VITE_API_URL: ${VITE_API_URL}
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL}
+        VITE_ENTRA_ENABLED: ${VITE_ENTRA_ENABLED}
     container_name: react_app
     ports:
       - "${FRONTEND_PORT}:80"

@@ -11,6 +11,8 @@ from database import get_session
 from services.entra_service import entra_service
 from auth import create_access_token
 from schemas.user_schema import UserResponse
+from config import config
+
 
 router = APIRouter(prefix="/auth/entra", tags=["Entra ID Authentication"])
 logger = logging.getLogger(__name__)

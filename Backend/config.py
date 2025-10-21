@@ -18,8 +18,13 @@ class config:
     ENTRA_CLIENT_SECRET = os.getenv("ENTRA_CLIENT_SECRET")
     ENTRA_TENANT_ID = os.getenv("ENTRA_TENANT_ID")
     ENTRA_AUTHORITY = f"https://login.microsoftonline.com/{os.getenv('ENTRA_TENANT_ID', 'common')}"
-    ENTRA_REDIRECT_URI = os.getenv("ENTRA_REDIRECT_URI", "http://localhost:5173/auth/callback")
-    ENTRA_SCOPES = ["User.Read", "openid", "profile", "email"]
-    
+
+    ENTRA_REDIRECT_URI = os.getenv("ENTRA_REDIRECT_URI", "http://localhost:3000/oauth2/redirect/microsoft")
+    ENTRA_SCOPES = [
+        "User.Read",
+       
+        "offline_access"
+    ]
+
     # Microsoft Graph API
     GRAPH_API_ENDPOINT = "https://graph.microsoft.com/v1.0"

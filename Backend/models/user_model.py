@@ -22,6 +22,12 @@ class User(SQLModel, table=True):
     super_hr: Optional[bool] = Field(default=False)  # True for super-HR with elevated access
     
     doj: Optional[datetime] = Field(default=None)
+    
+    # Microsoft Entra ID fields
+    entra_id: Optional[str] = Field(default=None, max_length=255, index=True, unique=True)  # Microsoft unique identifier
+    job_title: Optional[str] = Field(default=None, max_length=200)  # Job title from Entra ID
+    department: Optional[str] = Field(default=None, max_length=200)  # Department from Entra ID
+    auth_provider: Optional[str] = Field(default="local", max_length=50)  # Authentication provider: "local" or "entra"
 
    
     

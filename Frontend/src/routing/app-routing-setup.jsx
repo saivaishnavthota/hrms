@@ -26,6 +26,7 @@ import PendingRequests from '@/components/HR/PendingRequests';
 import ViewLeaveApplication from '@/components/HR/ViewLeaveApplication';
 import AddCompanyPolicy from '@/components/HR/AddCompanyPolicy';
 import Login from '@/components/auth/Login';
+import EntraCallback from '@/components/auth/EntraCallback';
 import EmployeePage from '@/pages/employee/page';
 import InternPage from '@/pages/intern/page';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
@@ -74,6 +75,7 @@ export const AppRoutingSetup = () => {
     <Routes>
       {/* Public routes */}
       <Route path="/login" element={<Login />} />
+      <Route path="/oauth2/redirect/microsoft" element={<EntraCallback />} />
       <Route path="/change-password-onboarding" element={<ChangePasswordOnboarding />} />
       <Route path="/new-user-details" element={<NewUserDetails />} />
       <Route path="/upload-documents" element={<NewUserUploadDocs />} />

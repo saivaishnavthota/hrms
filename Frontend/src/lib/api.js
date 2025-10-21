@@ -689,6 +689,11 @@ export const softwareRequestAPI = {
   getLocations: async () => {
     const response = await api.get('/software_requests/locations/');
     return response.data;
+  },
+
+  getEmployeeAssets: async (employeeId) => {
+    const response = await api.get(`/assets/employee/${employeeId}/assets`);
+    return response.data;
   }, 
 
   getSoftwareRequests: async (status = null) => {

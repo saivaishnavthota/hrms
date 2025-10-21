@@ -38,6 +38,7 @@ const SoftwareRequest = () => {
   const [managers, setManagers] = useState([]);
   const [itAdmins, setItAdmins] = useState([]);
   const [locations, setLocations] = useState([]);
+  const [employeeAssets, setEmployeeAssets] = useState([]);
   const [formData, setFormData] = useState({
     software_name: '',
     software_version: '',
@@ -46,6 +47,7 @@ const SoftwareRequest = () => {
     it_admin_id: '',
     business_unit_id: 'none', // Use 'none' instead of empty string
     software_duration: 'none', // Use 'none' instead of empty string
+    asset_id: 'none', // New field for asset selection
   });
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -119,7 +121,7 @@ const SoftwareRequest = () => {
     const fetchData = async () => {
       setLoading(true);
       try {
-        const [managersData, adminsData, locationsData, requestsData] = await Promise.all([
+        const [managersData, adminsData, locationsData, assetsData, requestsData] = await Promise.all([
           softwareRequestAPI.getEmployeeManagers(employeeId).catch((err) => {
             console.error('Failed to fetch managers:', err);
             return [];
@@ -132,6 +134,10 @@ const SoftwareRequest = () => {
             console.error('Failed to fetch locations:', err);
             return [];
           }),
+          softwareRequestAPI.getEmployeeAssets(employeeId).catch((err) => {
+            console.error('Failed to fetch employee assets:', err);
+            return [];
+          }),
           softwareRequestAPI.getSoftwareRequests().catch((err) => {
             console.error('Failed to fetch requests:', err);
             return [];
@@ -140,6 +146,7 @@ const SoftwareRequest = () => {
         setManagers(managersData);
         setItAdmins(adminsData);
         setLocations(locationsData);
+        setEmployeeAssets(assetsData);
         setRequests(requestsData.filter((req) => req.employee_id === parseInt(employeeId)).map(mapRequest));
       } catch (err) {
         console.error('Fetch data failed:', err);
@@ -199,6 +206,7 @@ const SoftwareRequest = () => {
         manager_id: formData.manager_id === 'none' ? null : parseInt(formData.manager_id),
         business_unit_id: formData.business_unit_id === 'none' ? null : parseInt(formData.business_unit_id),
         software_duration: formData.software_duration === 'none' ? null : formData.software_duration,
+        asset_id: formData.asset_id === 'none' ? null : parseInt(formData.asset_id),
       };
       const response = await softwareRequestAPI.createSoftwareRequest(submitData);
       const newRequest = mapRequest(response, requests.length);
@@ -212,6 +220,7 @@ const SoftwareRequest = () => {
         it_admin_id: '',
         business_unit_id: 'none',
         software_duration: 'none',
+        asset_id: 'none',
       });
     } catch (err) {
       console.error('Create Software Request Error:', err.response || err);
@@ -519,6 +528,32 @@ const SoftwareRequest = () => {
                     <SelectItem value="1 year">1 Year</SelectItem>
                   </SelectContent>
                 </Select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Asset (Optional)</label>
+                <Select
+                  name="asset_id"
+                  value={formData.asset_id}
+                  onValueChange={(value) => handleSelectChange('asset_id', value)}
+                >
+                  <SelectTrigger className="mt-1">
+                    <SelectValue placeholder="Select Asset" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">No Asset Selected</SelectItem>
+                    {employeeAssets.map((asset) => (
+                      <SelectItem key={asset.asset_id} value={asset.asset_id.toString()}>
+                        {asset.asset_name} ({asset.asset_tag}) - {asset.asset_type}
+                        {asset.brand && asset.model && ` - ${asset.brand} ${asset.model}`}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {employeeAssets.length === 0 && (
+                  <p className="text-sm text-gray-500 mt-1">
+                    No assets allocated to you. Contact your manager to request asset allocation.
+                  </p>
+                )}
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700">Additional Info</label>

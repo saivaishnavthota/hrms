@@ -54,6 +54,7 @@ import {
   KeyRound,
   UserPlus as AssignIcon,
   FileText as RequestIcon,
+  Activity,
 } from 'lucide-react';
 
 export const MENU_SIDEBAR = [
@@ -127,6 +128,16 @@ export const MENU_SIDEBAR = [
     title: 'Company Policies',
     icon: FileText,
     path: '/hr/company-policies',
+  },
+  {
+    title: 'Asset Allocations',
+    icon: Monitor,
+    path: '/hr/asset-allocations',
+  },
+  {
+    title: 'My Activity',
+    icon: Activity,
+    path: '/hr/my-activity',
   },
 ];
 

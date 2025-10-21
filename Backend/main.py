@@ -10,7 +10,7 @@ from fastapi import FastAPI
 import os
 from dotenv import load_dotenv
 load_dotenv()
-PORT=int(os.getenv("PORT", 8000))
+PORT=int(os.getenv("PORT", 2343))
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -60,6 +60,7 @@ app.include_router(hr_config_routes.router)
 app.include_router(asset_routes.router)
 app.include_router(swreq_routes.router)
 app.include_router(entra_auth_routes.router)
+app.include_router(entra_auth_routes.oauth2_router)  # Azure AD standard OAuth2 redirect path
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=PORT, reload=True)

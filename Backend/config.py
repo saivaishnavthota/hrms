@@ -19,7 +19,7 @@ class config:
     ENTRA_TENANT_ID = os.getenv("ENTRA_TENANT_ID")
     ENTRA_AUTHORITY = f"https://login.microsoftonline.com/{os.getenv('ENTRA_TENANT_ID', 'common')}"
 
-    ENTRA_REDIRECT_URI = os.getenv("ENTRA_REDIRECT_URI", "http://localhost:3000/oauth2/redirect/microsoft")
+    ENTRA_REDIRECT_URI = os.getenv("ENTRA_REDIRECT_URI", "http://localhost:2343/oauth2/redirect/microsoft")
     ENTRA_SCOPES = [
         "User.Read",
        

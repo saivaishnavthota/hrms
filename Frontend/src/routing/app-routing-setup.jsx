@@ -65,6 +65,7 @@ import ITSupporterVendors from '@/components/ITSupporter/Vendors';
 import ITSupporterAllocations from '@/components/ITSupporter/Allocations';
 import ITSupporterMaintanance from '@/components/ITSupporter/Maintanance';
 import ITSupporterMyActivity from '@/components/ITSupporter/MyActivity';
+import AssetAllocations from '@/components/HR/AssetAllocations';
 import AdminDashboard from '@/components/Admin/Dashboard';
 import AdminEmployeeAttendance from '@/components/Admin/EmployeeAttendance';
 import AdminLeaveRequests from '@/components/Admin/LeaveRequests';
@@ -101,6 +102,7 @@ export const AppRoutingSetup = () => {
         <Route path="add-policies" element={<AddCompanyPolicy />} />
         <Route path="reset-password" element={< ChangePassword />} />
         <Route path="my-activity" element={<MyActivity />} />
+        <Route path="asset-allocations" element={<AssetAllocations />} />
       </Route>
 
       {/* Protected Super-HR routes */}
@@ -118,6 +120,8 @@ export const AppRoutingSetup = () => {
         <Route path="holidays" element={<Holidays />} />
         <Route path="add-policies" element={<AddCompanyPolicy />} />
         <Route path="hr-config" element={<HRConfig />} />
+        <Route path="asset-allocations" element={<AssetAllocations />} />
+        <Route path="my-activity" element={<MyActivity />} />
       </Route>
 
       {/* Protected Employee routes using Layout1 with employee menu */}

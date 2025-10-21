@@ -11,6 +11,7 @@ from schemas.asset_schema import (
 )
 from models.user_model import User
 from schemas.user_schema import Employee
+from auth import get_current_user
 
 router = APIRouter(prefix="/assets", tags=["Assets"])
 
@@ -153,6 +154,81 @@ def get_allocations(
         query = query.where(AssetAllocation.employee_id == employee_id)
     return [AssetAllocationResponse.from_orm(a) for a in session.exec(query).all()]
 
+@router.get("/allocations/detailed/", response_model=List[dict])
+def get_detailed_allocations(
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+    status: Optional[str] = Query(None, description="Filter by allocation status")
+):
+    """
+    Get asset allocations with detailed employee and asset information
+    - Super-HR sees all allocations
+    - Regular HR sees only allocations of employees assigned to them
+    """
+    
+    # Check if user is Super-HR
+    is_super_hr = current_user.role == 'HR' and current_user.super_hr == True
+    
+    # Join allocations with assets and users
+    query = select(
+        AssetAllocation,
+        Asset,
+        User
+    ).join(
+        Asset, AssetAllocation.asset_id == Asset.asset_id
+    ).join(
+        User, AssetAllocation.employee_id == User.id
+    )
+    
+    # Filter by HR assignment if not Super-HR
+    if not is_super_hr:
+        # Import EmployeeHR model
+        from models.employee_assignment_model import EmployeeHR
+        
+        # Get employee IDs assigned to this HR
+        hr_employee_ids = session.exec(
+            select(EmployeeHR.employee_id).where(
+                EmployeeHR.hr_id == current_user.id
+            )
+        ).all()
+        
+        # Filter allocations to only include employees assigned to this HR
+        if hr_employee_ids:
+            query = query.where(AssetAllocation.employee_id.in_(hr_employee_ids))
+        else:
+            # If no employees assigned, return empty list
+            return []
+    
+    if status:
+        query = query.where(AssetAllocation.status == status)
+    
+    results = session.exec(query).all()
+    
+    detailed_allocations = []
+    for allocation, asset, employee in results:
+        detailed_allocations.append({
+            "allocation_id": allocation.allocation_id,
+            "employee_id": allocation.employee_id,
+            "employee_name": employee.name or "Unknown Employee",
+            "asset_id": asset.asset_id,
+            "asset_name": asset.asset_name,
+            "asset_tag": asset.asset_tag,
+            "asset_type": asset.asset_type,
+            "brand": asset.brand,
+            "model": asset.model,
+            "serial_number": asset.serial_number,
+            "condition": asset.condition,
+            "allocation_date": allocation.allocation_date,
+            "expected_return_date": allocation.expected_return_date,
+            "actual_return_date": allocation.actual_return_date,
+            "condition_at_allocation": allocation.condition_at_allocation,
+            "employee_ack": allocation.employee_ack,
+            "notes": allocation.notes,
+           
+        })
+    
+    return detailed_allocations
+
 @router.put("/allocations/{allocation_id}", response_model=AssetAllocationResponse)
 def update_allocation(allocation_id: int, allocation: AssetAllocationUpdate, session: Session = Depends(get_session)):
     db_allocation = session.get(AssetAllocation, allocation_id)
@@ -255,3 +331,39 @@ async def get_employees(o_status: Optional[bool] = True, role: Optional[str] = N
         )
         for emp in employees
     ]
+
+@router.get("/employee/{employee_id}/assets", response_model=List[dict])
+def get_employee_assets(employee_id: int, session: Session = Depends(get_session)):
+    """
+    Get all assets allocated to a specific employee with asset details
+    """
+    # Get allocations for the employee
+    allocations = session.exec(
+        select(AssetAllocation).where(AssetAllocation.employee_id == employee_id)
+    ).all()
+    
+    employee_assets = []
+    for allocation in allocations:
+        # Get asset details
+        asset = session.get(Asset, allocation.asset_id)
+        if asset:
+            employee_assets.append({
+                "allocation_id": allocation.allocation_id,
+                "asset_id": asset.asset_id,
+                "asset_name": asset.asset_name,
+                "asset_tag": asset.asset_tag,
+                "asset_type": asset.asset_type,
+                "brand": asset.brand,
+                "model": asset.model,
+                "serial_number": asset.serial_number,
+                "condition": asset.condition,
+                "allocation_date": allocation.allocation_date,
+                "expected_return_date": allocation.expected_return_date,
+                "actual_return_date": allocation.actual_return_date,
+                "condition_at_allocation": allocation.condition_at_allocation,
+                "employee_ack": allocation.employee_ack,
+                "notes": allocation.notes,
+                "status": asset.status
+            })
+    
+    return employee_assets

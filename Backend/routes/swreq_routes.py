@@ -54,31 +54,45 @@ async def create_software_request(
         if not business_unit:
             raise HTTPException(status_code=404, detail="Business Unit not found")
 
-    # Call stored procedure
-    result = session.execute(
-        text("""
-            SELECT create_software_request(
-                :employee_id, :manager_id, :it_admin_id, 
-                :software_name, :software_version, :additional_info,
-                :business_unit_id, :software_duration
-            ) AS id
-        """),
-        {
-            "employee_id": request.employee_id,
-            "manager_id": request.manager_id,
-            "it_admin_id": request.it_admin_id,
-            "software_name": request.software_name,
-            "software_version": request.software_version,
-            "additional_info": request.additional_info,
-            "business_unit_id": request.business_unit_id,
-            "software_duration": request.software_duration
-        }
-    ).first()
+    # Validate asset (if provided)
+    asset = None
+    if request.asset_id:
+        from models.asset_model import Asset
+        asset = session.get(Asset, request.asset_id)
+        if not asset:
+            raise HTTPException(status_code=404, detail="Asset not found")
+        # Verify the asset is allocated to the employee
+        from models.asset_model import AssetAllocation
+        allocation = session.exec(
+            select(AssetAllocation).where(
+                AssetAllocation.asset_id == request.asset_id,
+                AssetAllocation.employee_id == request.employee_id
+            )
+        ).first()
+        if not allocation:
+            raise HTTPException(status_code=400, detail="Asset is not allocated to this employee")
+
+    # Create software request directly using SQLModel
+    db_request = SoftwareRequest(
+        employee_id=request.employee_id,
+        manager_id=request.manager_id,
+        it_admin_id=request.it_admin_id,
+        asset_id=request.asset_id,
+        software_name=request.software_name,
+        software_version=request.software_version,
+        additional_info=request.additional_info,
+        business_unit_id=request.business_unit_id,
+        software_duration=request.software_duration,
+        status="Pending"
+    )
+    session.add(db_request)
     session.commit()
-    if not result or not result.id:
+    session.refresh(db_request)
+    
+    if not db_request.id:
         raise HTTPException(status_code=500, detail="Failed to create software request")
 
-    request_id = result.id
+    request_id = db_request.id
     base_url = "http://127.0.0.1:8000/software_requests"
 
     approve_url = f"{base_url}/{request_id}/manager-action?action=Approved" if manager else None
@@ -261,12 +275,17 @@ async def list_software_requests(
     ItAdminUser = aliased(User, name="it_admin_user")
     LocationAlias = aliased(Location, name="location")  # Alias for locations table
 
+    # Add asset information
+    from models.asset_model import Asset
+    AssetAlias = aliased(Asset, name="asset")
+    
     query = (
         select(
             SoftwareRequest.id,
             SoftwareRequest.employee_id,
             SoftwareRequest.manager_id,
             SoftwareRequest.it_admin_id,
+            SoftwareRequest.asset_id,  # New field
             SoftwareRequest.software_name,
             SoftwareRequest.software_version,
             SoftwareRequest.status,
@@ -283,12 +302,16 @@ async def list_software_requests(
             ManagerUser.company_email.label("manager_email"),
             ItAdminUser.name.label("it_admin_name"),
             ItAdminUser.company_email.label("it_admin_email"),
-            LocationAlias.name.label("business_unit_name")  # New field
+            LocationAlias.name.label("business_unit_name"),  # New field
+            AssetAlias.asset_name.label("asset_name"),  # New field
+            AssetAlias.asset_tag.label("asset_tag"),  # New field
+            AssetAlias.asset_type.label("asset_type")  # New field
         )
         .join(EmployeeUser, EmployeeUser.id == SoftwareRequest.employee_id, isouter=False)
         .outerjoin(ManagerUser, ManagerUser.id == SoftwareRequest.manager_id)
         .outerjoin(ItAdminUser, ItAdminUser.id == SoftwareRequest.it_admin_id)
         .outerjoin(LocationAlias, LocationAlias.id == SoftwareRequest.business_unit_id)  # Join with locations
+        .outerjoin(AssetAlias, AssetAlias.asset_id == SoftwareRequest.asset_id)  # Join with assets
     )
 
     if status:
@@ -331,6 +354,10 @@ async def list_software_requests(
             "it_admin_id": result.it_admin_id,
             "it_admin_name": result.it_admin_name,
             "it_admin_email": result.it_admin_email,
+            "asset_id": result.asset_id,  # New field
+            "asset_name": result.asset_name,  # New field
+            "asset_tag": result.asset_tag,  # New field
+            "asset_type": result.asset_type,  # New field
             "software_name": result.software_name,
             "software_version": result.software_version,
             "additional_info": result.additional_info,
@@ -365,6 +392,37 @@ async def get_it_admins(session: Session = Depends(get_session)):
 async def get_locations(session: Session = Depends(get_session)):
     locations = session.exec(select(Location)).all()
     return [{"id": loc.id, "name": loc.name} for loc in locations]
+
+@router.get("/employees/{employee_id}/assets", response_model=List[dict])
+async def get_employee_assets_for_selection(employee_id: int, session: Session = Depends(get_session)):
+    """
+    Get all assets allocated to a specific employee for software request selection
+    """
+    from models.asset_model import Asset, AssetAllocation
+    
+    # Get allocations for the employee
+    allocations = session.exec(
+        select(AssetAllocation).where(AssetAllocation.employee_id == employee_id)
+    ).all()
+    
+    employee_assets = []
+    for allocation in allocations:
+        # Get asset details
+        asset = session.get(Asset, allocation.asset_id)
+        if asset and asset.status == "Allocated":  # Only show allocated assets
+            employee_assets.append({
+                "asset_id": asset.asset_id,
+                "asset_name": asset.asset_name,
+                "asset_tag": asset.asset_tag,
+                "asset_type": asset.asset_type,
+                "brand": asset.brand,
+                "model": asset.model,
+                "serial_number": asset.serial_number,
+                "condition": asset.condition,
+                "allocation_date": allocation.allocation_date.isoformat() if allocation.allocation_date else None
+            })
+    
+    return employee_assets
 
 @router.get("/compliance_questions/", response_model=List[ComplianceQuestionResponse])
 async def list_compliance_questions(session: Session = Depends(get_session)):

@@ -16,7 +16,8 @@ class EntraIDService:
         self.authority = config.ENTRA_AUTHORITY
         self.redirect_uri = config.ENTRA_REDIRECT_URI
         
-        # Store scopes as a simple list
+        # Store scopes as a simple list - ONLY what we explicitly need
+        # Do NOT include 'openid' or 'profile' - MSAL adds these automatically and causes frozenset errors
         self.scopes = ["User.Read", "offline_access"]
         
         logger.info(f"Initialized with scopes: {self.scopes}")
@@ -69,21 +70,24 @@ class EntraIDService:
             raise HTTPException(status_code=503, detail="Entra ID not configured")
         
         try:
-            # WORKAROUND: Build the auth URL manually to avoid MSAL's frozenset issue
-            # This bypasses MSAL's internal scope handling
+            # Build auth URL manually to have full control over scopes
+            # This avoids MSAL adding 'openid' and 'profile' automatically
             import urllib.parse
+            
+            # Use ONLY the scopes we explicitly define - no automatic additions
+            scope_string = "User.Read offline_access"
             
             params = {
                 'client_id': self.client_id,
                 'response_type': 'code',
                 'redirect_uri': self.redirect_uri,
                 'response_mode': 'query',
-                'scope': ' '.join(self.scopes),  # Space-separated string
+                'scope': scope_string,
                 'state': state,
             }
             
             auth_url = f"{self.authority}/oauth2/v2.0/authorize?{urllib.parse.urlencode(params)}"
-            logger.info(f"Generated auth URL with scopes: {params['scope']}")
+            logger.info(f"Generated auth URL with scopes: {scope_string}")
             
             return auth_url
             
@@ -105,29 +109,53 @@ class EntraIDService:
             raise HTTPException(status_code=503, detail="Entra ID not configured")
         
         try:
-            # Use MSAL's token acquisition (this part usually works)
-            # But pass scopes as individual strings in a new list
-            scopes_copy = ["User.Read", "offline_access"]
+            # Make direct HTTP request to token endpoint to avoid MSAL's automatic scope additions
+            # MSAL adds 'openid' and 'profile' automatically which causes frozenset errors
+            token_url = f"{self.authority}/oauth2/v2.0/token"
             
-            result = self.app.acquire_token_by_authorization_code(
-                auth_code,
-                scopes=scopes_copy,
-                redirect_uri=self.redirect_uri
+            # Only include the scopes we explicitly need
+            scope_string = "User.Read offline_access"
+            
+            token_data = {
+                'client_id': self.client_id,
+                'client_secret': self.client_secret,
+                'code': auth_code,
+                'redirect_uri': self.redirect_uri,
+                'grant_type': 'authorization_code',
+                'scope': scope_string
+            }
+            
+            logger.info(f"Acquiring token with redirect_uri: {self.redirect_uri}")
+            logger.info(f"Using scopes: {scope_string}")
+            logger.info(f"Auth code: {auth_code[:20]}...")
+            logger.info(f"Token endpoint: {token_url}")
+            
+            response = requests.post(
+                token_url,
+                data=token_data,
+                headers={'Content-Type': 'application/x-www-form-urlencoded'},
+                timeout=10
             )
             
-            if "error" in result:
-                logger.error(f"Token acquisition failed: {result.get('error_description')}")
+            result = response.json()
+            
+            if response.status_code != 200 or "error" in result:
+                error_desc = result.get('error_description', 'No description')
+                error_code = result.get('error', 'unknown')
+                logger.error(f"Token Error - Code: {error_code}, Description: {error_desc}")
+                logger.error(f"Full error response: {result}")
                 raise HTTPException(
                     status_code=400,
-                    detail=f"Authentication failed: {result.get('error_description')}"
+                    detail=f"Authentication failed: {error_code} - {error_desc}"
                 )
             
+            logger.info("Token acquired successfully")
             return result
         except HTTPException:
             raise
         except Exception as e:
-            logger.error(f"Error acquiring token: {str(e)}")
-            raise HTTPException(status_code=500, detail="Token acquisition failed")
+            logger.error(f"Error acquiring token: {str(e)}", exc_info=True)
+            raise HTTPException(status_code=500, detail=f"Token acquisition failed: {str(e)}")
     
     def get_user_profile(self, access_token: str) -> Dict:
         """
@@ -218,14 +246,28 @@ class EntraIDService:
             raise HTTPException(status_code=503, detail="Entra ID not configured")
         
         try:
-            scopes_copy = ["User.Read", "offline_access"]
+            # Make direct HTTP request to avoid MSAL's automatic scope additions
+            token_url = f"{self.authority}/oauth2/v2.0/token"
+            scope_string = "User.Read offline_access"
             
-            result = self.app.acquire_token_by_refresh_token(
-                refresh_token,
-                scopes=scopes_copy
+            token_data = {
+                'client_id': self.client_id,
+                'client_secret': self.client_secret,
+                'refresh_token': refresh_token,
+                'grant_type': 'refresh_token',
+                'scope': scope_string
+            }
+            
+            response = requests.post(
+                token_url,
+                data=token_data,
+                headers={'Content-Type': 'application/x-www-form-urlencoded'},
+                timeout=10
             )
             
-            if "error" in result:
+            result = response.json()
+            
+            if response.status_code != 200 or "error" in result:
                 raise HTTPException(
                     status_code=401,
                     detail="Token refresh failed"

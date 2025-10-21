@@ -27,6 +27,7 @@ class SoftwareRequest(SQLModel, table=True):
     employee_id: int = Field(foreign_key="employees.id")
     manager_id: Optional[int] = Field(default=None, foreign_key="employees.id")
     it_admin_id: int = Field(foreign_key="employees.id")
+    asset_id: Optional[int] = Field(default=None, foreign_key="assets.asset_id")  # New field for asset selection
     software_name: str = Field(max_length=100)
     software_version: Optional[str] = Field(max_length=50)
     status: str = Field(default="Pending", max_length=20)

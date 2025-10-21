@@ -21,7 +21,8 @@ import {
   CalendarSearch,
   FileIcon,
   LayoutGrid,
-  Coins
+  Coins,
+  Monitor
 } from 'lucide-react';
 
 export function Main({ menu }) {
@@ -102,8 +103,10 @@ export function Main({ menu }) {
     { title: 'Attendance', path: (isSuperHRPath ? '/super-hr/employees-attendance' : '/hr/employees-attendance'), icon: CalendarCheck },
     { title: 'Holidays', path: (isSuperHRPath ? '/super-hr/holidays' : '/hr/holidays'), icon: CalendarSearch },
     { title: 'View Projects', path: (isSuperHRPath ? '/super-hr/view-projects' : '/hr/view-projects'), icon: FileIcon },
-    // New: My Activity tab (only for HR), and HR Config (only for Super HR)
-    ...(isSuperHRPath ? [{ title: 'HR Config', path: '/super-hr/hr-config', icon: Settings }] : [{ title: 'My Activity', path: '/hr/my-activity', icon: FileIcon }]),
+    { title: 'Asset Allocations', path: (isSuperHRPath ? '/super-hr/asset-allocations' : '/hr/asset-allocations'), icon: Monitor },
+    // New: My Activity tab (for both HR and Super-HR), and HR Config (only for Super HR)
+    { title: 'My Activity', path: (isSuperHRPath ? '/super-hr/my-activity' : '/hr/my-activity'), icon: FileIcon },
+    ...(isSuperHRPath ? [{ title: 'HR Config', path: '/super-hr/hr-config', icon: Settings }] : []),
   ];
 
   const GROUPS = [

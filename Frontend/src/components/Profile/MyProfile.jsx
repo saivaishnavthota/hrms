@@ -13,7 +13,13 @@ import {
   Loader2,
   AlertCircle,
   ArrowLeft,
-  KeyRound
+  KeyRound,
+  Monitor,
+  Smartphone,
+  Laptop,
+  HardDrive,
+  Printer,
+  Headphones
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -30,6 +36,7 @@ const MyProfile = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [projects, setProjects] = useState(null);
+  const [allocatedAssets, setAllocatedAssets] = useState([]);
   useEffect(() => {
     fetchEmployeeProfile();
   }, [user]);
@@ -49,6 +56,33 @@ const MyProfile = () => {
         return '/intern/set-password';
       default:
         return '/hr/change-password';
+    }
+  };
+
+  const getAssetIcon = (assetType) => {
+    const type = assetType?.toLowerCase() || '';
+    if (type.includes('laptop') || type.includes('computer')) return Laptop;
+    if (type.includes('monitor') || type.includes('display')) return Monitor;
+    if (type.includes('phone') || type.includes('mobile')) return Smartphone;
+    if (type.includes('printer')) return Printer;
+    if (type.includes('headphone') || type.includes('headset')) return Headphones;
+    if (type.includes('storage') || type.includes('drive')) return HardDrive;
+    return Monitor; // Default icon
+  };
+
+  const formatDate = (dateString) => {
+    if (!dateString) return 'N/A';
+    return new Date(dateString).toLocaleDateString();
+  };
+
+  const getStatusColor = (status) => {
+    switch (status?.toLowerCase()) {
+      case 'allocated': return 'bg-green-100 text-green-800';
+      case 'in stock': return 'bg-blue-100 text-blue-800';
+      case 'under repair': return 'bg-yellow-100 text-yellow-800';
+      case 'scrapped': return 'bg-red-100 text-red-800';
+      case 'returned': return 'bg-gray-100 text-gray-800';
+      default: return 'bg-gray-100 text-gray-800';
     }
   };
 
@@ -78,6 +112,16 @@ const fetchEmployeeProfile = async () => {
       console.error('Error fetching projects:', projError);
       toast.error('Error fetching assigned projects');
       setProjects([]);
+    }
+
+    // Fetch allocated assets for this employee
+    try {
+      const assetsRes = await api.get(`/assets/employee/${employeeId}/assets`);
+      setAllocatedAssets(assetsRes.data || []);
+    } catch (assetsError) {
+      console.error('Error fetching allocated assets:', assetsError);
+      toast.error('Error fetching allocated assets');
+      setAllocatedAssets([]);
     }
 
   } catch (error) {
@@ -331,6 +375,78 @@ const fetchEmployeeProfile = async () => {
     )}
   </CardContent>
 </Card>
+
+        {/* Allocated Assets */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Monitor className="h-5 w-5" />
+              Allocated Assets
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {allocatedAssets && allocatedAssets.length > 0 ? (
+              <div className="space-y-4">
+                {allocatedAssets.map((asset) => {
+                  const AssetIcon = getAssetIcon(asset.asset_type);
+                  return (
+                    <div key={asset.allocation_id} className="border rounded-lg p-4 bg-gray-50">
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center">
+                            <AssetIcon className="h-5 w-5 text-blue-600" />
+                          </div>
+                          <div>
+                            <h4 className="font-semibold text-sm">{asset.asset_name}</h4>
+                            <p className="text-xs text-muted-foreground">
+                              {asset.brand && asset.model ? `${asset.brand} ${asset.model}` : asset.asset_type}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              Tag: {asset.asset_tag} | Serial: {asset.serial_number}
+                            </p>
+                          </div>
+                        </div>
+                        <Badge className={`text-xs ${getStatusColor(asset.status)}`}>
+                          {asset.status}
+                        </Badge>
+                      </div>
+                      
+                      <div className="mt-3 grid grid-cols-2 gap-4 text-xs">
+                        <div>
+                          <span className="text-muted-foreground">Allocated:</span>
+                          <p className="font-medium">{formatDate(asset.allocation_date)}</p>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground">Expected Return:</span>
+                          <p className="font-medium">{formatDate(asset.expected_return_date)}</p>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground">Condition:</span>
+                          <p className="font-medium">{asset.condition || 'N/A'}</p>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground">Acknowledged:</span>
+                          <p className="font-medium">{asset.employee_ack ? 'Yes' : 'No'}</p>
+                        </div>
+                      </div>
+                      
+                      {asset.notes && (
+                        <div className="mt-3">
+                          <span className="text-xs text-muted-foreground">Notes:</span>
+                          <p className="text-xs mt-1">{asset.notes}</p>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                No assets allocated
+              </p>
+            )}
+          </CardContent>
+        </Card>
 
 
       </div>

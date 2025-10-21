@@ -17,16 +17,21 @@ export default defineConfig({
 
   server: {
     proxy: {
-      '/users': ' http://127.0.0.1:8000 ',
-      '/leave': ' http://127.0.0.1:8000',
-      '/onboarding': ' http://127.0.0.1:8000',
-      '/attendance': 'http://localhost:8000',
-      '/expenses': 'http://localhost:8000',
-      '/projects': 'http://localhost:8000',
-      '/weekoffs': 'http://localhost:8000',
-      '/locations': ' http://127.0.0.1:8000',
-      '/calendar': ' http://127.0.0.1:8000',
-      '/policies': ' http://127.0.0.1:8000',
+      '/users': 'http://127.0.0.1:2343',
+      '/leave': 'http://127.0.0.1:2343',
+      '/onboarding': 'http://127.0.0.1:2343',
+      '/attendance': 'http://127.0.0.1:2343',
+      '/expenses': 'http://127.0.0.1:2343',
+      '/projects': 'http://127.0.0.1:2343',
+      '/weekoffs': 'http://127.0.0.1:2343',
+      '/locations': 'http://127.0.0.1:2343',
+      '/calendar': 'http://127.0.0.1:2343',
+      '/policies': 'http://127.0.0.1:2343',
+      '/auth': 'http://127.0.0.1:2343',  // Entra ID authentication
+      '/oauth2': 'http://127.0.0.1:2343',  // Azure AD OAuth2 redirect
+      '/api': 'http://127.0.0.1:2343',   // Assets & other API routes
+      '/software_requests': 'http://127.0.0.1:2343',  // Software requests
+      '/assets': 'http://127.0.0.1:2343', // Asset endpoints
     },
   },
  

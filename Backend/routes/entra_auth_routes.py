@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, Query
 from fastapi.responses import JSONResponse
 from sqlmodel import Session, select
 from typing import Optional
@@ -15,6 +15,8 @@ from config import config
 
 
 router = APIRouter(prefix="/auth/entra", tags=["Entra ID Authentication"])
+# Additional router for Azure AD standard OAuth2 redirect path
+oauth2_router = APIRouter(prefix="/oauth2/redirect", tags=["Entra ID Authentication"])
 logger = logging.getLogger(__name__)
 
 # Store state parameters temporarily (use Redis in production)
@@ -57,31 +59,48 @@ async def entra_login():
 
 @router.post("/callback")
 async def entra_callback(
-    code: str,
-    state: str,
+    request: Request,
     session: Session = Depends(get_session)
 ):
     """
     Handle callback from Entra ID with authorization code
     
     Args:
-        code: Authorization code
-        state: State parameter for validation
+        request: FastAPI Request object containing code and state in body
         session: Database session
         
     Returns:
         JWT token and user information (same structure as traditional login)
     """
     try:
+        # Extract code and state from request body
+        body = await request.json()
+        code = body.get("code")
+        state = body.get("state")
+        
+        if not code or not state:
+            raise HTTPException(status_code=400, detail="Missing code or state parameter")
+        
         # Validate state parameter
         if state not in state_store:
+            logger.warning(f"Invalid state parameter received: {state}")
             raise HTTPException(status_code=400, detail="Invalid state parameter")
         
         # Remove used state
         del state_store[state]
         
         # Exchange code for tokens
-        token_response = entra_service.acquire_token_by_auth_code(code)
+        logger.info(f"Attempting token acquisition for code: {code[:10]}...")
+        logger.info(f"Current redirect URI configured: {config.ENTRA_REDIRECT_URI}")
+        try:
+            token_response = entra_service.acquire_token_by_auth_code(code)
+            logger.info("Token acquisition successful")
+        except HTTPException as http_exc:
+            logger.error(f"Token acquisition failed: {http_exc.detail}")
+            raise
+        except Exception as e:
+            logger.error(f"Unexpected error during token acquisition: {str(e)}", exc_info=True)
+            raise HTTPException(status_code=500, detail=f"Token acquisition failed: {str(e)}")
         
         # Get access token
         access_token = token_response.get("access_token")
@@ -195,7 +214,7 @@ async def entra_callback(
 
 @router.get("/user-info")
 async def get_entra_user_info(
-    access_token: str,
+    access_token: str = Query(..., description="Microsoft access token"),
 ):
     """
     Get user information from Microsoft Graph (for testing/debugging)
@@ -224,6 +243,19 @@ async def entra_status():
         "provider": "Microsoft Entra ID",
         "status": "ready" if entra_service.is_configured() else "not configured"
     }
+
+
+# Azure AD standard OAuth2 redirect endpoint (alias for /auth/entra/callback)
+@oauth2_router.post("/microsoft")
+async def microsoft_oauth2_callback(
+    request: Request,
+    session: Session = Depends(get_session)
+):
+    """
+    Azure AD standard OAuth2 redirect endpoint
+    This is an alias for /auth/entra/callback to match Azure AD configuration
+    """
+    return await entra_callback(request, session)
 
 
 def determine_user_role(job_title: Optional[str], department: Optional[str]) -> str:
@@ -271,4 +303,3 @@ def determine_user_role(job_title: Optional[str], department: Optional[str]) -> 
     
     # Default to Employee
     return "Employee"
-

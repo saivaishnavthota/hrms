@@ -43,6 +43,7 @@ class SoftwareRequestCreate(BaseModel):
     employee_id: int
     manager_id: Optional[int] = None
     it_admin_id: int
+    asset_id: Optional[int] = None  # New field for asset selection
     software_name: str
     software_version: Optional[str] = None
     additional_info: Optional[str] = None
@@ -58,6 +59,7 @@ class SoftwareRequestResponse(BaseModel):
     employee_id: int
     manager_id: Optional[int]
     it_admin_id: int
+    asset_id: Optional[int] = None  # New field for asset selection
     software_name: str
     software_version: Optional[str]
     status: str

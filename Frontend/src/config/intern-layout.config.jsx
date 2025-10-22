@@ -26,10 +26,6 @@ export const MENU_SIDEBAR_INTERN = [
     icon: Coins,
     path: '/intern/submit-expense',
   },
-  {
-    title: 'Set Password',
-    icon: KeyRound,
-    path: '/intern/set-password',
-  },
+  
 ];
 

@@ -36,9 +36,5 @@ export const MENU_SIDEBAR_MANAGER = [
     icon: ClipboardList,
     path: '/manager/software-requests',
   },
-  {
-    title: 'Change Password',
-    icon: KeyRound,
-    path: '/manager/change-password',
-  },
+ 
 ];

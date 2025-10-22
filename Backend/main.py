@@ -20,17 +20,26 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan, redirect_slashes=False)
 
 # Allow frontend (React at localhost:5173) to talk to backend
-origins = [
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
-    "http://localhost:2343",
-    "http://127.0.0.1:2343",
-    # Include alternate dev ports to avoid CORS during local testing
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
-    "http://react_app",  # Add this - Docker container name
-    "http://react_app:80",
-]
+# Get CORS origins from environment or use defaults
+cors_origins_env = os.getenv("CORS_ORIGINS", "")
+if cors_origins_env:
+    origins = cors_origins_env.split(",")
+else:
+    origins = [
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://localhost:2343",
+        "http://127.0.0.1:2343",
+        # Include alternate dev ports to avoid CORS during local testing
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://react_app",  # Add this - Docker container name
+        "http://react_app:80",
+        # Production deployment origins
+        "https://149.102.158.71",
+        "https://149.102.158.71:443",
+        "http://149.102.158.71:2343",
+    ]
 
 app.add_middleware(
     CORSMiddleware,

@@ -111,6 +111,7 @@ async def entra_callback(
         
         # Get user profile from Microsoft Graph
         user_profile = entra_service.get_user_profile(access_token)
+        print("==============",user_profile,"==============")
         
         # Extract user information
         email = user_profile.get("mail") or user_profile.get("userPrincipalName")

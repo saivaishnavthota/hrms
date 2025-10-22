@@ -33,6 +33,7 @@ services:
       - SMTP_USER=${SMTP_USER}
       - SMTP_PASSWORD=${SMTP_PASSWORD}
       - SMTP_FROM=${SMTP_FROM}
+      - CORS_ORIGINS=${CORS_ORIGINS}
     networks:
       - hrms-prod-network
     restart: always

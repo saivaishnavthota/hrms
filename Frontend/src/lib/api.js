@@ -162,6 +162,12 @@ export const leaveAPI = {
     const response = await api.get(`/leave/leave_balances/${employeeId}`);
     return response.data;
   },
+
+  // GET /users/{employee_id} - Get user profile
+  getUserProfile: async (employeeId) => {
+    const response = await api.get(`/users/${employeeId}`);
+    return response.data;
+  },
 };
 
 // Onboarding API endpoints

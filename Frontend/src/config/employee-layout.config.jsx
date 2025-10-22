@@ -31,9 +31,5 @@ export const MENU_SIDEBAR_EMPLOYEE = [
     icon: ClipboardList, 
     path: '/employee/software-requests',
   },
-  {
-    title: 'Set Password',
-    icon: KeyRound,
-    path: '/employee/set-password',
-  },
+ 
 ];

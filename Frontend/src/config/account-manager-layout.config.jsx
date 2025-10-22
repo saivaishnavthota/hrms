@@ -31,9 +31,5 @@ export const MENU_SIDEBAR_ACCOUNT_MANAGER = [
     icon: Briefcase,
     path: '/account-manager/projects',
   },
-  {
-    title: 'Change Password',
-    icon: KeyRound,
-    path: '/account-manager/change-password',
-  },
+ 
 ];

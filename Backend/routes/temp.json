@@ -1,0 +1,14 @@
+ {
+  "@odata.context": "https://graph.microsoft.com/v1.0/$metadata#users/$entity",
+ "businessPhones": [], 
+    "displayName": "Sai Aryan Nampally", 
+    "givenName": "Sai Aryan", 
+    "jobTitle": null, 
+    "mail": "sai.nampally@nxzen.com", 
+    "mobilePhone": null, 
+    "officeLocation": null, 
+    "preferredLanguage": null, 
+    "surname": "Nampally", 
+    "userPrincipalName": "sai.nampally@nxzen.com", 
+    "id": "ba7ec0d6-efff-490e-8dc2-ee85a32fc730"
+}

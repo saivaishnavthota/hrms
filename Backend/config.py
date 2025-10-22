@@ -22,7 +22,6 @@ class config:
     ENTRA_REDIRECT_URI = os.getenv("ENTRA_REDIRECT_URI", "http://localhost:2343/oauth2/redirect/microsoft")
     ENTRA_SCOPES = [
         "User.Read",
-       
         "offline_access"
     ]
 

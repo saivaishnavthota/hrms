@@ -5,15 +5,17 @@ from models.user_model import User
  
 class ExpenseAttachment(SQLModel, table=True):
     __tablename__ = "expense_attachments"
- 
+
     attachment_id: Optional[int] = Field(default=None, primary_key=True)
     request_id: int = Field(foreign_key="expense_requests.request_id")
     file_name: str
-    file_url: str  # Changed from file_path
+    file_url: Optional[str] = None  # Generated on-the-fly, not stored
     file_type: Optional[str] = None
     file_size: Optional[float] = None
+    file_data: Optional[bytes] = None  # Binary file content stored as bytea
+    content_type: Optional[str] = None  # MIME type
     uploaded_at: datetime = Field(default_factory=datetime.utcnow)
- 
+
     expense_request: Optional["ExpenseRequest"] = Relationship(back_populates="attachments")
  
 class ExpenseRequest(SQLModel, table=True):

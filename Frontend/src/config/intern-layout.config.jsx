@@ -21,11 +21,11 @@ export const MENU_SIDEBAR_INTERN = [
     icon: Upload,
     path: '/intern/upload-documents',
   },
-  {
-    title: 'Submit Expense',
-    icon: Coins,
-    path: '/intern/submit-expense',
-  },
+  // {
+  //   title: 'Submit Expense',
+  //   icon: Coins,
+  //   path: '/intern/submit-expense',
+  // },
   
 ];
 

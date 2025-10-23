@@ -76,6 +76,11 @@ const HRExpenseForm = ({ onSuccess, onCancel }) => {
         throw new Error('Please enter a valid amount.');
       }
 
+      // Validate that receipt is uploaded
+      if (!receiptFile) {
+        throw new Error('Receipt submission is mandatory. Please upload a receipt.');
+      }
+
       const token = localStorage.getItem('authToken');
       if (!token) throw new Error('Missing authentication token');
 
@@ -246,15 +251,20 @@ const HRExpenseForm = ({ onSuccess, onCancel }) => {
         />
       </div>
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Receipt (optional)</label>
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          Receipt <span className="text-red-500">*</span>
+        </label>
         <Input 
           type="file" 
           accept="image/*,.pdf" 
           onChange={handleFileChange} 
+          required
         />
         {receiptFile ? (
-          <p className="text-xs text-gray-500 mt-1">Selected: {receiptFile.name}</p>
-        ) : null}
+          <p className="text-xs text-green-600 mt-1">Selected: {receiptFile.name}</p>
+        ) : (
+          <p className="text-xs text-red-500 mt-1">Receipt is required (Max: 70 KB per file)</p>
+        )}
       </div>
       <div className="flex items-center">
         <input
@@ -314,10 +324,10 @@ const HRExpenseForm = ({ onSuccess, onCancel }) => {
       <div className="flex items-center gap-3">
         <Button 
           type="submit" 
-          className="bg-blue-600 hover:bg-blue-700 text-white"
-          disabled={isSubmitting}
+          className="bg-blue-600 hover:bg-blue-700 text-white disabled:bg-gray-400"
+          disabled={isSubmitting || !receiptFile}
         >
-          {isSubmitting ? 'Adding Expense...' : 'Add Expense'}
+          {isSubmitting ? 'Adding Expense...' : !receiptFile ? 'Upload Receipt to Submit' : 'Add Expense'}
         </Button>
         <Button
           type="button"

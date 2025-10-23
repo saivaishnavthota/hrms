@@ -80,15 +80,27 @@ const AddAttendance = () => {
   };
 
   const isWeekOffForDate = (date) => {
+    if (!allWeekOffs || allWeekOffs.length === 0) {
+      return false;
+    }
+    
     const weekDates = getWeekDates(date);
     const weekStart = formatDateLocal(weekDates[0]);
     const weekEnd = formatDateLocal(weekDates[6]);
-    const weekOff = allWeekOffs.find(wo => wo.week_start === weekStart && wo.week_end === weekEnd);
-    if (weekOff) {
+    
+    // Find weekoff record for this week
+    const weekOff = allWeekOffs.find(wo => 
+      wo.week_start === weekStart && wo.week_end === weekEnd
+    );
+    
+    if (weekOff && weekOff.off_days && Array.isArray(weekOff.off_days)) {
       const dayOfWeek = date.toLocaleDateString('en-US', { weekday: 'long' });
       return weekOff.off_days.includes(dayOfWeek);
     }
-    return false;
+    
+    // If no specific weekoff found, check if it's a default weekend (Saturday/Sunday)
+    const dayOfWeek = date.toLocaleDateString('en-US', { weekday: 'long' });
+    return dayOfWeek === 'Saturday' || dayOfWeek === 'Sunday';
   };
 
   useEffect(() => {
@@ -155,6 +167,7 @@ const AddAttendance = () => {
       }
 
       const response = await api.get(`/weekoffs/${user.employeeId}`);
+      console.log('Weekoffs fetched:', response.data); // Debug log
       setAllWeekOffs(response.data || []);
     } catch (error) {
       console.error('Error fetching week-offs:', error);
@@ -706,7 +719,7 @@ const AddAttendance = () => {
                     <option value="">Select Project</option>
                     {projects.map(p => (
                       <option key={p.project_id} value={String(p.project_id)}>
-                        {p.project_name}
+                        {p.project_name_commercial || p.project_name}
                       </option>
                     ))}
                   </select>

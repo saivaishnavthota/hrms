@@ -145,8 +145,8 @@ const ManagerEmployees = () => {
     try {
       const { data } = await api.get('/projects/get_projects');
       const names = Array.isArray(data?.projects)
-        ? data.projects.map((p) => p?.project_name || p?.name).filter(Boolean)
-        : (Array.isArray(data) ? data.map((p) => p?.project_name || p?.name).filter(Boolean) : []);
+        ? data.projects.map((p) => p?.project_name_commercial || p?.project_name || p?.name).filter(Boolean)
+        : (Array.isArray(data) ? data.map((p) => p?.project_name_commercial || p?.project_name || p?.name).filter(Boolean) : []);
       setAllProjects(names);
     } catch (e) {
       setAllProjects([]);
@@ -338,30 +338,30 @@ const ManagerEmployees = () => {
       {/* Projects Modal */}
       {projectsOpen && selectedEmployee && (
         <div className="fixed inset-0 bg-transparent backdrop-blur-[2px] flex items-center justify-center z-50">
-          <div className="bg-gradient-to-br from-white via-gray-50 to-blue-50 rounded-xl shadow-2xl w-full max-w-xl mx-4 border border-gray-200">
-            <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-gradient-to-r from-gray-600 to-blue-600 rounded-t-xl">
+          <div className="bg-gradient-to-br from-white via-gray-50 to-blue-50 rounded-xl shadow-2xl w-full max-w-xl mx-4 border border-gray-200 max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-gradient-to-r from-gray-600 to-blue-600 rounded-t-xl flex-shrink-0">
               <h2 className="text-lg font-semibold text-white">Assign Projects</h2>
               <button className="text-blue-100 hover:text-white transition-colors p-1 rounded-full hover:bg-blue-500" onClick={() => setProjectsOpen(false)} aria-label="Close"><X size={18} /></button>
             </div>
-            <div className="p-6">
+            <div className="p-6 flex-1 overflow-y-auto">
               <div className="text-sm text-gray-600 mb-2">Select one or more projects for {selectedEmployee.name}:</div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-96 overflow-y-auto pr-2">
                 {allProjects.length === 0 && (
                   <div className="text-sm text-gray-500">No projects available</div>
                 )}
                 {allProjects.map((name) => (
-                  <label key={name} className="flex items-center gap-2 border rounded-md px-3 py-2">
+                  <label key={name} className="flex items-center gap-2 border rounded-md px-3 py-2 hover:bg-gray-50 transition-colors">
                     <input
                       type="checkbox"
                       checked={selectedProjects.includes(name)}
                       onChange={() => toggleProject(name)}
                     />
-                    <span>{name}</span>
+                    <span className="text-sm">{name}</span>
                   </label>
                 ))}
               </div>
             </div>
-            <div className="flex justify-end gap-3 p-6 border-t border-gray-200 bg-white/60 rounded-b-xl">
+            <div className="flex justify-end gap-3 p-6 border-t border-gray-200 bg-white/60 rounded-b-xl flex-shrink-0">
               <button className="px-4 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 transition-colors duration-200" onClick={() => setProjectsOpen(false)}>Cancel</button>
               <button className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors duration-200" onClick={saveProjects}>Save</button>
             </div>

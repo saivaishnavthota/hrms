@@ -31,13 +31,15 @@ class ProjectStatusLogRead(ProjectStatusLogBase):
 
 # Project Schema
 class ProjectBase(SQLModel):
-    project_name: str
-    project_objective: Optional[str]
-    client_requirements: Optional[str]
-    budget: Optional[float]
-    start_date: Optional[date]
-    end_date: Optional[date]
-    skills_required: Optional[str]
+    project_name: str  # Project Name (Revenue) - Required
+    project_name_commercial: Optional[str] = None  # Project Name (Commercial) - Optional
+    account: Optional[str] = None  # Account - Optional
+    project_objective: Optional[str] = None
+    client_requirements: Optional[str] = None
+    budget: Optional[float] = None
+    start_date: Optional[date] = None
+    end_date: Optional[date] = None
+    skills_required: Optional[str] = None
     status: Optional[str] = "Active"
 
 # Project Create Schema – allows nested assignments and logs

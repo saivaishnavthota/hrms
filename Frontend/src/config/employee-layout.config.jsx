@@ -21,11 +21,11 @@ export const MENU_SIDEBAR_EMPLOYEE = [
     icon: Upload,
     path: '/employee/upload-documents',
   },
-  {
-    title: 'Submit Expense',
-    icon: Coins,
-    path: '/employee/submit-expense',
-  },
+  // {
+  //   title: 'Submit Expense',
+  //   icon: Coins,
+  //   path: '/employee/submit-expense',
+  // },
    {
     title: 'Software Requests',
     icon: ClipboardList, 

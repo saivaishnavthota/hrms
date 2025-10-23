@@ -6,7 +6,7 @@ export function Layout1({ menu }) {
   return (
     <>
       <Helmet>
-        <title>HR Employee Portal</title>
+        <title>Nxzen Portal</title>
       </Helmet>
 
       <LayoutProvider>

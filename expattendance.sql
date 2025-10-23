@@ -702,7 +702,7 @@ RETURNS TEXT
 LANGUAGE plpgsql
 AS $$
 BEGIN
-    INSERT INTO weekoff (employee_id, week_start, week_end, off_days)
+    INSERT INTO weekoffs (employee_id, week_start, week_end, off_days)
     VALUES (p_employee_id, p_week_start, p_week_end, p_off_days)
     ON CONFLICT (employee_id, week_start)
     DO UPDATE SET

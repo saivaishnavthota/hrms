@@ -1,4 +1,4 @@
-import { LayoutGrid, ClipboardList, UserPlus, Users, Plane, DollarSign, KeyRound, Upload ,CalendarCheck ,Coins} from 'lucide-react';
+import { LayoutGrid, ClipboardList, UserPlus, Users, Plane, DollarSign, KeyRound, Upload ,CalendarCheck ,Coins, Monitor} from 'lucide-react';
 
 export const MENU_SIDEBAR_MANAGER = [
   {
@@ -21,11 +21,11 @@ export const MENU_SIDEBAR_MANAGER = [
     icon: CalendarCheck,
     path: '/manager/leave-management',
   },
-  {
-    title: 'Expense Management',
-    icon: Coins,
-    path: '/manager/expense-management',
-  },
+  // {
+  //   title: 'Expense Management',
+  //   icon: Coins,
+  //   path: '/manager/expense-management',
+  // },
   {
     title: 'Upload Documents',
     icon: Upload,
@@ -33,7 +33,7 @@ export const MENU_SIDEBAR_MANAGER = [
   },
    {
     title: 'Software Requests',
-    icon: ClipboardList,
+    icon: Monitor,
     path: '/manager/software-requests',
   },
  

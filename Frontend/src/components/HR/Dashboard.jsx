@@ -54,7 +54,6 @@ const Dashboard = () => {
   const [leaveCounts, setLeaveCounts] = useState({ approved: 0, pending: 0, rejected: 0, total: 0 });
   const [isLoadingMetrics, setIsLoadingMetrics] = useState(false);
   const [metricsError, setMetricsError] = useState(null);
-  const [expenseCounts, setExpenseCounts] = useState({ pendingHr: 0, approved: 0, rejected: 0, carried: 0, total: 0 });
   const [attTrendData, setAttTrendData] = useState([]);
 
 useEffect(() => {
@@ -326,24 +325,6 @@ useEffect(() => {
         console.error("Error fetching employees:", e);
       }
 
-      // Expenses summary for HR (current month)
-      try {
-        const resExp = await api.get('/expenses/hr-exp-list', {
-          params: { hr_id: hrId, year, month },
-        });
-        const items = Array.isArray(resExp.data) ? resExp.data : (Array.isArray(resExp.data?.items) ? resExp.data.items : []);
-        let pendingHr = 0, approved = 0, rejected = 0, carried = 0;
-        for (const it of items) {
-          const s = String(it.status || '').toLowerCase();
-          if (s === 'pending_hr_approval') pendingHr += 1;
-          else if (s === 'approved') approved += 1;
-          else if (s === 'hr_rejected') rejected += 1;
-          else if (s === 'carried_forward') carried += 1;
-        }
-        setExpenseCounts({ pendingHr, approved, rejected, carried, total: items.length });
-      } catch (e) {
-        // ignore errors
-      }
     } catch (err) {
       setMetricsError('Failed to load metrics');
     } finally {
@@ -659,20 +640,6 @@ useEffect(() => {
             </div>
             <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center">
               <Briefcase className="w-6 h-6 text-orange-600" />
-            </div>
-          </div>
-        </div>
-
-        {/* Pending Expenses */}
-        <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600 mb-1">Pending Expenses</p>
-              <p className="text-3xl font-bold text-gray-900">{expenseCounts.pendingHr || 0}</p>
-              <p className="text-sm text-red-600 mt-1">+{expenseCounts.total || 0} this month</p>
-            </div>
-            <div className="w-12 h-12 bg-indigo-100 rounded-lg flex items-center justify-center">
-              <UserCheck className="w-6 h-6 text-indigo-600" />
             </div>
           </div>
         </div>

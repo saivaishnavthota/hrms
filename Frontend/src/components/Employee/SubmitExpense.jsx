@@ -102,11 +102,16 @@ const SubmitExpense = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsSubmitting(true);
- 
+
     try {
       let employeeId = user?.employeeId || JSON.parse(localStorage.getItem('userData') || '{}')?.employeeId;
       if (!employeeId) throw new Error('Employee ID not found. Please log in.');
- 
+
+      // Validate that at least one receipt is uploaded
+      if (receipts.length === 0) {
+        throw new Error('Receipt submission is mandatory. Please upload at least one receipt.');
+      }
+
       const formData = new FormData();
       formData.append('employee_id', Number(employeeId));
       formData.append('category', expenseData.category || 'Other');
@@ -120,7 +125,8 @@ const SubmitExpense = () => {
         formData.append('sgst', parseFloat(expenseData.sgst || 0));
         formData.append('discount', parseFloat(expenseData.discount || 0));
       }
- 
+
+      // Append files to form data
       receipts.forEach(receipt => {
         if (receipt.file) {
           formData.append('files', receipt.file);
@@ -233,11 +239,11 @@ const SubmitExpense = () => {
     if (employeeId) loadExpenseHistory(employeeId, selectedYear, selectedMonth);
   };
 
- 
- 
   useEffect(() => {
     const employeeId = user?.employeeId || JSON.parse(localStorage.getItem('userData') || '{}')?.employeeId;
-    if (employeeId) loadExpenseHistory(employeeId, selectedYear, selectedMonth);
+    if (employeeId) {
+      loadExpenseHistory(employeeId, selectedYear, selectedMonth);
+    }
   }, [user, selectedYear, selectedMonth]);
 
   // Reset pagination when data changes
@@ -519,7 +525,9 @@ const SubmitExpense = () => {
  
               {/* Receipt Upload */}
               <div>
-                <label className="block text-sm font-medium mb-2">Upload Receipts</label>
+                <label className="block text-sm font-medium mb-2">
+                  Upload Receipts <span className="text-red-500">*</span>
+                </label>
                 <input
                   type="file"
                   multiple
@@ -533,8 +541,12 @@ const SubmitExpense = () => {
                   variant="outline"
                   onClick={() => document.getElementById('receipt-upload').click()}
                 >
+                  <Upload className="h-4 w-4 mr-2" />
                   Select Files
                 </Button>
+                <p className="text-xs text-gray-500 mt-1">
+                  At least one receipt is required (Max: 70 KB per file). Supported formats: JPG, PNG, PDF
+                </p>
  
                 {receipts.length > 0 && (
                   <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -560,12 +572,18 @@ const SubmitExpense = () => {
               <div className="flex gap-3 pt-4">
                 <Button
                   type="submit"
-                  disabled={isSubmitting}
-                  className="flex-1 bg-orange-600 hover:bg-orange-700 text-white"
+                  disabled={isSubmitting || receipts.length === 0}
+                  className="flex-1 bg-orange-600 hover:bg-orange-700 text-white disabled:bg-gray-400"
                 >
-                  {isSubmitting ? 'Submitting...' : 'Submit Expense'}
+                  {isSubmitting ? 'Submitting...' : receipts.length === 0 ? 'Upload Receipt to Submit' : 'Submit Expense'}
                 </Button>
               </div>
+              {receipts.length === 0 && (
+                <p className="text-sm text-red-500 mt-2 flex items-center">
+                  <AlertCircle className="h-4 w-4 mr-1" />
+                  Please upload at least one receipt to submit the expense.
+                </p>
+              )}
             </form>
           </TabsContent>
  

@@ -639,7 +639,7 @@ const ManagerExpenseManagement = () => {
                   <TableHead className="text-left font-semibold text-gray-700 px-6 py-4">DETAILS</TableHead>
                   <TableHead className="text-left font-semibold text-gray-700 px-6 py-4">SUBMITTED ON</TableHead>
                   <TableHead className="text-left font-semibold text-gray-700 px-6 py-4">STATUS</TableHead>
-                  <TableHead className="text-left font-semibold text-gray-700 px-6 py-4">ACTIONS</TableHead>
+                  <TableHead className="text-center font-semibold text-gray-700 px-6 py-4">ACTIONS</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -679,7 +679,7 @@ const ManagerExpenseManagement = () => {
                     <TableCell className="px-6 py-4 text-gray-700">{expense.submittedOn}</TableCell>
                     <TableCell className="px-6 py-4">{getStatusBadge(expense.status)}</TableCell>
                     <TableCell className="px-6 py-4">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center justify-center gap-2">
                         <Button
                           variant="ghost"
                           size="sm"
@@ -744,15 +744,15 @@ const ManagerExpenseManagement = () => {
       )}
 
       <Dialog open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
-        <DialogContent className="bg-white rounded-xl shadow-lg border border-gray-200 p-6 max-w-md w-full">
-          <DialogHeader className="mb-4">
+        <DialogContent className="bg-white rounded-xl shadow-lg border border-gray-200 p-6 max-w-md w-full max-h-[90vh] flex flex-col">
+          <DialogHeader className="mb-4 flex-shrink-0">
             <DialogTitle className="text-lg font-semibold text-gray-900">Expense Details</DialogTitle>
             <DialogDescription className="text-sm text-gray-500">
               Complete information about the expense request
             </DialogDescription>
           </DialogHeader>
           {selectedExpense && (
-            <div className="space-y-4 text-sm text-gray-700">
+            <div className="space-y-4 text-sm text-gray-700 overflow-y-auto pr-2">
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <span className="text-xs font-medium text-gray-500">Request ID</span>

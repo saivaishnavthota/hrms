@@ -104,11 +104,11 @@ export const MENU_SIDEBAR = [
     icon: AssignIcon,
     path: '/hr/assign-leaves',
   },
-  {
-    title: 'Expense Management',
-    icon: DollarSign,
-    path: '/hr/expense-management',
-  },
+  // {
+  //   title: 'Expense Management',
+  //   icon: DollarSign,
+  //   path: '/hr/expense-management',
+  // },
   {
     title: 'View Projects',
     icon: Briefcase,

@@ -8,10 +8,10 @@ from models.expenses_model import ExpenseRequest, ExpenseAttachment, ExpenseHist
 from utils.code import generate_request_code
 from auth import get_current_user, role_required
 from models.user_model import User
-from models.employee_master_model import EmployeeMaster
+# EmployeeMaster model no longer used - all manager/HR data is in EmployeeManager/EmployeeHR tables
 from models.employee_assignment_model import EmployeeManager, EmployeeHR
 from sqlalchemy import func
-from azure.storage.blob import BlobServiceClient, ContentSettings, generate_blob_sas, BlobSasPermissions
+# from azure.storage.blob import BlobServiceClient, ContentSettings, generate_blob_sas, BlobSasPermissions
 from utils.email import (
     send_manager_expense_notification, 
     send_hr_expense_notification,
@@ -131,30 +131,11 @@ def get_all_expense_requests_admin(
 load_dotenv()
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-AZURE_CONNECTION_STRING = os.getenv("AZURE_CONNECTION_STRING", "DefaultEndpointsProtocol=https;AccountName=hrmsnxzen;AccountKey=Jug56pLmeZIJplobcV+f20v7IXnh6PWuih0hxRYpvRXpGh6tnJrzALqtqL/hRR3lpZK0ZTKIs2Pv+AStDvBH4w==;EndpointSuffix=core.windows.net")
-AZURE_CONTAINER_NAME = os.getenv("AZURE_CONTAINER_NAME", "con-hrms")
-ACCOUNT_NAME = os.getenv("ACCOUNT_NAME", "hrmsnxzen")
-ACCOUNT_KEY = os.getenv("ACCOUNT_KEY", "Jug56pLmeZIJplobcV+f20v7IXnh6PWuih0hxRYpvRXpGh6tnJrzALqtqL/hRR3lpZK0ZTKIs2Pv+AStDvBH4w==")
-BASE_URL = os.getenv("BASE_URL", "http://localhost:8000")
- 
-blob_service_client = BlobServiceClient.from_connection_string(AZURE_CONNECTION_STRING)
-container_client = blob_service_client.get_container_client(AZURE_CONTAINER_NAME)
- 
-def build_blob_url_with_sas(employee_id: int, file_name: str) -> str:
-    """Generate the Azure Blob URL with SAS token for a file."""
-    blob_name = f"expenses/{employee_id}/{file_name}"
-   
-    # Generate SAS token valid for 1 year
-    sas_token = generate_blob_sas(
-        account_name=ACCOUNT_NAME,
-        container_name=AZURE_CONTAINER_NAME,
-        blob_name=blob_name,
-        account_key=ACCOUNT_KEY,
-        permission=BlobSasPermissions(read=True),
-        expiry=datetime.utcnow() + timedelta(days=365)
-    )
-   
-    return f"https://{ACCOUNT_NAME}.blob.core.windows.net/{AZURE_CONTAINER_NAME}/{blob_name}?{sas_token}"
+BASE_URL = os.getenv("BASE_URL", "https://hrms.nxzen.com")
+
+def build_file_url(attachment_id: int) -> str:
+    """Generate the file URL for an attachment stored in database."""
+    return f"{BASE_URL}/expenses/attachment/{attachment_id}"
  
 def calculate_final_amount(amount, discount_percentage=None, cgst_percentage=None, sgst_percentage=None):
 
@@ -205,16 +186,20 @@ async def submit_expense(
  
     session: Session = Depends(get_session),
 ):
-    """Submit an expense request with optional attachments stored in Azure Blob Storage."""
+    """Submit an expense request with mandatory attachments stored in local storage."""
     print(f"Received submit-exp request: employee_id={employee_id}, category={category}, amount={amount}, currency={currency}, expense_date={expense_date}, tax_included={tax_included}, files={[f.filename for f in files if f.filename]}")
    
     try:
+        # Validate that at least one receipt is provided
+        if not files or len(files) == 0 or all(not file.filename for file in files):
+            raise HTTPException(status_code=400, detail="Receipt submission is mandatory. Please upload at least one receipt.")
+        
         final_amount = calculate_final_amount(amount, discount, cgst, sgst)
- 
-        # Validate file size (5 MB = 5 * 1024 * 1024 bytes)
+
+        # Validate file size (70 KB = 70 * 1024 bytes)
         for file in files:
-            if file.size > 5 * 1024 * 1024:
-                raise HTTPException(status_code=400, detail=f"File {file.filename} exceeds 5 MB limit")
+            if file.size > 70 * 1024:
+                raise HTTPException(status_code=400, detail=f"File {file.filename} exceeds 70 KB limit")
  
         # Create expense request
         req = ExpenseRequest(
@@ -239,39 +224,34 @@ async def submit_expense(
             for file in files:
                 if not file.filename:
                     continue
-                if file.filename:
-                    file_data = await file.read()
-                    if not file_data:
-                        continue
+                    
+                file_data = await file.read()
+                if not file_data:
+                    continue
  
-                    # Upload to Azure Blob Storage
-                    blob_name = f"expenses/{employee_id}/{file.filename}"
-                    blob_client = container_client.get_blob_client(blob_name)
-                    content_settings = ContentSettings(content_type=file.content_type)
-                    blob_client.upload_blob(file_data, overwrite=True, content_settings=content_settings)
-                    file_url = build_blob_url_with_sas(employee_id, file.filename)
- 
-                    # Call add_expense_attachment function
-                    result = session.execute(
-                        text("SELECT * FROM add_expense_attachment(:request_id, :file_name, :file_url, :file_type, :file_size)"),
-                        {
-                            "request_id": req.request_id,
-                            "file_name": file.filename,
-                            "file_url": file_url,
-                            "file_type": file.content_type,
-                            "file_size": len(file_data) / 1024,
-                        }
-                    ).fetchone()
- 
-                    if result:
-                        attachments.append({
-                            "attachment_id": result.attachment_id,
-                            "file_name": result.file_name,
-                            "file_url": result.file_url,
-                            "file_type": result.file_type,
-                            "file_size": result.file_size,
-                            "uploaded_at": result.uploaded_at,
-                        })
+                # Create attachment record with binary data
+                attachment = ExpenseAttachment(
+                    request_id=req.request_id,
+                    file_name=file.filename,
+                    file_type=file.content_type,
+                    content_type=file.content_type,
+                    file_size=len(file_data) / 1024,  # Size in KB
+                    file_data=file_data,  # Store binary data in database
+                )
+                session.add(attachment)
+                session.flush()  # Get the attachment_id
+                
+                # Generate URL for this attachment
+                file_url = build_file_url(attachment.attachment_id)
+                
+                attachments.append({
+                    "attachment_id": attachment.attachment_id,
+                    "file_name": attachment.file_name,
+                    "file_url": file_url,
+                    "file_type": attachment.file_type,
+                    "file_size": attachment.file_size,
+                    "uploaded_at": attachment.uploaded_at,
+                })
  
         session.commit()
         print(f"Expense submitted: request_id={req.request_id}, request_code={req.request_code}")
@@ -347,48 +327,79 @@ async def add_attachment(
     if expense.employee_id != user_id:
         raise HTTPException(status_code=403, detail="Unauthorized to add attachment")
  
-    if file.size > 5 * 1024 * 1024:
-        raise HTTPException(status_code=400, detail=f"File {file.filename} exceeds 5 MB limit")
+    if file.size > 70 * 1024:
+        raise HTTPException(status_code=400, detail=f"File {file.filename} exceeds 70 KB limit")
  
     file_data = await file.read()
     if not file_data:
         raise HTTPException(status_code=400, detail="Empty file")
  
     try:
-        blob_name = f"expenses/{user_id}/{file.filename}"
-        blob_client = container_client.get_blob_client(blob_name)
-        content_settings = ContentSettings(content_type=file.content_type)
-        blob_client.upload_blob(file_data, overwrite=True, content_settings=content_settings)
-        file_url = build_blob_url_with_sas(user_id, file.filename)
- 
-        result = session.execute(
-            text("SELECT * FROM add_expense_attachment(:request_id, :file_name, :file_url, :file_type, :file_size)"),
-            {
-                "request_id": request_id,
-                "file_name": file.filename,
-                "file_url": file_url,
-                "file_type": file.content_type,
-                "file_size": len(file_data) / 1024,
-            }
-        ).fetchone()
- 
-        if not result:
-            raise HTTPException(status_code=500, detail="Failed to add attachment")
- 
+        # Create attachment record with binary data
+        attachment = ExpenseAttachment(
+            request_id=request_id,
+            file_name=file.filename,
+            file_type=file.content_type,
+            content_type=file.content_type,
+            file_size=len(file_data) / 1024,  # Size in KB
+            file_data=file_data,  # Store binary data in database
+        )
+        session.add(attachment)
+        session.flush()  # Get the attachment_id
+        
+        # Generate URL for this attachment
+        file_url = build_file_url(attachment.attachment_id)
+        
         session.commit()
+        
         return {
-            "attachment_id": result.attachment_id,
-            "file_name": result.file_name,
-            "file_url": result.file_url,
-            "file_type": result.file_type,
-            "file_size": result.file_size,
-            "uploaded_at": result.uploaded_at,
+            "attachment_id": attachment.attachment_id,
+            "file_name": attachment.file_name,
+            "file_url": file_url,
+            "file_type": attachment.file_type,
+            "file_size": attachment.file_size,
+            "uploaded_at": attachment.uploaded_at,
         }
     except Exception as e:
         session.rollback()
-        print(f"Error adding attachment: {str(e)}\nSQL: {e.__cause__}")
+        print(f"Error adding attachment: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to add attachment: {str(e)}")
  
+@router.get("/attachment/{attachment_id}")
+async def get_attachment(
+    attachment_id: int,
+    session: Session = Depends(get_session),
+):
+    """Serve an attachment file from the database."""
+    try:
+        attachment = session.get(ExpenseAttachment, attachment_id)
+        if not attachment:
+            raise HTTPException(status_code=404, detail="Attachment not found")
+        
+        if not attachment.file_data:
+            raise HTTPException(status_code=404, detail="File data not found")
+        
+        # Determine content type
+        content_type = attachment.content_type or attachment.file_type or "application/octet-stream"
+        
+        # Return file as response
+        from fastapi.responses import Response
+        return Response(
+            content=attachment.file_data,
+            media_type=content_type,
+            headers={
+                "Content-Disposition": f'inline; filename="{attachment.file_name}"',
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Methods": "GET",
+                "Access-Control-Allow-Headers": "*",
+            }
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error serving attachment {attachment_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail="Error serving file")
+
 @router.get("/my-expenses", response_model=List[dict])
 def list_my_expenses(
     employee_id: int = Query(...),
@@ -439,7 +450,7 @@ def list_my_expenses(
             {
                 "attachment_id": att.attachment_id,
                 "file_name": att.file_name,
-                "file_url": att.file_url,
+                "file_url": build_file_url(att.attachment_id),  # Generate URL dynamically
                 "file_type": att.file_type,
                 "file_size": att.file_size,
                 "uploaded_at": att.uploaded_at,
@@ -515,7 +526,7 @@ def list_all_expenses(
             {
                 "attachment_id": att.attachment_id,
                 "file_name": att.file_name,
-                "file_url": att.file_url,
+                "file_url": build_file_url(att.attachment_id),  # Generate URL dynamically
                 "file_type": att.file_type,
                 "file_size": att.file_size,
                 "uploaded_at": att.uploaded_at,
@@ -772,7 +783,7 @@ def list_all_expenses(
             {
                 "attachment_id": att.attachment_id,
                 "file_name": att.file_name,
-                "file_url": att.file_url,
+                "file_url": build_file_url(att.attachment_id),  # Generate URL dynamically
                 "file_type": att.file_type,
                 "file_size": att.file_size,
                 "uploaded_at": att.uploaded_at,
@@ -1021,7 +1032,7 @@ def list_acc_mgr_expenses(
             {
                 "attachment_id": att.attachment_id,
                 "file_name": att.file_name,
-                "file_url": att.file_url,
+                "file_url": build_file_url(att.attachment_id),  # Generate URL dynamically
                 "file_type": att.file_type,
                 "file_size": att.file_size,
                 "uploaded_at": att.uploaded_at,
@@ -1299,25 +1310,15 @@ async def delete_expense(
             session.delete(history)
         print(f"Deleted {len(history_records)} history records for request_id={request_id}")
  
-        # 2. Fetch and delete attachments from database and Azure Blob Storage
+        # 2. Fetch and delete attachments from database (files stored as bytea)
         attachments = session.exec(
             select(ExpenseAttachment).where(ExpenseAttachment.request_id == request_id)
         ).all()
- 
+
         for attachment in attachments:
-            # Delete from Azure Blob Storage
-            try:
-                blob_name = attachment.file_url.split(f"/{AZURE_CONTAINER_NAME}/")[-1]
-                blob_client = container_client.get_blob_client(blob_name)
-                blob_client.delete_blob()
-                print(f"Deleted blob: {blob_name}")
-            except Exception as e:
-                print(f"Failed to delete blob {blob_name}: {str(e)}")
-                # Continue even if blob deletion fails
- 
-            # Delete from database
+            # Delete from database (file data is in bytea column)
             session.delete(attachment)
- 
+
         print(f"Deleted {len(attachments)} attachments for request_id={request_id}")
  
         # 3. Record deletion in history (before deleting the expense)
@@ -1345,3 +1346,33 @@ async def delete_expense(
         session.rollback()
         print(f"Error deleting expense request_id={request_id}: {str(e)}\nSQL: {e.__cause__}")
         raise HTTPException(status_code=500, detail=f"Failed to delete expense: {str(e)}")
+
+@router.get("/storage-info")
+async def get_storage_info(session: Session = Depends(get_session)):
+    """Get storage information for expense documents in database."""
+    try:
+        # Count total attachments and total size
+        result = session.execute(
+            text("""
+                SELECT 
+                    COUNT(*) as total_files,
+                    COALESCE(SUM(file_size), 0) as total_size_kb,
+                    COALESCE(SUM(OCTET_LENGTH(file_data)), 0) as total_size_bytes
+                FROM expense_attachments
+                WHERE file_data IS NOT NULL
+            """)
+        ).fetchone()
+        
+        return {
+            "status": "success",
+            "data": {
+                "total_files": result.total_files,
+                "total_size_kb": float(result.total_size_kb),
+                "total_size_mb": round(float(result.total_size_kb) / 1024, 2),
+                "total_size_bytes": result.total_size_bytes,
+                "storage_type": "PostgreSQL Database (bytea)"
+            }
+        }
+    except Exception as e:
+        print(f"Error getting storage info: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error getting storage info: {str(e)}")

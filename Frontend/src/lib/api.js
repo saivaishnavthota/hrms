@@ -413,6 +413,12 @@ export const weekoffAPI = {
   getDefaultWeekoffs: async (employeeId) => {
     const response = await api.get(`/weekoffs/${employeeId}/default`);
     return response.data;
+  },
+
+  // POST /weekoffs/set-default-for-all - Set default weekoffs for all employees
+  setDefaultWeekoffsForAll: async () => {
+    const response = await api.post('/weekoffs/set-default-for-all');
+    return response.data;
   }
 };
 

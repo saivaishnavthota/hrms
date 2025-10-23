@@ -3,7 +3,7 @@ from sqlmodel import Session, select, delete
 from typing import List, Dict, Optional
 from models.user_model import User
 from models.employee_details_model import Location
-from models.employee_assignment_model import EmployeeManager
+from models.employee_assignment_model import EmployeeManager, EmployeeHR
 from models.swreq_model import SoftwareRequest, ComplianceQuestion, ComplianceAnswer
 from schemas.swreq_schema import (
     SoftwareRequestCreate, SoftwareRequestUpdate, SoftwareRequestResponse, UserResponse,
@@ -373,20 +373,111 @@ async def list_software_requests(
         })
 
     return response
-
 @router.get("/employees/{employee_id}/managers", response_model=List[UserResponse])
 async def get_employee_managers(employee_id: int, session: Session = Depends(get_session)):
-    managers = session.exec(
-        select(User)
-        .join(EmployeeManager, EmployeeManager.manager_id == User.id)
-        .where(EmployeeManager.employee_id == employee_id)
-    ).all()
-    return [{"id": m.id, "name": m.name, "email": m.company_email} for m in managers]
-
+    try:
+        # Check if employee exists
+        employee = session.exec(select(User).where(User.id == employee_id)).first()
+        if not employee:
+            print(f"Employee {employee_id} not found")
+            return []
+        
+        managers = []
+        
+        try:
+            print(f"Fetching managers for employee {employee_id} from EmployeeManager table")
+            
+            # Query to get managers for the employee
+            manager_records = session.exec(
+                select(EmployeeManager).where(EmployeeManager.employee_id == employee_id)
+            ).all()
+            
+            print(f"Found {len(manager_records)} manager relationships")
+            
+            # Get the actual manager User objects
+            for record in manager_records:
+                manager = session.exec(
+                    select(User).where(User.id == record.manager_id)
+                ).first()
+                
+                if manager:
+                    print(f"Found manager: {manager.name} (ID: {manager.id})")
+                    managers.append(manager)
+                else:
+                    print(f"Manager ID {record.manager_id} not found in User table")
+                    
+        except Exception as e:
+            print(f"Error fetching from EmployeeManager table: {str(e)}")
+            import traceback
+            traceback.print_exc()
+        
+        # If no managers found, try fallback
+        if not managers:
+            print(f"No managers found for employee {employee_id}, trying fallback")
+            try:
+                fallback_managers = session.exec(
+                    select(User).where(User.role == "Manager")
+                ).all()
+                print(f"Found {len(fallback_managers)} users with Manager role")
+                managers.extend(fallback_managers)
+            except Exception as e:
+                print(f"Fallback query failed: {str(e)}")
+        
+        print(f"Returning {len(managers)} managers for employee {employee_id}")
+        # Return User objects directly, not dictionaries
+        return managers
+        
+    except Exception as e:
+        print(f"Error fetching managers for employee {employee_id}: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return []
+        
 @router.get("/it_admins/", response_model=List[UserResponse])
 async def get_it_admins(session: Session = Depends(get_session)):
     it_admins = session.exec(select(User).where((User.role =="itadmin") | (User.role == "Admin"))).all()
     return [{"id": a.id, "name": a.name, "email": a.company_email} for a in it_admins]
+
+# Debug endpoint to test database connectivity
+@router.get("/debug/employee/{employee_id}")
+async def debug_employee_managers(employee_id: int, session: Session = Depends(get_session)):
+    try:
+        # Test basic employee lookup
+        employee = session.exec(select(User).where(User.id == employee_id)).first()
+        if not employee:
+            return {"error": f"Employee {employee_id} not found"}
+        
+        # Test EmployeeManager table with join
+        try:
+            # Test the join query
+            manager_query = session.exec(
+                select(User)
+                .join(EmployeeManager, EmployeeManager.manager_id == User.id)
+                .where(EmployeeManager.employee_id == employee_id)
+            ).all()
+            
+            # Also get raw records for debugging
+            manager_records = session.exec(select(EmployeeManager).where(EmployeeManager.employee_id == employee_id)).all()
+            
+            return {
+                "employee_id": employee_id,
+                "employee_name": employee.name,
+                "manager_records_count": len(manager_records),
+                "manager_records": [{"id": m.id, "employee_id": m.employee_id, "manager_id": m.manager_id} for m in manager_records],
+                "managers_via_join": [{"id": m.id, "name": m.name, "email": m.company_email} for m in manager_query],
+                "join_query_success": True,
+                "status": "success"
+            }
+        except Exception as e:
+            return {
+                "employee_id": employee_id,
+                "employee_name": employee.name,
+                "error": f"EmployeeManager join query failed: {str(e)}",
+                "join_query_success": False,
+                "status": "error"
+            }
+    except Exception as e:
+        return {"error": f"General error: {str(e)}", "status": "error"}
 
 @router.get("/locations/", response_model=List[dict])  # New endpoint for locations
 async def get_locations(session: Session = Depends(get_session)):

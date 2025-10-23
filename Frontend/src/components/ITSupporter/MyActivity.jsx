@@ -16,7 +16,7 @@ const ITSupporterMyActivity = () => {
           <TabsList className="mb-6 bg-gray-100 rounded-md p-1">
             <TabsTrigger value="attendance">Add Attendance</TabsTrigger>
             <TabsTrigger value="leave">Apply Leave</TabsTrigger>
-            <TabsTrigger value="expense">Submit Expense</TabsTrigger>
+            {/* <TabsTrigger value="expense">Submit Expense</TabsTrigger> */}
             <TabsTrigger value="documents">Upload Documents</TabsTrigger>
           </TabsList>
 
@@ -28,9 +28,9 @@ const ITSupporterMyActivity = () => {
             <ApplyLeave />
           </TabsContent>
 
-          <TabsContent value="expense" className="mt-0">
+          {/* <TabsContent value="expense" className="mt-0">
             <SubmitExpense />
-          </TabsContent>
+          </TabsContent> */}
 
           <TabsContent value="documents" className="mt-0">
             <UploadDocuments />

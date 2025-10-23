@@ -181,3 +181,44 @@ def get_default_weekoffs(employee_id: int, session: Session = Depends(get_sessio
         return default_weekoffs
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error getting default weekoffs: {str(e)}")
+
+
+@router.post("/set-default-for-all")
+def set_default_weekoffs_for_all_employees(session: Session = Depends(get_session)):
+    """
+    Set default weekoffs (Saturday and Sunday) for all employees who don't have weekoffs set
+    """
+    try:
+        # Get all employees who don't have any weekoffs
+        employees_without_weekoffs = session.execute(
+            text("""
+                SELECT DISTINCT e.id 
+                FROM employees e 
+                LEFT JOIN weekoffs w ON e.id = w.employee_id 
+                WHERE w.employee_id IS NULL
+            """)
+        ).all()
+        
+        success_count = 0
+        error_count = 0
+        
+        for employee_row in employees_without_weekoffs:
+            employee_id = employee_row[0]
+            try:
+                success = set_default_weekoffs(employee_id, session)
+                if success:
+                    success_count += 1
+                else:
+                    error_count += 1
+            except Exception as e:
+                print(f"Error setting weekoffs for employee {employee_id}: {str(e)}")
+                error_count += 1
+        
+        return {
+            "message": f"Default weekoffs processing completed",
+            "success_count": success_count,
+            "error_count": error_count,
+            "total_processed": success_count + error_count
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error setting default weekoffs for all employees: {str(e)}")

@@ -64,6 +64,11 @@ const NewExpenseForm = ({ employeeIdOverride, onSuccess, onCancel }) => {
       if (!expenseData.category) throw new Error('Please select an expense category.');
       const amountNum = parseFloat(expenseData.amount);
       if (Number.isNaN(amountNum) || amountNum <= 0) throw new Error('Please enter a valid amount.');
+      
+      // Validate that receipt is uploaded
+      if (!receiptFile) {
+        throw new Error('Receipt submission is mandatory. Please upload a receipt.');
+      }
 
       const form = new FormData();
       form.append('employee_id', Number(employeeId));
@@ -245,17 +250,25 @@ const NewExpenseForm = ({ employeeIdOverride, onSuccess, onCancel }) => {
 
       {/* Row 6: Attachment */}
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Receipt (optional)</label>
-        <Input type="file" accept="image/*,.pdf" onChange={handleFileChange} />
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          Receipt <span className="text-red-500">*</span>
+        </label>
+        <Input type="file" accept="image/*,.pdf" onChange={handleFileChange} required />
         {receiptFile ? (
-          <p className="text-xs text-gray-500 mt-1">Selected: {receiptFile.name}</p>
-        ) : null}
+          <p className="text-xs text-green-600 mt-1">Selected: {receiptFile.name}</p>
+        ) : (
+          <p className="text-xs text-red-500 mt-1">Receipt is required (Max: 70 KB per file)</p>
+        )}
       </div>
 
       {/* Actions */}
       <div className="flex items-center gap-3">
-        <Button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white">
-          {isSubmitting ? 'Submitting…' : 'Submit Expense'}
+        <Button 
+          type="submit" 
+          disabled={isSubmitting || !receiptFile}
+          className="bg-blue-600 hover:bg-blue-700 text-white disabled:bg-gray-400"
+        >
+          {isSubmitting ? 'Submitting…' : !receiptFile ? 'Upload Receipt to Submit' : 'Submit Expense'}
         </Button>
         <Button
           type="button"

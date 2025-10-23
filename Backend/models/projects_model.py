@@ -25,7 +25,9 @@ class Project(SQLModel, table=True):
     __tablename__ = "projects"
 
     project_id: Optional[int] = Field(default=None, primary_key=True)
-    project_name: str
+    project_name: str  # Project Name (Revenue)
+    project_name_commercial: Optional[str] = Field(default=None, max_length=100)  # Project Name (Commercial)
+    account: Optional[str] = Field(default=None, max_length=100)  # Account
     project_objective: Optional[str]
     client_requirements: Optional[str]
     budget: Optional[float]

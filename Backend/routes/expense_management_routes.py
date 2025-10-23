@@ -5,7 +5,7 @@ from sqlmodel import Session, select
 from database import get_session
 from models.expenses_model import ExpenseRequest, ExpenseAttachment, ExpenseHistory
 from models.user_model import User
-from models.employee_master_model import EmployeeMaster
+# EmployeeMaster model no longer used - all manager/HR data is in EmployeeManager/EmployeeHR tables
 from models.employee_assignment_model import EmployeeManager, EmployeeHR
 from auth import get_current_user, role_required
 from utils.code import generate_request_code
@@ -64,6 +64,10 @@ def submit_expense_request(
 ):
     """Submit expense request - Employee only"""
     try:
+        # Validate that receipt is provided
+        if not file or not file.filename:
+            raise HTTPException(status_code=400, detail="Receipt submission is mandatory. Please upload a receipt.")
+        
         # Validate expense date
         expense_dt = datetime.strptime(expense_date, "%Y-%m-%d")
        

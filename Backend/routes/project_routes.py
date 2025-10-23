@@ -21,12 +21,12 @@ def create_project(
     
     query = text("""
         INSERT INTO projects (
-            project_name, project_objective, client_requirements,
+            project_name, project_name_commercial, account, project_objective, client_requirements,
             budget, start_date, end_date, skills_required, status, created_at
         ) VALUES (
-            :project_name, :project_objective, :client_requirements,
+            :project_name, :project_name_commercial, :account, :project_objective, :client_requirements,
             :budget, :start_date, :end_date, :skills_required, 'Active', NOW()
-        ) RETURNING project_id, project_name, project_objective, client_requirements,
+        ) RETURNING project_id, project_name, project_name_commercial, account, project_objective, client_requirements,
                    budget, start_date, end_date, skills_required, status, created_at
     """)
 
@@ -38,6 +38,8 @@ def create_project(
     return ProjectRead(
         project_id=new_project.project_id,
         project_name=new_project.project_name,
+        project_name_commercial=new_project.project_name_commercial,
+        account=new_project.account,
         project_objective=new_project.project_objective,
         client_requirements=new_project.client_requirements,
         budget=new_project.budget,
@@ -59,7 +61,13 @@ def get_all_projects(
     # current_user: User = Depends(get_current_user)
 ):
     # Fetch all projects
-    projects = session.execute(text("SELECT * FROM projects ORDER BY created_at DESC")).fetchall()
+    projects = session.execute(text("""
+        SELECT project_id, project_name, project_name_commercial, account,
+               project_objective, client_requirements, budget, start_date, end_date, 
+               skills_required, status, created_at
+        FROM projects 
+        ORDER BY created_at DESC
+    """)).fetchall()
     
     result = []
     for p in projects:
@@ -88,6 +96,8 @@ def get_all_projects(
         result.append(ProjectRead(
             project_id=p.project_id,
             project_name=p.project_name,
+            project_name_commercial=p.project_name_commercial,
+            account=p.account,
             project_objective=p.project_objective,
             client_requirements=p.client_requirements,
             budget=p.budget,
@@ -138,6 +148,8 @@ def update_project(
             """
             UPDATE projects SET
                 project_name = :project_name,
+                project_name_commercial = :project_name_commercial,
+                account = :account,
                 project_objective = :project_objective,
                 client_requirements = :client_requirements,
                 budget = :budget,
@@ -145,7 +157,7 @@ def update_project(
                 end_date = :end_date,
                 skills_required = :skills_required
             WHERE project_id = :project_id
-            RETURNING project_id, project_name, project_objective, client_requirements,
+            RETURNING project_id, project_name, project_name_commercial, account, project_objective, client_requirements,
                       budget, start_date, end_date, skills_required, status, created_at
             """
         )
@@ -185,6 +197,8 @@ def update_project(
         return ProjectRead(
             project_id=updated.project_id,
             project_name=updated.project_name,
+            project_name_commercial=updated.project_name_commercial,
+            account=updated.account,
             project_objective=updated.project_objective,
             client_requirements=updated.client_requirements,
             budget=updated.budget,

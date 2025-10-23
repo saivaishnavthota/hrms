@@ -9,7 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { Eye, Edit, Trash2 } from 'lucide-react';
+import { Eye, Edit, Trash2, Pencil } from 'lucide-react';
 import api, { projectsAPI } from '@/lib/api';
 import { toast } from 'react-toastify';
 import { markDeleted, filterListByDeleted } from '@/lib/localDelete';
@@ -24,6 +24,7 @@ const Projects = ({ viewOnly = false }) => {
   const [error, setError] = useState(null);
   const [selectedProject, setSelectedProject] = useState(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
+  const [isEditOpen, setIsEditOpen] = useState(false);
  
   const storageKey = 'accountManagerProjects';
 
@@ -41,6 +42,22 @@ const Projects = ({ viewOnly = false }) => {
   const form = useForm({
     defaultValues: {
       projectName: '',
+      projectNameCommercial: '',
+      account: '',
+      projectObjective: '',
+      technology: '',
+      clientRequirements: '',
+      budget: '',
+      startDate: '',
+      endDate: '',
+    },
+  });
+
+  const editForm = useForm({
+    defaultValues: {
+      projectName: '',
+      projectNameCommercial: '',
+      account: '',
       projectObjective: '',
       technology: '',
       clientRequirements: '',
@@ -55,12 +72,14 @@ const Projects = ({ viewOnly = false }) => {
     try {
       const payload = {
         project_name: values.projectName,
-        project_objective: values.projectObjective || '',
-        client_requirements: values.clientRequirements || '',
-        budget: values.budget ? Number(values.budget) : 0,
-        start_date: values.startDate,
+        project_name_commercial: values.projectNameCommercial || null,
+        account: values.account || null,
+        project_objective: values.projectObjective || null,
+        client_requirements: values.clientRequirements || null,
+        budget: values.budget ? Number(values.budget) : null,
+        start_date: values.startDate || null,
         end_date: values.endDate || null,
-        skills_required: values.technology || '',
+        skills_required: values.technology || null,
       };
       const res = await projectsAPI.createProject(payload);
       console.log("Error:",res);
@@ -83,6 +102,8 @@ const Projects = ({ viewOnly = false }) => {
       const mapped = data.map((p) => ({
         id: p.project_id,
         name: p.project_name,
+        nameCommercial: p.project_name_commercial,
+        account: p.account,
         objective: p.project_objective,
         requirements: p.client_requirements,
         budget: p.budget,
@@ -111,6 +132,46 @@ const Projects = ({ viewOnly = false }) => {
     } catch (err) {
       console.error('Error deleting project locally:', err);
       toast.error('Failed to delete project');
+    }
+  };
+
+  const handleEditProject = (project) => {
+    setSelectedProject(project);
+    editForm.reset({
+      projectName: project.name || '',
+      projectNameCommercial: project.nameCommercial || '',
+      account: project.account || '',
+      projectObjective: project.objective || '',
+      technology: project.skills || '',
+      clientRequirements: project.requirements || '',
+      budget: project.budget || '',
+      startDate: project.startDate || '',
+      endDate: project.endDate || '',
+    });
+    setIsEditOpen(true);
+  };
+
+  const onEditSubmit = async (values) => {
+    if (!selectedProject) return;
+    try {
+      const payload = {
+        project_name: values.projectName,
+        project_name_commercial: values.projectNameCommercial || null,
+        account: values.account || null,
+        project_objective: values.projectObjective || null,
+        client_requirements: values.clientRequirements || null,
+        budget: values.budget ? Number(values.budget) : null,
+        start_date: values.startDate || null,
+        end_date: values.endDate || null,
+        skills_required: values.technology || null,
+      };
+      await projectsAPI.updateProject(selectedProject.id, payload);
+      toast.success('Project updated successfully');
+      setIsEditOpen(false);
+      fetchProjects();
+    } catch (err) {
+      console.error('Error updating project:', err);
+      toast.error(err?.response?.data?.detail || 'Failed to update project');
     }
   };
 
@@ -179,12 +240,40 @@ const Projects = ({ viewOnly = false }) => {
                   <FormField
                     control={form.control}
                     name="projectName"
-                    rules={{ required: 'Project name is required' }}
+                    rules={{ required: 'Project Name (Revenue) is required' }}
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-sm font-medium text-gray-700">Project Name</FormLabel>
+                        <FormLabel className="text-sm font-medium text-gray-700">Project Name (Revenue) *</FormLabel>
                         <FormControl>
-                          <Input className="focus:ring-2 focus:ring-blue-500" placeholder="Enter project name" {...field} />
+                          <Input className="focus:ring-2 focus:ring-blue-500" placeholder="Enter project name (Revenue)" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="projectNameCommercial"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-sm font-medium text-gray-700">Project Name (Commercial)</FormLabel>
+                        <FormControl>
+                          <Input className="focus:ring-2 focus:ring-blue-500" placeholder="Enter project name (Commercial)" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="account"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-sm font-medium text-gray-700">Account</FormLabel>
+                        <FormControl>
+                          <Input className="focus:ring-2 focus:ring-blue-500" placeholder="Enter account" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -252,7 +341,6 @@ const Projects = ({ viewOnly = false }) => {
                   <FormField
                     control={form.control}
                     name="startDate"
-                    rules={{ required: 'Start date is required' }}
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel className="text-sm font-medium text-gray-700">Start Date</FormLabel>
@@ -325,7 +413,7 @@ const Projects = ({ viewOnly = false }) => {
                     ) : (
                       getPaginatedData(projects).map((p) => (
                         <TableRow key={p.id} className="hover:bg-gray-50">
-                          <TableCell className="font-medium">{p.name}</TableCell>
+                          <TableCell className="font-medium">{p.nameCommercial || p.name}</TableCell>
                           <TableCell>{p.startDate ? new Date(p.startDate).toLocaleDateString() : '-'}</TableCell>
                           <TableCell>{p.endDate ? new Date(p.endDate).toLocaleDateString() : '-'}</TableCell>
                           <TableCell className="text-right">
@@ -343,6 +431,19 @@ const Projects = ({ viewOnly = false }) => {
                                   </Button>
                                 </TooltipTrigger>
                                 <TooltipContent>View</TooltipContent>
+                              </Tooltip>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button 
+                                    variant="ghost" 
+                                    size="sm" 
+                                    onClick={() => handleEditProject(p)}
+                                    className="text-green-900 hover:text-green-600 hover:bg-green-50"
+                                  >
+                                    <Pencil className="h-4 w-4" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>Edit</TooltipContent>
                               </Tooltip>
                               <Tooltip>
                                 <TooltipTrigger asChild>
@@ -393,8 +494,18 @@ const Projects = ({ viewOnly = false }) => {
     {selectedProject && (
       <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4 text-gray-700">
         <div className="flex flex-col">
-          <span className="font-medium text-gray-900">Name:</span>
-          <span>{selectedProject.name}</span>
+          <span className="font-medium text-gray-900">Project Name (Commercial):</span>
+          <span>{selectedProject.nameCommercial || '-'}</span>
+        </div>
+
+        <div className="flex flex-col">
+          <span className="font-medium text-gray-900">Project Name (Revenue):</span>
+          <span>{selectedProject.name || '-'}</span>
+        </div>
+
+        <div className="flex flex-col">
+          <span className="font-medium text-gray-900">Account:</span>
+          <span>{selectedProject.account || '-'}</span>
         </div>
 
         <div className="flex flex-col">
@@ -457,6 +568,159 @@ const Projects = ({ viewOnly = false }) => {
           </Button>
         </div>
       </div>
+    )}
+  </DialogContent>
+</Dialog>
+
+{/* Edit Project Modal */}
+<Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
+  <DialogContent className="bg-gradient-to-br from-white via-gray-50 to-blue-50 rounded-xl shadow-2xl max-w-2xl w-full mx-4 max-h-[80vh] overflow-y-auto border border-gray-200">
+    <DialogHeader>
+      <DialogTitle className="flex items-center gap-2 text-xl font-semibold text-gray-900">
+        Edit Project
+      </DialogTitle>
+    </DialogHeader>
+
+    {selectedProject && (
+      <Form {...editForm}>
+        <form onSubmit={editForm.handleSubmit(onEditSubmit)} className="space-y-5">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            <FormField
+              control={editForm.control}
+              name="projectName"
+              rules={{ required: 'Project Name (Revenue) is required' }}
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-sm font-medium text-gray-700">Project Name (Revenue) *</FormLabel>
+                  <FormControl>
+                    <Input className="focus:ring-2 focus:ring-blue-500" placeholder="Enter project name" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={editForm.control}
+              name="projectNameCommercial"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-sm font-medium text-gray-700">Project Name (Commercial)</FormLabel>
+                  <FormControl>
+                    <Input className="focus:ring-2 focus:ring-blue-500" placeholder="Enter commercial name" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={editForm.control}
+              name="account"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-sm font-medium text-gray-700">Account</FormLabel>
+                  <FormControl>
+                    <Input className="focus:ring-2 focus:ring-blue-500" placeholder="Enter account" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={editForm.control}
+              name="technology"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-sm font-medium text-gray-700">Skills Required</FormLabel>
+                  <FormControl>
+                    <Input className="focus:ring-2 focus:ring-blue-500" placeholder="e.g., React, Python" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            <FormField
+              control={editForm.control}
+              name="startDate"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-sm font-medium text-gray-700">Start Date</FormLabel>
+                  <FormControl>
+                    <Input className="focus:ring-2 focus:ring-blue-500" type="date" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={editForm.control}
+              name="endDate"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-sm font-medium text-gray-700">End Date</FormLabel>
+                  <FormControl>
+                    <Input className="focus:ring-2 focus:ring-blue-500" type="date" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
+
+          <FormField
+            control={editForm.control}
+            name="budget"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel className="text-sm font-medium text-gray-700">Budget</FormLabel>
+                <FormControl>
+                  <Input className="focus:ring-2 focus:ring-blue-500" type="number" placeholder="Enter budget" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={editForm.control}
+            name="projectObjective"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel className="text-sm font-medium text-gray-700">Project Objective</FormLabel>
+                <FormControl>
+                  <Input className="focus:ring-2 focus:ring-blue-500" placeholder="Brief objective" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={editForm.control}
+            name="clientRequirements"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel className="text-sm font-medium text-gray-700">Client Requirements</FormLabel>
+                <FormControl>
+                  <Textarea className="focus:ring-2 focus:ring-blue-500" rows={4} placeholder="List client requirements" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <div className="flex justify-end gap-3">
+            <Button type="button" variant="outline" onClick={() => setIsEditOpen(false)} className="bg-gray-100 text-gray-700 hover:bg-gray-200">Cancel</Button>
+            <Button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white">Save Changes</Button>
+          </div>
+        </form>
+      </Form>
     )}
   </DialogContent>
 </Dialog>

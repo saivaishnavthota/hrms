@@ -9,10 +9,8 @@ from auth import get_current_user, create_access_token, verify_password, role_re
 from database import get_session
 from datetime import datetime, timedelta
 from sqlalchemy.sql import text
-from models.employee_master_model import EmployeeMaster
 from models.employee_details_model import EmployeeDetails, Location
 from models.employee_assignment_model import EmployeeHR, EmployeeManager
-from schemas.employee_master_schema import EmployeeMasterCreate, EmployeeMasterResponse
 import logging
 from utils.hash_utils import hash_password
 import random
@@ -574,37 +572,20 @@ def get_employee_profile(employee_id: int, session: Session = Depends(get_sessio
     if not employee:
         raise HTTPException(status_code=404, detail="Employee not found")
     
-    # managers and HRs from EmployeeMaster
-    master = session.exec(select(EmployeeMaster).where(EmployeeMaster.emp_id == employee_id)).first()
+    # Get managers from EmployeeManager table
     managers = []
-    hrs = []
-
-    if master:
-        # managers from master table
-        for mid in [master.manager1_id, master.manager2_id, master.manager3_id]:
-            if mid:
-                mgr = session.exec(select(User).where(User.id == mid)).first()
-                if mgr:
-                    managers.append(mgr.name)
-        # HRs from master table
-        for hid in [master.hr1_id, master.hr2_id]:
-            if hid:
-                hr = session.exec(select(User).where(User.id == hid)).first()
-                if hr:
-                    hrs.append(hr.name)
-
-    # extra managers from EmployeeManager table
-    extra_managers = session.exec(select(EmployeeManager).where(EmployeeManager.employee_id == employee_id)).all()
-    for m in extra_managers:
+    manager_records = session.exec(select(EmployeeManager).where(EmployeeManager.employee_id == employee_id)).all()
+    for m in manager_records:
         mgr = session.exec(select(User).where(User.id == m.manager_id)).first()
-        if mgr and mgr.name not in managers:
+        if mgr:
             managers.append(mgr.name)
 
-    # extra HRs from EmployeeHR table
-    extra_hrs = session.exec(select(EmployeeHR).where(EmployeeHR.employee_id == employee_id)).all()
-    for h in extra_hrs:
+    # Get HRs from EmployeeHR table
+    hrs = []
+    hr_records = session.exec(select(EmployeeHR).where(EmployeeHR.employee_id == employee_id)).all()
+    for h in hr_records:
         hr = session.exec(select(User).where(User.id == h.hr_id)).first()
-        if hr and hr.name not in hrs:
+        if hr:
             hrs.append(hr.name)
 
     details = session.exec(select(EmployeeDetails).where(EmployeeDetails.employee_id == employee_id)).first()
@@ -938,12 +919,7 @@ async def delete_employee(
         if employee_details:
             session.delete(employee_details)
         
-        # Delete employee master records
-        employee_master = session.exec(
-            select(EmployeeMaster).where(EmployeeMaster.emp_id == employee_id)
-        ).first()
-        if employee_master:
-            session.delete(employee_master)
+        # EmployeeMaster records are no longer used - all data is in EmployeeManager/EmployeeHR tables
         
         # Delete employee HR assignments
         employee_hrs = session.exec(

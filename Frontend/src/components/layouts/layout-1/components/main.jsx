@@ -99,7 +99,7 @@ export function Main({ menu }) {
       path: (isSuperHRPath ? '/super-hr/leave-requests' : '/hr/leave-requests'),
     },
     
-    { title: 'Expense Management', path: (isSuperHRPath ? '/super-hr/expense-management' : '/hr/expense-management'), icon: Coins },
+    // { title: 'Expense Management', path: (isSuperHRPath ? '/super-hr/expense-management' : '/hr/expense-management'), icon: Coins },
     { title: 'Attendance', path: (isSuperHRPath ? '/super-hr/employees-attendance' : '/hr/employees-attendance'), icon: CalendarCheck },
     { title: 'Holidays', path: (isSuperHRPath ? '/super-hr/holidays' : '/hr/holidays'), icon: CalendarSearch },
     { title: 'View Projects', path: (isSuperHRPath ? '/super-hr/view-projects' : '/hr/view-projects'), icon: FileIcon },

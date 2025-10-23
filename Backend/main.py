@@ -71,5 +71,14 @@ app.include_router(swreq_routes.router)
 app.include_router(entra_auth_routes.router)
 app.include_router(entra_auth_routes.oauth2_router)  # Azure AD standard OAuth2 redirect path
 
+# Add static file serving for uploads
+import os
+uploads_path = os.path.join(os.getcwd(), "uploads")
+if os.path.exists(uploads_path):
+    app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
+    print(f"Static files mounted at /uploads from {uploads_path}")
+else:
+    print(f"Warning: Uploads directory not found at {uploads_path}")
+
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=PORT, reload=True)

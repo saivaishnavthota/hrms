@@ -114,7 +114,7 @@ export function PaginationControls({
                 id="pageSize"
                 value={pageSize}
                 onChange={handlePageSizeChange}
-                className="px-2 py-1 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="px-2 py-1 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#2D5016]"
               >
                 {pageSizeOptions.map((size) => (
                   <option key={size} value={size}>
@@ -165,7 +165,7 @@ export function PaginationControls({
               onClick={() => handlePageChange(page)}
               className={`h-8 min-w-[32px] px-3 ${
                 currentPage === page
-                  ? 'bg-blue-600 text-white hover:bg-blue-700'
+                  ? 'bg-[#2D5016] text-white hover:bg-green-700'
                   : ''
               }`}
             >

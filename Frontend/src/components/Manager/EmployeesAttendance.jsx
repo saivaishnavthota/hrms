@@ -140,7 +140,7 @@ const ManagerEmployeeAttendance = () => {
   const getStatusBadge = (status) => {
     const statusConfig = {
       'Present': 'bg-green-100 text-green-800',
-      'WFH': 'bg-blue-100 text-blue-800',
+      'WFH': 'bg-green-100 text-green-800',
       'Leave': 'bg-red-100 text-red-800',
       'Unknown': 'bg-gray-100 text-gray-800'
     };
@@ -167,12 +167,12 @@ const ManagerEmployeeAttendance = () => {
               placeholder="Year"
               value={year}
               onChange={(e) => setYear(parseInt(e.target.value))}
-              className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm w-24"
+              className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#2D5016] text-sm w-24"
             />
             <select
               value={month}
               onChange={(e) => setMonth(parseInt(e.target.value))}
-              className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
+              className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#2D5016] text-sm"
             >
               {[...Array(12)].map((_, i) => (
                 <option key={i + 1} value={i + 1}>{new Date(0, i).toLocaleString('en-US', { month: 'long' })}</option>
@@ -193,11 +193,11 @@ const ManagerEmployeeAttendance = () => {
                 </div>
                 <div className="mt-1 text-2xl font-bold text-green-900">{monthlyCounts.present}</div>
               </div>
-              <div className="rounded-lg border border-blue-200 bg-gradient-to-br from-blue-50 to-blue-100 p-3">
-                <div className="text-xs font-medium text-blue-800 flex items-center gap-1">
+              <div className="rounded-lg border border-green-200 bg-gradient-to-br from-green-50 to-green-100 p-3">
+                <div className="text-xs font-medium text-green-800 flex items-center gap-1">
                   <Home className="h-3 w-3" /> WFH
                 </div>
-                <div className="mt-1 text-2xl font-bold text-blue-900">{monthlyCounts.wfh}</div>
+                <div className="mt-1 text-2xl font-bold text-green-900">{monthlyCounts.wfh}</div>
               </div>
               <div className="rounded-lg border border-red-200 bg-gradient-to-br from-red-50 to-red-100 p-3">
                 <div className="text-xs font-medium text-red-800 flex items-center gap-1">
@@ -219,11 +219,11 @@ const ManagerEmployeeAttendance = () => {
                 </div>
                 <div className="mt-1 text-2xl font-bold text-green-900">{dailyCounts.present}</div>
               </div>
-              <div className="rounded-lg border border-blue-200 bg-gradient-to-br from-blue-50 to-blue-100 p-3">
-                <div className="text-xs font-medium text-blue-800 flex items-center gap-1">
+              <div className="rounded-lg border border-green-200 bg-gradient-to-br from-green-50 to-green-100 p-3">
+                <div className="text-xs font-medium text-green-800 flex items-center gap-1">
                   <Home className="h-3 w-3" /> WFH
                 </div>
-                <div className="mt-1 text-2xl font-bold text-blue-900">{dailyCounts.wfh}</div>
+                <div className="mt-1 text-2xl font-bold text-green-900">{dailyCounts.wfh}</div>
               </div>
               <div className="rounded-lg border border-red-200 bg-gradient-to-br from-red-50 to-red-100 p-3">
                 <div className="text-xs font-medium text-red-800 flex items-center gap-1">
@@ -254,13 +254,13 @@ const ManagerEmployeeAttendance = () => {
                     placeholder="Search employees..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm w-64"
+                    className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#2D5016] text-sm w-64"
                   />
                 </div>
                 <select
                   value={typeFilter}
                   onChange={(e) => setTypeFilter(e.target.value)}
-                  className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
+                  className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#2D5016] text-sm"
                 >
                   <option value="all">All Types</option>
                   <option value="Full-Time">Full-Time</option>
@@ -269,7 +269,7 @@ const ManagerEmployeeAttendance = () => {
                 <select
                   value={roleFilter}
                   onChange={(e) => setRoleFilter(e.target.value)}
-                  className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
+                  className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#2D5016] text-sm"
                 >
                   <option value="all">All Roles</option>
                   <option value="Employee">Employee</option>
@@ -339,7 +339,7 @@ const ManagerEmployeeAttendance = () => {
                         {record.projects && record.projects.length > 0 ? (
                           <button
                             onClick={() => handleShowProjects(record)}
-                            className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 hover:bg-blue-200 transition-colors duration-200"
+                            className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 hover:bg-green-200 transition-colors duration-200"
                           >
                             <Eye className="h-3 w-3 mr-1" />
                             View Projects ({record.projects.length})
@@ -353,7 +353,7 @@ const ManagerEmployeeAttendance = () => {
                       <div className="flex items-center justify-end space-x-2">
                         <button
                           onClick={() => handleShowView(record)}
-                          className="text-blue-600 hover:text-blue-900 p-1 rounded-full hover:bg-blue-50"
+                          className="text-[#2D5016] hover:text-green-900 p-1 rounded-full hover:bg-green-50"
                           title="View Details"
                         >
                           <Eye className="h-4 w-4" />
@@ -394,14 +394,14 @@ const ManagerEmployeeAttendance = () => {
       {showModal && selectedRecord && (
         <div className="fixed inset-0 bg-transparent backdrop-blur-[2px] flex items-center justify-center z-50">
           <div className="bg-gradient-to-br from-white via-gray-50 to-blue-50 rounded-xl shadow-2xl max-w-2xl w-full mx-4 max-h-[80vh] overflow-y-auto border border-gray-200">
-            <div className="flex items-center justify-between p-6 border-b border-blue-200 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-t-xl">
+            <div className="flex items-center justify-between p-6 border-b border-green-200 bg-gradient-to-r from-[#2D5016] to-green-600 rounded-t-xl">
               <div>
                 <h3 className="text-lg font-semibold text-white">Projects & Subtasks</h3>
-                <p className="text-sm text-blue-100 mt-1">{selectedRecord.employee.name} - {selectedRecord.date}</p>
+                <p className="text-sm text-green-100 mt-1">{selectedRecord.employee.name} - {selectedRecord.date}</p>
               </div>
               <button
                 onClick={handleCloseModal}
-                className="text-blue-100 hover:text-white p-1 rounded-full hover:bg-blue-500"
+                className="text-green-100 hover:text-white p-1 rounded-full hover:bg-green-500"
               >
                 <X className="h-5 w-5" />
               </button>
@@ -410,9 +410,9 @@ const ManagerEmployeeAttendance = () => {
               {selectedRecord.projects && selectedRecord.projects.length > 0 ? (
                 <div className="space-y-6">
                   {selectedRecord.projects.map((project, projectIndex) => (
-                    <div key={projectIndex} className="bg-white/70 backdrop-blur-sm border border-blue-200 rounded-xl p-4 shadow-md hover:shadow-lg transition-shadow">
+                    <div key={projectIndex} className="bg-white/70 backdrop-blur-sm border border-green-200 rounded-xl p-4 shadow-md hover:shadow-lg transition-shadow">
                       <h4 className="text-md font-semibold text-gray-800 mb-3 flex items-center">
-                        <div className="w-3 h-3 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full mr-2"></div>
+                        <div className="w-3 h-3 bg-gradient-to-r from-[#2D5016] to-green-500 rounded-full mr-2"></div>
                         {project.name}
                       </h4>
                       {project.subtasks && project.subtasks.length > 0 ? (
@@ -422,7 +422,7 @@ const ManagerEmployeeAttendance = () => {
                             {project.subtasks.map((subtask, subtaskIndex) => (
                               <div
                                 key={subtaskIndex}
-                                className="flex items-center p-2 bg-white/50 rounded-md border border-blue-100"
+                                className="flex items-center p-2 bg-white/50 rounded-md border border-green-100"
                               >
                                 <div className="w-2 h-2 bg-gradient-to-r from-emerald-400 to-teal-500 rounded-full mr-3"></div>
                                 <span className="text-sm text-gray-800">{subtask.name} ({subtask.hours}h)</span>
@@ -459,11 +459,11 @@ const ManagerEmployeeAttendance = () => {
       {showViewModal && viewRecord && (
         <div className="fixed inset-0 bg-transparent backdrop-blur-[2px] flex items-center justify-center z-50">
           <div className="bg-gradient-to-br from-white via-gray-50 to-blue-50 rounded-xl shadow-2xl max-w-3xl w-full mx-4 max-h-[80vh] overflow-y-auto border border-gray-200">
-            <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-gradient-to-r from-gray-600 to-blue-600 rounded-t-xl">
+            <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-gradient-to-r from-gray-600 to-[#2D5016] rounded-t-xl">
               <h3 className="text-xl font-semibold text-white">Employee Details - {viewRecord.employee.name}</h3>
               <button
                 onClick={handleCloseViewModal}
-                className="text-blue-100 hover:text-white transition-colors p-1 rounded-full hover:bg-blue-500"
+                className="text-green-100 hover:text-white transition-colors p-1 rounded-full hover:bg-green-500"
               >
                 <X size={24} />
               </button>
@@ -472,7 +472,7 @@ const ManagerEmployeeAttendance = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="bg-white/70 backdrop-blur-sm border border-gray-200 rounded-xl p-4 shadow-md">
                   <h4 className="font-semibold text-gray-800 mb-3 flex items-center">
-                    <div className="w-3 h-3 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full mr-2"></div>
+                    <div className="w-3 h-3 bg-gradient-to-r from-[#2D5016] to-green-500 rounded-full mr-2"></div>
                     Employee Information
                   </h4>
                   <div className="space-y-3">
@@ -537,7 +537,7 @@ const ManagerEmployeeAttendance = () => {
                           <div className="space-y-1">
                             {project.subtasks.map((subtask, subIndex) => (
                               <div key={subIndex} className="flex items-center space-x-2">
-                                <div className="w-1.5 h-1.5 bg-gradient-to-r from-blue-400 to-purple-400 rounded-full"></div>
+                                <div className="w-1.5 h-1.5 bg-gradient-to-r from-green-400 to-green-500 rounded-full"></div>
                                 <span className="text-sm text-gray-700">{subtask.name} ({subtask.hours}h)</span>
                               </div>
                             ))}

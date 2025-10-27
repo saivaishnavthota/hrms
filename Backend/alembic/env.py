@@ -12,11 +12,11 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # Import all models to ensure they are registered with SQLModel
 from models.user_model import User
-from models.employee_master_model import EmployeeMaster
 from models.employee_details_model import EmployeeDetails, Location
 from models.employee_assignment_model import EmployeeHR, EmployeeManager
 from models.onboarding_model import candidate, onboard_emp_doc
 from models.attendance_model import Attendance, AttendanceProject
+from models.project_allocation_model import ProjectAllocation
 from models.document_model import Document
 from models.expenses_model import ExpenseRequest, ExpenseAttachment, ExpenseHistory
 from models.leave_model import LeaveManagement
@@ -24,7 +24,6 @@ from models.leave_balance_model import LeaveBalance
 from models.leave_approvals_model import LeaveApproval
 from models.projects_model import Project
 from models.request_log_model import RequestLog
-from models.weekoff_model import Weekoff
 
 from sqlmodel import SQLModel
 

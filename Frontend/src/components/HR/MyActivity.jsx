@@ -14,7 +14,7 @@ const MyActivity = () => {
 
         <Tabs defaultValue="attendance" className="w-full">
           <TabsList className="mb-6 bg-gray-100 rounded-md p-1">
-            <TabsTrigger value="attendance">Add Attendance</TabsTrigger>
+            <TabsTrigger value="attendance">Book Your Time</TabsTrigger>
             <TabsTrigger value="leave">Apply Leave</TabsTrigger>
             <TabsTrigger value="documents">Upload Documents</TabsTrigger>
             <TabsTrigger value="software">Software Requests</TabsTrigger>

@@ -101,6 +101,11 @@ export const MENU_SIDEBAR_ADMIN = [
     icon: ClipboardList,
     path: '/admin/software-requests',
   },
+  {
+    title: 'Project Allocations',
+    icon: Briefcase,
+    path: '/admin/project-allocations',
+  },
   // Configuration Section
   {
     title: 'HR Config',

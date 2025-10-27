@@ -100,7 +100,8 @@ async def apply_leave(leave: dict, session: Session = Depends(get_session)):
             raise HTTPException(status_code=404, detail="Employee not found")
         location_id = employee.location_id
         logger.info(f"Employee found: {employee.name}, Location ID: {location_id}")
-        weekoffs = get_employee_weekoffs(employee.id, session)
+        # Default weekoffs are Saturday and Sunday for all employees
+        weekoffs = {"Saturday", "Sunday"}
         logger.info(f"Employee weekoffs: {weekoffs}")
         start_date = datetime.strptime(leave["start_date"], "%Y-%m-%d").date()
         end_date = datetime.strptime(leave["end_date"], "%Y-%m-%d").date()
@@ -618,22 +619,4 @@ def update_leave_balance(
     session.refresh(balance)
     return balance
  
-def get_employee_weekoffs(employee_id: int, session: Session):
-    """
-    Fetches the weekoff days (day names) for a given employee.
-    Returns a set of day names, e.g., {"Monday", "Wednesday"}.
-    """
-    result = session.execute(
-        text("SELECT off_days FROM weekoffs WHERE employee_id = :emp"),
-        {"emp": employee_id}
-    ).all()
-   
-    # Each row[0] is already a list/set of day names
-    # Flatten all rows into a single set
-    weekoff_days = set()
-    for row in result:
-        if row[0]:  # check not null
-            weekoff_days.update(row[0])
-   
-    return weekoff_days
  

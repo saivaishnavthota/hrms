@@ -1,7 +1,11 @@
 # app/models/user_model.py
 from sqlmodel import SQLModel, Field, Relationship
-from typing import Optional, List
+from typing import Optional, List, TYPE_CHECKING
 from datetime import datetime
+
+if TYPE_CHECKING:
+    from .attendance_model import Attendance
+    from .project_allocation_model import ProjectAllocation
 
 class User(SQLModel, table=True):
     __tablename__ = "employees"
@@ -14,7 +18,9 @@ class User(SQLModel, table=True):
     created_at: Optional[datetime] = Field(default_factory=datetime.now)
     reset_otp: Optional[str] = Field(default=None, max_length=6)
     company_email:Optional[str] = Field(max_length=100)
-    company_employee_id: Optional[str] = Field(max_length=50, default=None)
+    company_employee_id: Optional[str] = Field(max_length=6, default=None)
+    designation: Optional[str] = Field(max_length=200, default=None)  # Job title/designation
+    band: Optional[str] = Field(max_length=50, default=None)  # Employee band level
     reassignment: Optional[bool] = Field(default=False)  # Track if employee has been assigned before
     login_status: Optional[bool] = Field(default=False)
     location_id: Optional[int] = Field(default=None, foreign_key="locations.id")
@@ -29,5 +35,7 @@ class User(SQLModel, table=True):
     department: Optional[str] = Field(default=None, max_length=200)  # Department from Entra ID
     auth_provider: Optional[str] = Field(default="local", max_length=50)  # Authentication provider: "local" or "entra"
 
-   
+    # Relationships - using string references to avoid circular imports
+    attendances: List["Attendance"] = Relationship(back_populates="employee")
+    project_allocations: List["ProjectAllocation"] = Relationship(back_populates="employee")
     

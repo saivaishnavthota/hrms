@@ -1,8 +1,11 @@
 from sqlmodel import SQLModel, Field, Relationship
-from typing import Optional, List
+from typing import Optional, List, TYPE_CHECKING
 from datetime import datetime, date
 from zoneinfo import ZoneInfo
-from .user_model import User
+
+if TYPE_CHECKING:
+    from .user_model import User
+    from .project_model import Project
  
 class AttendanceProject(SQLModel, table=True):
     __tablename__ = "attendance_projects"
@@ -12,9 +15,11 @@ class AttendanceProject(SQLModel, table=True):
     project_id: int = Field(foreign_key="projects.project_id")
     sub_task: Optional[str]
     hours: Optional[float]  # Changed from int to float
+    days_worked: float = Field(default=1.0)
  
     # Relationships
     attendance: Optional["Attendance"] = Relationship(back_populates="attendance_projects")
+    project: Optional["Project"] = Relationship()
  
 class Attendance(SQLModel, table=True):
     __tablename__ = "attendance"
@@ -26,12 +31,11 @@ class Attendance(SQLModel, table=True):
     action: Optional[str]
     status: Optional[str]
     hours: Optional[float]  # Changed from int to float
+    days_count: float = Field(default=1.0)
     created_at: datetime = Field(default_factory=lambda: datetime.now(tz=ZoneInfo("Asia/Kolkata")))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(tz=ZoneInfo("Asia/Kolkata")))
  
     # Relationships
-    employee: Optional[User] = Relationship(back_populates="attendances")
+    employee: Optional["User"] = Relationship(back_populates="attendances")
     attendance_projects: List[AttendanceProject] = Relationship(back_populates="attendance")
  
-# Link back relationships
-AttendanceProject.attendance = Relationship(back_populates="attendance_projects")

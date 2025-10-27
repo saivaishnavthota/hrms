@@ -1,7 +1,6 @@
 from datetime import datetime
 from typing import Optional, List
 from sqlmodel import SQLModel, Field, Relationship
-from models.user_model import User
  
 class ExpenseAttachment(SQLModel, table=True):
     __tablename__ = "expense_attachments"

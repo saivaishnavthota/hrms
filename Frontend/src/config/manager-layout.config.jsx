@@ -1,4 +1,4 @@
-import { LayoutGrid, ClipboardList, UserPlus, Users, Plane, DollarSign, KeyRound, Upload ,CalendarCheck ,Coins, Monitor} from 'lucide-react';
+import { LayoutGrid, ClipboardList, UserPlus, Users, Plane, DollarSign, KeyRound, Upload ,CalendarCheck ,Coins, Monitor, BarChart3} from 'lucide-react';
 
 export const MENU_SIDEBAR_MANAGER = [
   {
@@ -15,6 +15,11 @@ export const MENU_SIDEBAR_MANAGER = [
     title: 'Employees',
     icon: Users,
     path: '/manager/employees',
+  },
+  {
+    title: 'Employee Allocations',
+    icon: BarChart3,
+    path: '/manager/employee-allocation-dashboard',
   },
   {
     title: 'Leave Management',

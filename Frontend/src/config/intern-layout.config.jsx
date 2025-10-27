@@ -7,7 +7,7 @@ export const MENU_SIDEBAR_INTERN = [
     path: '/intern',
   },
   {
-    title: 'Add Attendance',
+    title: 'Book Your Time',
     icon: ClipboardList,
     path: '/intern/add-attendance',
   },

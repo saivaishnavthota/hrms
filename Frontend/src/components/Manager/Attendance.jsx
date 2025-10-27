@@ -18,13 +18,13 @@ const ManagerAttendance = () => {
         <TabsList className="grid grid-cols-2 w-full max-w-md bg-white shadow-sm border border-gray-200">
           <TabsTrigger 
             value="add_attendance" 
-            className="flex items-center gap-2 data-[state=active]:bg-blue-500 data-[state=active]:text-white transition-all duration-200"
+            className="flex items-center gap-2 data-[state=active]:bg-[#2D5016] data-[state=active]:text-white transition-all duration-200"
           >
-            Add Attendance
+            Book Your Time
           </TabsTrigger>
           <TabsTrigger 
             value="employee_attendance" 
-            className="flex items-center gap-2 data-[state=active]:bg-blue-500 data-[state=active]:text-white transition-all duration-200"
+            className="flex items-center gap-2 data-[state=active]:bg-[#2D5016] data-[state=active]:text-white transition-all duration-200"
           >
             Employee Attendance
           </TabsTrigger>

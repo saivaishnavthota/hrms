@@ -172,11 +172,11 @@ const ManagerDashboard = () => {
               </div>
               <div className="mt-1 text-2xl font-bold text-green-900">{monthlyCounts.present}</div>
             </div>
-            <div className="rounded-lg border border-blue-200 bg-gradient-to-br from-blue-50 to-blue-100 p-3">
-              <div className="text-xs font-medium text-blue-800 flex items-center gap-1">
+            <div className="rounded-lg border border-green-200 bg-gradient-to-br from-green-50 to-green-100 p-3">
+              <div className="text-xs font-medium text-green-800 flex items-center gap-1">
                 <Home className="h-3 w-3" /> WFH
               </div>
-              <div className="mt-1 text-2xl font-bold text-blue-900">{monthlyCounts.wfh}</div>
+              <div className="mt-1 text-2xl font-bold text-green-900">{monthlyCounts.wfh}</div>
             </div>
             <div className="rounded-lg border border-red-200 bg-gradient-to-br from-red-50 to-red-100 p-3">
               <div className="text-xs font-medium text-red-800 flex items-center gap-1">
@@ -200,11 +200,11 @@ const ManagerDashboard = () => {
               </div>
               <div className="mt-1 text-2xl font-bold text-green-900">{dailyCounts.present}</div>
             </div>
-            <div className="rounded-lg border border-blue-200 bg-gradient-to-br from-blue-50 to-blue-100 p-3">
-              <div className="text-xs font-medium text-blue-800 flex items-center gap-1">
+            <div className="rounded-lg border border-green-200 bg-gradient-to-br from-green-50 to-green-100 p-3">
+              <div className="text-xs font-medium text-green-800 flex items-center gap-1">
                 <Home className="h-3 w-3" /> WFH
               </div>
-              <div className="mt-1 text-2xl font-bold text-blue-900">{dailyCounts.wfh}</div>
+              <div className="mt-1 text-2xl font-bold text-green-900">{dailyCounts.wfh}</div>
             </div>
             <div className="rounded-lg border border-red-200 bg-gradient-to-br from-red-50 to-red-100 p-3">
               <div className="text-xs font-medium text-red-800 flex items-center gap-1">

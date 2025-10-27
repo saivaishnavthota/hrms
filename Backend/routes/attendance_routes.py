@@ -9,6 +9,7 @@ from models.user_model import User
 from models.employee_assignment_model import EmployeeManager, EmployeeHR
 from datetime import datetime, date, timedelta
 from schemas.attendance_schema import AttendanceCreate, AttendanceBase, AttendanceResponse
+from services.project_allocation_service import ProjectAllocationService
 import json
  
 router = APIRouter(prefix="/attendance", tags=["Attendance"])
@@ -111,28 +112,58 @@ def get_active_projects(
     manager_id: Optional[int] = Query(None),
     employee_id: Optional[int] = Query(None),
     hr_id: Optional[int] = Query(None),
+    month: Optional[str] = Query(None),  # Format: YYYY-MM
     session: Session = Depends(get_session)
 ):
     user_id = employee_id or manager_id or hr_id
     if not user_id:
         raise HTTPException(status_code=400, detail="employee_id, manager_id, or hr_id is required")
- 
-    query = text("""
-        SELECT p.project_id, p.project_name
-        FROM projects p
-        JOIN employee_project_assignments epa
-        ON p.project_id = epa.project_id
-        WHERE epa.employee_id = :user_id
-        AND p.status = 'Active'
-        ORDER BY p.created_at DESC
-    """)
- 
-    projects = session.execute(query, {"user_id": user_id}).fetchall()
- 
-    return [
-        {"project_id": p._mapping["project_id"], "project_name": p._mapping["project_name"]}
-        for p in projects
-    ]
+    
+    # If month is provided, filter by project allocations
+    if month:
+        query = text("""
+            SELECT DISTINCT p.project_id, p.project_name, pa.allocated_days, pa.consumed_days
+            FROM projects p
+            JOIN project_allocations pa ON p.project_id = pa.project_id
+            WHERE pa.employee_id = :user_id
+            AND pa.month = :month
+            AND p.status = 'Active'
+            AND pa.allocated_days > 0
+            ORDER BY p.project_name
+        """)
+        projects = session.execute(query, {"user_id": user_id, "month": month}).fetchall()
+        
+        result = []
+        for p in projects:
+            allocated_days = float(p._mapping["allocated_days"]) if p._mapping["allocated_days"] is not None else 0.0
+            consumed_days = float(p._mapping["consumed_days"]) if p._mapping["consumed_days"] is not None else 0.0
+            
+            result.append({
+                "project_id": p._mapping["project_id"], 
+                "project_name": p._mapping["project_name"],
+                "allocated_days": allocated_days,
+                "consumed_days": consumed_days,
+                "remaining_days": allocated_days - consumed_days
+            })
+        
+        return result
+    else:
+        # Fallback to all assigned projects (for backward compatibility)
+        query = text("""
+            SELECT p.project_id, p.project_name
+            FROM projects p
+            JOIN employee_project_assignments epa
+            ON p.project_id = epa.project_id
+            WHERE epa.employee_id = :user_id
+            AND p.status = 'Active'
+            ORDER BY p.created_at DESC
+        """)
+        projects = session.execute(query, {"user_id": user_id}).fetchall()
+        
+        return [
+            {"project_id": p._mapping["project_id"], "project_name": p._mapping["project_name"]}
+            for p in projects
+        ]
  
 @router.post("", response_model=dict)
 @router.post("/", response_model=dict)
@@ -157,6 +188,87 @@ async def save_attendance(
     print(f"✅ Using user_id: {user_id}")
  
     try:
+        # First pass: Calculate total consumption per project across all days
+        project_consumption = {}  # {project_id: total_days}
+        
+        for date_str, entry in data.items():
+            print(f"\n📅 Pre-processing date: {date_str}")
+            if (not entry.action or entry.action.strip() == "") and \
+               (not entry.project_ids or len(entry.project_ids) == 0) and \
+               (not entry.sub_tasks or len(entry.sub_tasks) == 0):
+                continue
+
+            if entry.action not in VALID_ACTIONS:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Invalid action '{entry.action}' for date {entry.date}. Valid actions: {VALID_ACTIONS}"
+                )
+
+            sub_tasks = entry.sub_tasks or []
+            
+            # Calculate consumption for each project in this day
+            for st in sub_tasks:
+                if st.hours < 0:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Negative hours ({st.hours}) for sub_task '{st.sub_task}' on date {entry.date}"
+                    )
+                
+                # Parse the date to get the month for allocation validation
+                if isinstance(entry.date, str):
+                    entry_date_obj = datetime.strptime(entry.date, "%Y-%m-%d").date()
+                else:
+                    entry_date_obj = entry.date
+                
+                # Verify project allocation (not assignment)
+                result = session.execute(
+                    text("""
+                        SELECT 1
+                        FROM project_allocations
+                        WHERE employee_id = :user_id AND project_id = :project_id
+                        AND month = :month
+                        AND allocated_days > 0
+                    """),
+                    {"user_id": user_id, "project_id": st.project_id, "month": entry_date_obj.strftime('%Y-%m')}
+                ).fetchone()
+                if not result:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Invalid project_id {st.project_id} for employee {user_id} on date {entry.date}. Employee not allocated to this project for {entry_date_obj.strftime('%Y-%m')}"
+                    )
+                
+                # Add to cumulative consumption
+                project_days = float(st.hours) / 8.0 if st.hours > 0 else 1.0
+                if st.project_id not in project_consumption:
+                    project_consumption[st.project_id] = 0.0
+                project_consumption[st.project_id] += project_days
+        
+        # Validate total consumption for each project
+        print(f"📊 Total consumption per project: {project_consumption}")
+        for project_id, total_days in project_consumption.items():
+            # Use the first date for month calculation (all dates should be in same month)
+            first_date_str = next(iter(data.keys()))
+            if isinstance(data[first_date_str].date, str):
+                date_obj = datetime.strptime(data[first_date_str].date, "%Y-%m-%d").date()
+            else:
+                date_obj = data[first_date_str].date
+            
+            print(f"🔍 Validating project {project_id}: {total_days} days for month {date_obj.strftime('%Y-%m')}")
+            
+            is_valid, message = ProjectAllocationService.check_allocation_available(
+                user_id, project_id, date_obj, total_days, session
+            )
+            
+            if not is_valid:
+                print(f"❌ Validation failed for project {project_id}: {message}")
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Allocation validation failed for project {project_id}: {message}"
+                )
+            else:
+                print(f"✅ Validation passed for project {project_id}")
+        
+        # Second pass: Process each day
         for date_str, entry in data.items():
             print(f"\n📅 Processing date: {date_str}")
             print(f"   Action: {entry.action}, Hours: {entry.hours if hasattr(entry, 'hours') else 'N/A'}")
@@ -164,39 +276,17 @@ async def save_attendance(
                (not entry.project_ids or len(entry.project_ids) == 0) and \
                (not entry.sub_tasks or len(entry.sub_tasks) == 0):
                 continue
- 
-            if entry.action not in VALID_ACTIONS:
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Invalid action '{entry.action}' for date {entry.date}. Valid actions: {VALID_ACTIONS}"
-                )
- 
+
             project_ids = entry.project_ids or []
             sub_tasks = entry.sub_tasks or []
- 
+
             # Calculate total hours from subtask hours (using float)
             total_hours = sum(float(st.hours) for st in sub_tasks if st.hours is not None) if sub_tasks else 0.0
             print(f"Calculated total_hours for {entry.date}: {total_hours}")  # Debug log
- 
-            for st in sub_tasks:
-                if st.hours < 0:
-                    raise HTTPException(
-                        status_code=400,
-                        detail=f"Negative hours ({st.hours}) for sub_task '{st.sub_task}' on date {entry.date}"
-                    )
-                result = session.execute(
-                    text("""
-                        SELECT 1
-                        FROM employee_project_assignments
-                        WHERE employee_id = :user_id AND project_id = :project_id
-                    """),
-                    {"user_id": user_id, "project_id": st.project_id}
-                ).fetchone()
-                if not result:
-                    raise HTTPException(
-                        status_code=400,
-                        detail=f"Invalid project_id {st.project_id} for employee {user_id} on date {entry.date}"
-                    )
+            
+            # Calculate days to consume (assuming 1 day = 8 hours, or use fractional days)
+            days_to_consume = total_hours / 8.0 if total_hours > 0 else 1.0
+            print(f"Calculated days_to_consume for {entry.date}: {days_to_consume}")  # Debug log
  
             sub_tasks_json = [
                 {"project_id": st.project_id, "sub_task": st.sub_task, "hours": float(st.hours)}
@@ -224,6 +314,19 @@ async def save_attendance(
  
             if result[0] != 'Attendance Saved Successfully':
                 raise HTTPException(status_code=500, detail=result[0])
+            
+            # Update consumed days for each project after successful attendance creation
+            for st in sub_tasks:
+                # Handle both string and date object inputs
+                if isinstance(entry.date, str):
+                    date_obj = datetime.strptime(entry.date, "%Y-%m-%d").date()
+                else:
+                    date_obj = entry.date
+                project_days = float(st.hours) / 8.0 if st.hours > 0 else 1.0
+                
+                ProjectAllocationService.update_consumed_days(
+                    user_id, st.project_id, date_obj, project_days, session
+                )
  
         session.commit()
         print("✅ Attendance commit successful")

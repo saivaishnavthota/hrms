@@ -26,10 +26,10 @@ const NavbarMenu = ({ items, onItemWithChildrenClick = () => {} }) => {
                   className={cn(
                     'flex items-center gap-1.5 px-3 py-3.5 text-sm text-gray-400',
                     'rounded-none border-b-[2px] border-transparent bg-transparent!',
-                    'hover:text-blue-600 hover:bg-transparent',
+                    'hover:text-[#2D5016] hover:bg-transparent',
                     'focus-visible:text-gray-400 focus-visible:bg-transparent',
                     'data-[state=open]:text-gray-400 data-[state=open]:bg-transparent',
-                    'data-[active=true]:text-blue-600 data-[active=true]:border-blue-600',
+                    'data-[active=true]:text-[#2D5016] data-[active=true]:border-[#2D5016]',
                   )}
                   data-active={active || undefined}
                   onClick={(e) => {
@@ -50,16 +50,16 @@ const NavbarMenu = ({ items, onItemWithChildrenClick = () => {} }) => {
                   className={cn(
                     'flex items-center py-3.5 text-sm text-gray-400 px-3 gap-1.5',
                     'rounded-none border-b-[2px] border-transparent bg-transparent!',
-                    'hover:text-blue-600 hover:bg-transparent',
+                    'hover:text-[#2D5016] hover:bg-transparent',
                     'focus-visible:text-gray-400 focus-visible:bg-transparent',
                     'data-[state=open]:text-gray-400 data-[state=open]:bg-transparent',
-                    'data-[active=true]:text-blue-600 data-[active=true]:border-blue-600',
+                    'data-[active=true]:text-[#2D5016] data-[active=true]:border-[#2D5016]',
                   )}
                 >
                   <Link
                     to={item.path || ''}
                     data-active={active || undefined}
-                    className="flex items-center gap-1.5 text-gray-400 hover:text-blue-600 focus-visible:text-gray-400"
+                    className="flex items-center gap-1.5 text-gray-400 hover:text-[#2D5016] focus-visible:text-gray-400"
                   >
                     {item.icon && <item.icon className="size-4 text-current" />}
                     <span>{item.title}</span>

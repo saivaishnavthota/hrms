@@ -1,0 +1,621 @@
+import React, { useState, useEffect } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Badge } from '@/components/ui/badge';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { 
+  Users, 
+  Calendar,
+  Search,
+  Download,
+  RefreshCw,
+  TrendingUp,
+  TrendingDown,
+  BarChart3,
+  FileSpreadsheet,
+  User,
+  X
+} from 'lucide-react';
+import { toast } from 'react-toastify';
+import { projectAllocationAPI, userAPI } from '@/lib/api';
+import api from '@/lib/api';
+
+// Get current user function - same as Manager/Employees
+const getCurrentUser = () => {
+  try {
+    const userId = localStorage.getItem('userId');
+    const userType = localStorage.getItem('userType');
+    const authToken = localStorage.getItem('authToken');
+    return { userId: userId ? Number(userId) : null, userType, authToken };
+  } catch (e) {
+    return { userId: null, userType: null, authToken: null };
+  }
+}; 
+
+const EmployeeAllocationDashboard = () => {
+  const [employees, setEmployees] = useState([]);
+  const [selectedEmployee, setSelectedEmployee] = useState('');
+  const [employeeData, setEmployeeData] = useState(null);
+  const [allocations, setAllocations] = useState({});
+  const [loading, setLoading] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [dateRange, setDateRange] = useState({
+    startMonth: '',
+    endMonth: ''
+  });
+  const [currentUser, setCurrentUser] = useState(null);
+
+  // Generate month options (current year and next year)
+  const currentYear = new Date().getFullYear();
+  const monthOptions = [];
+  for (let year = currentYear; year <= currentYear + 1; year++) {
+    for (let month = 1; month <= 12; month++) {
+      const monthStr = `${year}-${month.toString().padStart(2, '0')}`;
+      const monthName = new Date(year, month - 1).toLocaleString('default', { month: 'long', year: 'numeric' });
+      monthOptions.push({ value: monthStr, label: monthName });
+    }
+  }
+
+  useEffect(() => {
+    // Get current user using same method as Manager/Employees
+    const user = getCurrentUser();
+    if (user.userId) {
+      setCurrentUser(user);
+      console.log('Current user:', user);
+      console.log('User ID:', user.userId);
+      console.log('User Type:', user.userType);
+    } else {
+      console.error('No user data found in localStorage');
+      console.log('Available localStorage keys:', Object.keys(localStorage));
+    }
+  }, []);
+
+  useEffect(() => {
+    if (currentUser) {
+      fetchEmployees();
+    }
+  }, [currentUser]);
+
+  useEffect(() => {
+    if (employees && employees.length > 0) {
+      fetchAllEmployeesAllocations();
+    }
+  }, [employees, dateRange]);
+
+  const fetchEmployees = async () => {
+    if (!currentUser) return;
+    
+    try {
+      setLoading(true);
+      // Use userId from getCurrentUser() - same as Manager/Employees
+      const managerId = currentUser.userId;
+      console.log('Fetching employees for manager:', managerId);
+      console.log('Available user fields:', Object.keys(currentUser));
+      
+      if (!managerId) {
+        console.error('No manager ID found in user object');
+        toast.error('Manager ID not found in user data');
+        return;
+      }
+      
+      // Use the manager-specific API endpoint - same pattern as Manager/Employees
+      const { data: dataMgr } = await api.get(`/projects/manager-employees?manager_id=${managerId}`);
+      console.log('Manager employees API Response:', dataMgr);
+      
+      // Handle the response structure - same logic as Manager/Employees
+      const mgrEmployees = Array.isArray(dataMgr?.employees) ? dataMgr.employees : (Array.isArray(dataMgr) ? dataMgr : []);
+      
+      console.log('Processed manager employees data:', mgrEmployees);
+      setEmployees(mgrEmployees);
+    } catch (error) {
+      console.error('Error fetching manager employees:', error);
+      toast.error('Failed to fetch assigned employees');
+      setEmployees([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchAllEmployeesAllocations = async () => {
+    if (!employees || employees.length === 0) return;
+
+    try {
+      setLoading(true);
+      console.log('Fetching allocations for all employees:', employees.length);
+      
+      // Fetch allocations for all employees in parallel
+      const allocationPromises = employees.map(async (employee) => {
+        try {
+          const response = await projectAllocationAPI.getEmployeeAllocations(
+            employee.id,
+            dateRange.startMonth || undefined,
+            dateRange.endMonth || undefined
+          );
+          return {
+            employeeId: employee.id,
+            employeeName: employee.name,
+            employeeEmail: employee.email,
+            allocations: response.allocations_by_month || {}
+          };
+        } catch (error) {
+          console.error(`Error fetching allocations for employee ${employee.id}:`, error);
+          return {
+            employeeId: employee.id,
+            employeeName: employee.name,
+            employeeEmail: employee.email,
+            allocations: {}
+          };
+        }
+      });
+
+      const allAllocations = await Promise.all(allocationPromises);
+      console.log('All employees allocations:', allAllocations);
+      
+      // Group all allocations by month
+      const groupedAllocations = {};
+      allAllocations.forEach(employeeData => {
+        Object.entries(employeeData.allocations).forEach(([month, allocations]) => {
+          if (!groupedAllocations[month]) {
+            groupedAllocations[month] = [];
+          }
+          // Add employee info to each allocation
+          allocations.forEach(allocation => {
+            groupedAllocations[month].push({
+              ...allocation,
+              employee_id: employeeData.employeeId,
+              employee_name: employeeData.employeeName,
+              employee_email: employeeData.employeeEmail
+            });
+          });
+        });
+      });
+
+      setAllocations(groupedAllocations);
+    } catch (error) {
+      console.error('Error fetching all employees allocations:', error);
+      toast.error('Failed to fetch team allocations');
+      setAllocations({});
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const filteredEmployees = Array.isArray(employees) ? employees.filter(emp => 
+    emp.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    emp.email?.toLowerCase().includes(searchTerm.toLowerCase())
+  ) : [];
+
+
+  const getMonthColumns = () => {
+    const months = Object.keys(allocations).sort();
+    return months.map(month => {
+      const [year, monthNum] = month.split('-');
+      const monthName = new Date(year, monthNum - 1).toLocaleString('default', { month: 'short' });
+      return {
+        key: month,
+        label: `${monthName}-${year.slice(-2)}`,
+        fullLabel: `${monthName} ${year}`
+      };
+    });
+  };
+
+  const getTotalAllocationForMonth = (month) => {
+    const monthAllocations = allocations[month] || [];
+    return monthAllocations.reduce((sum, alloc) => sum + alloc.allocated_days, 0);
+  };
+
+  const getTotalConsumedForMonth = (month) => {
+    const monthAllocations = allocations[month] || [];
+    return monthAllocations.reduce((sum, alloc) => sum + alloc.consumed_days, 0);
+  };
+
+  const exportToExcel = () => {
+    if (!allocations || Object.keys(allocations).length === 0) return;
+
+    const monthColumns = getMonthColumns();
+    const csvData = [];
+
+    // Headers
+    const headers = [
+      'Employee ID',
+      'Employee Name',
+      'Employee Email',
+      'Project Name',
+      'Client',
+      ...monthColumns.map(col => col.label),
+      'Total Allocated',
+      'Total Consumed',
+      'Remaining'
+    ];
+    csvData.push(headers.join(','));
+
+    // Group allocations by employee and project
+    const employeeProjectGroups = {};
+    Object.entries(allocations).forEach(([month, monthAllocations]) => {
+      monthAllocations.forEach(allocation => {
+        const groupKey = `${allocation.employee_id}-${allocation.project_name}-${allocation.client}`;
+        if (!employeeProjectGroups[groupKey]) {
+          employeeProjectGroups[groupKey] = {
+            employee_id: allocation.employee_id,
+            employee_name: allocation.employee_name,
+            employee_email: allocation.employee_email,
+            project_name: allocation.project_name,
+            project_id: allocation.project_id,
+            company: allocation.company,
+            client: allocation.client,
+            months: {},
+            total_allocated: 0,
+            total_consumed: 0,
+            total_remaining: 0
+          };
+        }
+        employeeProjectGroups[groupKey].months[month] = allocation;
+        employeeProjectGroups[groupKey].total_allocated += allocation.allocated_days;
+        employeeProjectGroups[groupKey].total_consumed += allocation.consumed_days;
+        employeeProjectGroups[groupKey].total_remaining += allocation.remaining_days;
+      });
+    });
+
+    // Add data rows
+    Object.values(employeeProjectGroups).forEach(group => {
+      const row = [
+        group.employee_id,
+        group.employee_name,
+        group.employee_email,
+        group.project_name,
+        group.client || '',
+        ...monthColumns.map(col => group.months[col.key]?.allocated_days || ''),
+        group.total_allocated,
+        group.total_consumed,
+        group.total_remaining
+      ];
+      csvData.push(row.join(','));
+    });
+
+    // Download CSV
+    const csvContent = csvData.join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `team_allocation_${new Date().toISOString().split('T')[0]}.csv`;
+    link.click();
+    window.URL.revokeObjectURL(url);
+    
+    toast.success('Team allocation data exported successfully');
+  };
+
+  return (
+    <div className="p-6 bg-gray-50 min-h-screen">
+      <div className="max-w-7xl mx-auto">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">Team Allocation Dashboard</h1>
+            <p className="text-gray-600 mt-1">View project allocations for all employees assigned to you</p>
+          </div>
+          
+          <div className="flex gap-3">
+            <Button onClick={exportToExcel} variant="outline" className="flex items-center gap-2" disabled={!allocations || Object.keys(allocations).length === 0}>
+              <Download className="w-4 h-4" />
+              Export to Excel
+            </Button>
+            
+            <Button onClick={fetchAllEmployeesAllocations} variant="outline" className="flex items-center gap-2">
+              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+              Refresh
+            </Button>
+          </div>
+        </div>
+
+
+        {/* Team Overview */}
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Users className="w-5 h-5" />
+              Team Overview
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className="text-center p-4 bg-blue-50 rounded-lg">
+                <div className="text-2xl font-bold text-blue-600">
+                  {searchTerm ? 
+                    employees.filter(emp => 
+                      emp.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                      emp.email?.toLowerCase().includes(searchTerm.toLowerCase())
+                    ).length 
+                    : employees.length}
+                </div>
+                <div className="text-sm text-blue-700">
+                  {searchTerm ? 'Filtered Employees' : 'Total Employees'}
+                </div>
+              </div>
+              <div className="text-center p-4 bg-green-50 rounded-lg">
+                <div className="text-2xl font-bold text-green-600">
+                  {(() => {
+                    const employeesWithAllocations = new Set();
+                    Object.values(allocations).forEach(monthAllocations => {
+                      monthAllocations.forEach(allocation => {
+                        employeesWithAllocations.add(allocation.employee_id);
+                      });
+                    });
+                    return employeesWithAllocations.size;
+                  })()}
+                </div>
+                <div className="text-sm text-green-700">With Allocations</div>
+              </div>
+              <div className="text-center p-4 bg-orange-50 rounded-lg">
+                <div className="text-2xl font-bold text-orange-600">
+                  {(() => {
+                    const employeesWithAllocations = new Set();
+                    Object.values(allocations).forEach(monthAllocations => {
+                      monthAllocations.forEach(allocation => {
+                        employeesWithAllocations.add(allocation.employee_id);
+                      });
+                    });
+                    return employees.length - employeesWithAllocations.size;
+                  })()}
+                </div>
+                <div className="text-sm text-orange-700">No Allocations</div>
+              </div>
+              <div className="text-center p-4 bg-purple-50 rounded-lg">
+                <div className="text-2xl font-bold text-purple-600">
+                  {(() => {
+                    const uniqueProjects = new Set();
+                    Object.values(allocations).forEach(monthAllocations => {
+                      monthAllocations.forEach(allocation => {
+                        uniqueProjects.add(`${allocation.project_name}-${allocation.client}`);
+                      });
+                    });
+                    return uniqueProjects.size;
+                  })()}
+                </div>
+                <div className="text-sm text-purple-700">Total Projects</div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+
+        {/* Date Range Filter */}
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Calendar className="w-5 h-5" />
+              Date Range Filter
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <Label htmlFor="start-month">Start Month</Label>
+                <Select value={dateRange.startMonth} onValueChange={(value) => setDateRange(prev => ({ ...prev, startMonth: value }))}>
+                  <SelectTrigger className="mt-1">
+                    <SelectValue placeholder="Select start month" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {monthOptions.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div>
+                <Label htmlFor="end-month">End Month</Label>
+                <Select value={dateRange.endMonth} onValueChange={(value) => setDateRange(prev => ({ ...prev, endMonth: value }))}>
+                  <SelectTrigger className="mt-1">
+                    <SelectValue placeholder="Select end month" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {monthOptions.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div>
+                <Label htmlFor="employee-search">Search Employee</Label>
+                <div className="relative mt-1">
+                  <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                  <Input
+                    id="employee-search"
+                    placeholder="Search by employee name..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-10 pr-10"
+                  />
+                  {searchTerm && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="absolute right-1 top-1 h-8 w-8 p-0"
+                      onClick={() => setSearchTerm('')}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+
+        {/* Allocation Table */}
+        {loading ? (
+          <Card>
+            <CardContent className="flex items-center justify-center py-8">
+              <RefreshCw className="w-6 h-6 animate-spin mr-2" />
+              Loading allocations...
+            </CardContent>
+          </Card>
+        ) : Object.keys(allocations).length > 0 ? (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <BarChart3 className="w-5 h-5" />
+                Monthly Allocation Details
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Employee</TableHead>
+                      <TableHead>Project Name</TableHead>
+                      <TableHead>Client</TableHead>
+                      {getMonthColumns().map((month) => (
+                        <TableHead key={month.key} className="text-center">
+                          {month.label}
+                        </TableHead>
+                      ))}
+                      <TableHead className="text-center">Total Allocated</TableHead>
+                      <TableHead className="text-center">Total Consumed</TableHead>
+                      <TableHead className="text-center">Remaining</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {(() => {
+                      // Group allocations by employee and project
+                      const employeeProjectGroups = {};
+                      Object.entries(allocations).forEach(([month, monthAllocations]) => {
+                        monthAllocations.forEach(allocation => {
+                          // Filter by search term if provided
+                          const matchesSearch = !searchTerm || 
+                            allocation.employee_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                            allocation.employee_email?.toLowerCase().includes(searchTerm.toLowerCase());
+                          
+                          if (!matchesSearch) return;
+                          
+                          const groupKey = `${allocation.employee_id}-${allocation.project_name}-${allocation.client}`;
+                          if (!employeeProjectGroups[groupKey]) {
+                            employeeProjectGroups[groupKey] = {
+                              employee_id: allocation.employee_id,
+                              employee_name: allocation.employee_name,
+                              employee_email: allocation.employee_email,
+                              project_name: allocation.project_name,
+                              company: allocation.company,
+                              client: allocation.client,
+                              months: {},
+                              total_allocated: 0,
+                              total_consumed: 0,
+                              total_remaining: 0
+                            };
+                          }
+                          employeeProjectGroups[groupKey].months[month] = allocation;
+                          employeeProjectGroups[groupKey].total_allocated += allocation.allocated_days;
+                          employeeProjectGroups[groupKey].total_consumed += allocation.consumed_days;
+                          employeeProjectGroups[groupKey].total_remaining += allocation.remaining_days;
+                        });
+                      });
+
+                      // Render grouped employee-project combinations
+                      return Object.values(employeeProjectGroups).map((group, index) => (
+                        <TableRow key={`group-${index}`}>
+                          <TableCell className="font-medium">
+                            <div className="space-y-1">
+                              <div className="font-semibold">{group.employee_name}</div>
+                              <div className="text-xs text-gray-500">{group.employee_email}</div>
+                            </div>
+                          </TableCell>
+                          <TableCell className="font-medium">
+                            <div className="space-y-1">
+                              <div className="font-semibold">{group.project_name}</div>
+                              <div className="text-xs text-gray-500">Project Name</div>
+                            </div>
+                          </TableCell>
+                          <TableCell>{group.client || '-'}</TableCell>
+                          {getMonthColumns().map((monthCol) => (
+                            <TableCell key={monthCol.key} className="text-center">
+                              {group.months[monthCol.key] ? (
+                                <div className="space-y-1">
+                                  <Badge variant="outline" className="text-xs">
+                                    {group.months[monthCol.key].allocated_days}d allocated
+                                  </Badge>
+                                  <div className="text-xs text-gray-600">
+                                    {group.months[monthCol.key].remaining_days}d remaining
+                                  </div>
+                                </div>
+                              ) : (
+                                <span className="text-gray-400">-</span>
+                              )}
+                            </TableCell>
+                          ))}
+                          <TableCell className="text-center font-medium">
+                            <div className="space-y-1">
+                              <div className="text-sm font-semibold">{group.total_allocated}.0 days</div>
+                              <div className="text-xs text-gray-500">Total Allocated</div>
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <div className="space-y-1">
+                              <Badge variant="secondary" className="text-xs">
+                                {group.total_consumed}.0 days
+                              </Badge>
+                              <div className="text-xs text-gray-500">Total Consumed</div>
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <div className="space-y-1">
+                              <Badge 
+                                variant={group.total_remaining > 0 ? "default" : "destructive"}
+                                className="text-xs"
+                              >
+                                {group.total_remaining}.0 days
+                              </Badge>
+                              <div className="text-xs text-gray-500">Remaining</div>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ));
+                    })()}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+        ) : employees.length > 0 ? (
+          <Card>
+            <CardContent className="text-center py-8">
+              <FileSpreadsheet className="w-12 h-12 mx-auto mb-4 text-gray-400" />
+              <p className="text-gray-500">
+                {searchTerm ? 
+                  `No allocation data found for employees matching "${searchTerm}".` : 
+                  'No allocation data found for your team.'
+                }
+              </p>
+              <p className="text-sm text-gray-400 mt-1">
+                {searchTerm ? 
+                  'Try adjusting your search term or date range.' : 
+                  'Try adjusting the date range or contact HR for assistance.'
+                }
+              </p>
+            </CardContent>
+          </Card>
+        ) : (
+          <Card>
+            <CardContent className="text-center py-8">
+              <Users className="w-12 h-12 mx-auto mb-4 text-gray-400" />
+              <p className="text-gray-500">No employees found in your team.</p>
+            </CardContent>
+          </Card>
+        )}
+
+      </div>
+    </div>
+  );
+};
+
+export default EmployeeAllocationDashboard;

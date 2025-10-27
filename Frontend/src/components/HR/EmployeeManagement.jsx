@@ -7,13 +7,16 @@ import {
   UserPlus,
   X,
   User,
-  Mail
+  Mail,
+  Upload,
+  FileSpreadsheet
 } from 'lucide-react';
 import { toast } from 'react-toastify' ;
 import api from '../../lib/api';
 import { useUser } from '@/contexts/UserContext';
 import { PaginationControls, usePagination } from '@/components/ui/pagination-controls';
 import PageSizeSelect from '@/components/ui/page-size-select';
+import EmployeeImport from './EmployeeImport';
 
 const getAvatarColor = (name) => {
   const colors = [
@@ -46,6 +49,7 @@ const EmployeeManagement = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -338,13 +342,22 @@ const EmployeeManagement = () => {
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-bold text-gray-900">Employee Management</h1>
           {isSuperHR && (
-            <button 
-              onClick={() => setIsModalOpen(true)}
-              className="flex items-center gap-2 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white px-6 py-3 rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
-            >
-              <UserPlus className="h-5 w-5" />
-              Add Employee
-            </button>
+            <div className="flex gap-3">
+              <button 
+                onClick={() => setIsImportModalOpen(true)}
+                className="flex items-center gap-2 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white px-6 py-3 rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
+              >
+                <Upload className="h-5 w-5" />
+                Bulk Import
+              </button>
+              <button 
+                onClick={() => setIsModalOpen(true)}
+                className="flex items-center gap-2 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white px-6 py-3 rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
+              >
+                <UserPlus className="h-5 w-5" />
+                Add Employee
+              </button>
+            </div>
           )}
         </div>
         <div className="bg-white rounded-lg shadow p-4 space-y-4">
@@ -984,6 +997,29 @@ const EmployeeManagement = () => {
                     </div>
                   </div>
                 </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Bulk Import Modal */}
+        {isImportModalOpen && (
+          <div className="fixed inset-0 bg-transparent backdrop-blur-[2px] flex items-center justify-center z-50 p-4">
+            <div className="bg-gradient-to-br from-white via-gray-50 to-blue-50 rounded-xl shadow-2xl max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto border border-gray-200">
+              <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-t-xl">
+                <h2 className="text-xl font-bold text-white">Bulk Import Employees</h2>
+                <button
+                  onClick={() => setIsImportModalOpen(false)}
+                  className="p-2 hover:bg-white hover:bg-opacity-20 rounded-lg transition-colors"
+                >
+                  <X className="h-5 w-5 text-white" />
+                </button>
+              </div>
+              <div className="p-6">
+                <EmployeeImport onImportComplete={() => {
+                  setIsImportModalOpen(false);
+                  fetchAllData(); // Refresh the employee list
+                }} />
               </div>
             </div>
           </div>

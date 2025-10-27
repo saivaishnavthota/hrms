@@ -36,7 +36,7 @@ const InternPage = () => {
   const getPageInfo = (pathname) => {
     const routes = {
       '/intern/add-attendance': {
-        title: 'Add Attendance',
+        title: 'Book Your Time',
         description: 'Record your daily attendance and working hours',
         content: <AddAttendance />
       },

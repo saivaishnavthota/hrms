@@ -5,7 +5,6 @@ from schemas.onboarding_schema import UserCreate,AssignEmployeeRequest,ReassignE
 from database import get_session
 from fastapi.responses import JSONResponse,StreamingResponse
 from utils.email import send_login_email,send_onboarding_email,send_credentials_email
-from routes.weekoff_routes import set_default_weekoffs
 from auth import get_current_user, create_access_token, verify_password, role_required, hash_password
 from sqlalchemy.sql import text
 from sqlmodel import Session, select
@@ -644,10 +643,52 @@ async def approve_employee(
             cur.execute("SELECT currval(pg_get_serial_sequence('employees','id'))")
             new_emp_id = cur.fetchone()[0]
 
+        # Create default in-house project allocation for the new employee
+        try:
+            from services.project_allocation_service import ProjectAllocationService
+            from models.user_model import User
+            from datetime import datetime
+            
+            # Get current month
+            current_month = datetime.now().strftime("%Y-%m")
+            
+            # Get the new employee
+            new_employee = session.get(User, new_emp_id)
+            if new_employee:
+                # Get or create the in-house project
+                inhouse_project = ProjectAllocationService.create_or_get_inhouse_project(session)
+                
+                # Create default allocation for current month
+                from models.project_allocation_model import ProjectAllocation
+                default_allocation = ProjectAllocation(
+                    employee_id=new_emp_id,
+                    project_id=inhouse_project.project_id,
+                    employee_name=new_employee.name,
+                    company=getattr(new_employee, 'company', None),
+                    level=getattr(new_employee, 'band', None),
+                    client=inhouse_project.account,
+                    service_line="Internal",
+                    month=current_month,
+                    allocated_days=20.0,
+                    consumed_days=0.0
+                )
+                session.add(default_allocation)
+                
+                # Also create employee project assignment for attendance form
+                ProjectAllocationService.create_project_assignment(
+                    new_emp_id, inhouse_project.project_id, session
+                )
+                
+                logger.info(f"Created default in-house allocation for new employee {new_employee.name} (ID: {new_emp_id})")
+        except Exception as e:
+            logger.error(f"Error creating default allocation for new employee {new_emp_id}: {str(e)}")
+            # Don't fail the onboarding if allocation creation fails
+            pass
+
         session.commit()
         return {
             "status": "success",
-            "message": f"Employee {onboarding_id} approved successfully",
+            "message": f"Employee {onboarding_id} approved successfully with default in-house project allocation",
             "new_employee_id": new_emp_id
         }
 
@@ -722,14 +763,7 @@ async def assign_employee(
         
         session.commit()
         
-        # Set default weekoffs for first assignment
-        if is_first_assignment:
-            try:
-                set_default_weekoffs(data.employee_id, session)
-                logger.info(f"Default weekoffs set for employee {data.employee_id}")
-            except Exception as e:
-                logger.error(f"Error setting default weekoffs for employee {data.employee_id}: {str(e)}")
-                # Don't fail the assignment if weekoff setting fails
+        # Default weekoffs are Saturday and Sunday for all employees (no database storage needed)
         
         # Only send email for first assignment
         if is_first_assignment:
@@ -739,7 +773,7 @@ async def assign_employee(
             location_name = location_row[0] if location_row else "Not Assigned"
 
             await send_credentials_email(
-                to_email=data.to_email,
+                to_email=data.to_email or data.company_email,  # Use company_email as fallback
                 company_email=data.company_email,
                 temp_password=temp_password,
                 location=location_name,

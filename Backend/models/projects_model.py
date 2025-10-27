@@ -1,7 +1,9 @@
 from sqlmodel import SQLModel, Field, Relationship
-from typing import Optional, List
+from typing import Optional, List, TYPE_CHECKING
 from datetime import datetime, date
-from .user_model import User
+
+if TYPE_CHECKING:
+    from .project_allocation_model import ProjectAllocation
 
 class ProjectStatusLog(SQLModel, table=True):
     __tablename__ = "project_status_logs"
@@ -12,6 +14,9 @@ class ProjectStatusLog(SQLModel, table=True):
     new_status: Optional[str]
     updated_at: datetime = Field(default_factory=datetime.now)
 
+    # Relationships
+    project: Optional["Project"] = Relationship(back_populates="status_logs")
+
 class EmployeeProjectAssignment(SQLModel, table=True):
     __tablename__ = "employee_project_assignments"
 
@@ -21,12 +26,14 @@ class EmployeeProjectAssignment(SQLModel, table=True):
     assigned_by: Optional[int] = Field(foreign_key="employees.id")
     assigned_at: datetime = Field(default_factory=datetime.now)
 
+    # Relationships
+    project: Optional["Project"] = Relationship(back_populates="assignments")
+
 class Project(SQLModel, table=True):
     __tablename__ = "projects"
 
     project_id: Optional[int] = Field(default=None, primary_key=True)
-    project_name: str  # Project Name (Revenue)
-    project_name_commercial: Optional[str] = Field(default=None, max_length=100)  # Project Name (Commercial)
+    project_name: str = Field(max_length=200)  # Project Name (Commercial) - now the main project name
     account: Optional[str] = Field(default=None, max_length=100)  # Account
     project_objective: Optional[str]
     client_requirements: Optional[str]
@@ -40,7 +47,5 @@ class Project(SQLModel, table=True):
     # Relationships
     assignments: List[EmployeeProjectAssignment] = Relationship(back_populates="project")
     status_logs: List[ProjectStatusLog] = Relationship(back_populates="project")
+    allocations: List["ProjectAllocation"] = Relationship(back_populates="project")
 
-# Link back relationships
-EmployeeProjectAssignment.project = Relationship(back_populates="assignments")
-ProjectStatusLog.project = Relationship(back_populates="status_logs")

@@ -7,7 +7,7 @@ export const MENU_SIDEBAR_EMPLOYEE = [
     path: '/employee',
   },
   {
-    title: 'Add Attendance',
+    title: 'Book Your Time',
     icon: ClipboardList,
     path: '/employee/add-attendance',
   },

@@ -131,7 +131,7 @@ def get_all_expense_requests_admin(
 load_dotenv()
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-BASE_URL = os.getenv("BASE_URL", "https://hrms.nxzen.com")
+BASE_URL = os.getenv("BASE_URL", "https://localhost:2342")
 
 def build_file_url(attachment_id: int) -> str:
     """Generate the file URL for an attachment stored in database."""

@@ -26,7 +26,7 @@ export function PageSizeSelect({
         id="pageSizeSelect"
         value={pageSize}
         onChange={handleChange}
-        className="px-2 py-1 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+        className="px-2 py-1 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#2D5016]"
       >
         {options.map((size) => (
           <option key={size} value={size}>

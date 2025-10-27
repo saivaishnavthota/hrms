@@ -389,37 +389,91 @@ export const projectsAPI = {
   }
 };
 
-// Weekoff API endpoints
-export const weekoffAPI = {
-  // POST /weekoffs/ - Create weekoff request
-  createWeekoff: async (data) => {
-    const response = await api.post('/weekoffs/', data);
+// Project Allocation API endpoints
+export const projectAllocationAPI = {
+  // POST /api/allocations/import - Import Excel file for project allocations
+  importAllocations: async (projectId, file) => {
+    const formData = new FormData();
+    formData.append('project_id', projectId || 0);  // Default to 0 to extract from Excel
+    formData.append('file', file);
+    
+    const response = await api.post('/api/allocations/import', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
     return response.data;
   },
 
-  // GET /weekoffs/{employee_id} - Get employee weekoffs
-  getEmployeeWeekoffs: async (employeeId) => {
-    const response = await api.get(`/weekoffs/${employeeId}`);
+  // GET /api/allocations/summary/{employee_id}/{month} - Get allocation summary
+  getAllocationSummary: async (employeeId, month) => {
+    const response = await api.get(`/api/allocations/summary/${employeeId}/${month}`);
     return response.data;
   },
 
-  // POST /weekoffs/{employee_id}/set-default - Set default weekoffs
-  setDefaultWeekoffs: async (employeeId) => {
-    const response = await api.post(`/weekoffs/${employeeId}/set-default`);
+  // GET /api/allocations/employee/{employee_id} - Get employee allocations
+  getEmployeeAllocations: async (employeeId, startMonth = null, endMonth = null) => {
+    const params = {};
+    if (startMonth) params.start_month = startMonth;
+    if (endMonth) params.end_month = endMonth;
+    
+    const response = await api.get(`/api/allocations/employee/${employeeId}`, { params });
     return response.data;
   },
 
-  // GET /weekoffs/{employee_id}/default - Get default weekoffs info
-  getDefaultWeekoffs: async (employeeId) => {
-    const response = await api.get(`/weekoffs/${employeeId}/default`);
+  // GET /api/allocations/project/{project_id}/{month} - Get project allocations
+  getProjectAllocations: async (projectId, month) => {
+    const response = await api.get(`/api/allocations/project/${projectId}/${month}`);
     return response.data;
   },
 
-  // POST /weekoffs/set-default-for-all - Set default weekoffs for all employees
-  setDefaultWeekoffsForAll: async () => {
-    const response = await api.post('/weekoffs/set-default-for-all');
+  // GET /api/allocations/validate/{employee_id}/{project_id}/{date} - Validate allocation
+  validateAllocation: async (employeeId, projectId, date, daysToConsume = 1.0) => {
+    const response = await api.get(`/api/allocations/validate/${employeeId}/${projectId}/${date}`, {
+      params: { days_to_consume: daysToConsume }
+    });
+    return response.data;
+  },
+  createDefaultAllocationsForExisting: async () => {
+    const response = await api.post('/api/allocations/create-default-allocations-for-existing');
+    return response.data;
+  },
+  createDefaultAllocationsForMonth: async (month) => {
+    const response = await api.post(`/api/allocations/create-default-allocations/${month}`);
     return response.data;
   }
+};
+
+// Employee Import API endpoints
+export const employeeImportAPI = {
+  // POST /api/employee-import/import - Import Excel file for employees
+  importEmployees: async (file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    const response = await api.post('/api/employee-import/import', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
+  },
+
+  // GET /api/employee-import/template - Download template
+  downloadTemplate: async () => {
+    const response = await api.get('/api/employee-import/template', {
+      responseType: 'blob'
+    });
+    return response.data;
+  }
+};
+
+// Default weekoffs are Saturday and Sunday for all employees
+export const getDefaultWeekoffs = () => {
+  return {
+    default_off_days: ["Saturday", "Sunday"],
+    description: "Default weekoffs are Saturday and Sunday for all employees"
+  };
 };
 
 

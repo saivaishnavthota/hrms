@@ -73,7 +73,7 @@ export const MENU_SIDEBAR = [
         path: '/hr/employees-attendance',
       },
       {
-        title: 'Add Attendance',
+        title: 'Book Your Time',
         icon: UserPlus,
         path: '/hr/add-attendance',
       },
@@ -133,6 +133,16 @@ export const MENU_SIDEBAR = [
     title: 'Asset Allocations',
     icon: Monitor,
     path: '/hr/asset-allocations',
+  },
+  {
+    title: 'Project Allocations',
+    icon: Briefcase,
+    path: '/hr/project-allocations',
+  },
+  {
+    title: 'Employee Import',
+    icon: Upload,
+    path: '/hr/employee-import',
   },
   {
     title: 'My Activity',

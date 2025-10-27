@@ -49,13 +49,14 @@ import AccountManagerDashboard from '@/components/AccountManager/Dashboard';
 import ManagerEmployees from '@/components/Manager/Employees';
 import ManagerLeaveRequests from '@/components/Manager/LeaveRequests';
 import ManagerLeaveManagement from '@/components/Manager/LeaveManagement';
-import AccountManagerExpenseManagement from '@/components/AccountManager/ExpenseManagement';
+// import AccountManagerExpenseManagement from '@/components/AccountManager/ExpenseManagement';
 import Projects from '@/components/AccountManager/Projects';
 import ManagerDashboard from '@/components/Manager/Dashboard';
 import ManagerExpenseManagement from '@/components/Manager/ExpenseManagement';
 import ManagerEmployeeAttendance from '@/components/Manager/EmployeesAttendance';
 import SoftwareRequestApproval from '@/components/Manager/SoftwareRequestApproval';
 import ManagerAttendance from '@/components/Manager/Attendance';
+import EmployeeAllocationDashboard from '@/components/Manager/EmployeeAllocationDashboard';
 // Super HR components
 import HRConfig from '@/components/HR/HRConfig';
 import ITSupporterDashboard from '@/components/ITSupporter/Dashboard';
@@ -66,6 +67,8 @@ import ITSupporterAllocations from '@/components/ITSupporter/Allocations';
 import ITSupporterMaintanance from '@/components/ITSupporter/Maintanance';
 import ITSupporterMyActivity from '@/components/ITSupporter/MyActivity';
 import AssetAllocations from '@/components/HR/AssetAllocations';
+import ProjectAllocations from '@/components/HR/ProjectAllocations';
+import EmployeeImport from '@/components/HR/EmployeeImport';
 import AdminDashboard from '@/components/Admin/Dashboard';
 import AdminEmployeeAttendance from '@/components/Admin/EmployeeAttendance';
 import AdminLeaveRequests from '@/components/Admin/LeaveRequests';
@@ -103,6 +106,8 @@ export const AppRoutingSetup = () => {
         <Route path="reset-password" element={< ChangePassword />} />
         <Route path="my-activity" element={<MyActivity />} />
         <Route path="asset-allocations" element={<AssetAllocations />} />
+        <Route path="project-allocations" element={<ProjectAllocations />} />
+        <Route path="employee-import" element={<EmployeeImport />} />
       </Route>
 
       {/* Protected Super-HR routes */}
@@ -121,6 +126,7 @@ export const AppRoutingSetup = () => {
         <Route path="add-policies" element={<AddCompanyPolicy />} />
         <Route path="hr-config" element={<HRConfig />} />
         <Route path="asset-allocations" element={<AssetAllocations />} />
+        <Route path="project-allocations" element={<ProjectAllocations />} />
         <Route path="my-activity" element={<MyActivity />} />
       </Route>
 
@@ -162,6 +168,7 @@ export const AppRoutingSetup = () => {
         <Route path="expense-management" element={<ManagerExpenseManagement />} />
         <Route path="upload-documents" element={<UploadDocuments />} />
         <Route path="software-requests" element={<SoftwareRequestApproval />} />
+        <Route path="employee-allocation-dashboard" element={<EmployeeAllocationDashboard />} />
         <Route path="change-password" element={<SetPassword />} />
       </Route>
 
@@ -169,11 +176,13 @@ export const AppRoutingSetup = () => {
       <Route path="/account-manager" element={<ProtectedRoute allowedRoles={["Account Manager"]}><Layout1 menu={MENU_SIDEBAR_ACCOUNT_MANAGER} /></ProtectedRoute>}>
         <Route index element={<AccountManagerDashboard />} />
         <Route path="dashboard" element={<AccountManagerDashboard />} />
-        <Route path="expense-management" element={<AccountManagerExpenseManagement />} />
+        {/* <Route path="expense-management" element={<AccountManagerExpenseManagement />} /> */}
         <Route path="upload-documents" element={<UploadDocuments />} />
         <Route path="add-attendance" element={<EmployeeAddAttendance />} />
         <Route path="apply-leave" element={<ApplyLeave />} />
         <Route path="projects" element={<Projects />} />
+        <Route path="project-allocations" element={<ProjectAllocations />} />
+        <Route path="employee-allocation-dashboard" element={<EmployeeAllocationDashboard />} />
         <Route path="change-password" element={<SetPassword />} />
         {/* <Route path="my-profile" element={<MyProfile />} /> */}
       </Route>
@@ -231,6 +240,7 @@ export const AppRoutingSetup = () => {
         <Route path="allocations" element={<ITSupporterAllocations />} />
         <Route path="maintanance" element={<ITSupporterMaintanance />} />
         <Route path="software-requests" element={<SoftwareRequestCompletion />} />
+        <Route path="project-allocations" element={<ProjectAllocations />} />
       </Route>
     </Routes>
   );

@@ -189,7 +189,7 @@ const fetchEmployeeProfile = async () => {
     <div className="container mx-auto p-6 max-w-4xl">
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+          <h1 className="text-3xl font-bold bg-gradient-to-r from-black to-black bg-clip-text ">
             My Profile
           </h1>
           <p className="text-muted-foreground mt-2">

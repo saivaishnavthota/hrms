@@ -51,7 +51,7 @@ class AssignEmployeeRequest(SQLModel):
     employee_id: int
     location_id: int
     doj: date
-    to_email:EmailStr
+    to_email: EmailStr | None = None  # Make optional, will use company_email as fallback
     company_email: EmailStr   # HR provides this
     company_employee_id: str | None = None  # Company-specific employee ID
     role: str | None = None  # Optional role change during assignment

@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { toast } from 'react-toastify';
 import { useUser } from '@/contexts/UserContext';
 import { Trash2, Plus, Edit2, Save, X, Calendar } from 'lucide-react';
-import api, { weekoffAPI } from '@/lib/api';
+import api from '@/lib/api';
 
 const HRConfig = () => {
   const { user } = useUser();
@@ -28,8 +28,6 @@ const HRConfig = () => {
   const [newDepartment, setNewDepartment] = useState({ name: '', description: '' });
   const [editingDepartment, setEditingDepartment] = useState(null);
 
-  // Weekoff Management State
-  const [weekoffLoading, setWeekoffLoading] = useState(false);
 
   // Load data from API on component mount
   useEffect(() => {
@@ -246,23 +244,6 @@ const HRConfig = () => {
     }
   };
 
-  // Weekoff Management Functions
-  const handleSetDefaultWeekoffsForAll = async () => {
-    if (!window.confirm('This will set default weekoffs (Saturday & Sunday) for all employees who don\'t have weekoffs configured. Continue?')) {
-      return;
-    }
-    
-    try {
-      setWeekoffLoading(true);
-      const response = await weekoffAPI.setDefaultWeekoffsForAll();
-      toast.success(`Default weekoffs set successfully! Processed ${response.success_count} employees.`);
-    } catch (error) {
-      console.error('Error setting default weekoffs:', error);
-      toast.error('Failed to set default weekoffs for all employees');
-    } finally {
-      setWeekoffLoading(false);
-    }
-  };
 
   if (!isSuperHR) {
     return (
@@ -285,7 +266,6 @@ const HRConfig = () => {
           <TabsList className="mb-6 bg-gray-100 rounded-md p-1">
             <TabsTrigger value="leave-categories">Leave Categories</TabsTrigger>
             <TabsTrigger value="departments">Departments</TabsTrigger>
-            <TabsTrigger value="weekoffs">Weekoff Management</TabsTrigger>
           </TabsList>
 
           <TabsContent value="leave-categories" className="mt-0">
@@ -492,89 +472,6 @@ const HRConfig = () => {
             </div>
           </TabsContent>
 
-          <TabsContent value="weekoffs" className="mt-0">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Weekoff Management */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Calendar className="h-5 w-5" />
-                    Default Weekoff Management
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                    <h4 className="font-medium text-blue-900 mb-2">Default Weekoffs</h4>
-                    <p className="text-sm text-blue-700 mb-3">
-                      All employees are automatically assigned Saturday and Sunday as default weekoffs. 
-                      This ensures consistent weekend coverage across the organization.
-                    </p>
-                    <div className="flex items-center gap-2 text-sm text-blue-600">
-                      <Calendar className="h-4 w-4" />
-                      <span>Default: Saturday & Sunday</span>
-                    </div>
-                  </div>
-                  
-                  <div className="space-y-3">
-                    <h4 className="font-medium text-gray-900">Bulk Actions</h4>
-                    <p className="text-sm text-gray-600">
-                      Set default weekoffs for all employees who don't have weekoffs configured yet.
-                    </p>
-                    <Button 
-                      onClick={handleSetDefaultWeekoffsForAll}
-                      disabled={weekoffLoading}
-                      className="w-full"
-                    >
-                      {weekoffLoading ? 'Processing...' : 'Set Default Weekoffs for All Employees'}
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Weekoff Information */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Calendar className="h-5 w-5" />
-                    Weekoff Information
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="space-y-3">
-                    <div className="flex items-start gap-3">
-                      <div className="w-2 h-2 bg-green-500 rounded-full mt-2"></div>
-                      <div>
-                        <h4 className="font-medium text-gray-900">Automatic Assignment</h4>
-                        <p className="text-sm text-gray-600">
-                          New employees automatically get Saturday and Sunday as weekoffs when they are first assigned to a location.
-                        </p>
-                      </div>
-                    </div>
-                    
-                    <div className="flex items-start gap-3">
-                      <div className="w-2 h-2 bg-blue-500 rounded-full mt-2"></div>
-                      <div>
-                        <h4 className="font-medium text-gray-900">Employee Customization</h4>
-                        <p className="text-sm text-gray-600">
-                          Employees can modify their weekoffs through the attendance management interface, but defaults are always Saturday and Sunday.
-                        </p>
-                      </div>
-                    </div>
-                    
-                    <div className="flex items-start gap-3">
-                      <div className="w-2 h-2 bg-orange-500 rounded-full mt-2"></div>
-                      <div>
-                        <h4 className="font-medium text-gray-900">Calendar Integration</h4>
-                        <p className="text-sm text-gray-600">
-                          Weekoffs are automatically displayed in the calendar view and attendance tracking system.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          </TabsContent>
         </Tabs>
       </div>
     </div>

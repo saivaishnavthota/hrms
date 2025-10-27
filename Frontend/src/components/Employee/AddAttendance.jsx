@@ -4,8 +4,8 @@
 
 
 
-import React, { useState, useEffect } from 'react';
-import api, { weekoffAPI } from '@/lib/api';
+import React, { useState, useEffect, useCallback } from 'react';
+import api, { getDefaultWeekoffs } from '@/lib/api';
 import { Calendar, Clock, Plus, X, Save, ChevronLeft, ChevronRight, Edit3, Search, Filter, Eye, Briefcase } from 'lucide-react';
 import { useUser } from '../../contexts/UserContext';
 import { toast } from 'react-toastify';
@@ -41,13 +41,14 @@ const AddAttendance = () => {
   const [selectedRowIndex, setSelectedRowIndex] = useState(null);
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
-  const [weekOffDays, setWeekOffDays] = useState([]);
-  const [allWeekOffs, setAllWeekOffs] = useState([]);
-  const [defaultWeekoffs, setDefaultWeekoffs] = useState([]);
-  const [hasDefaultWeekoffs, setHasDefaultWeekoffs] = useState(false);
+  // Default weekoffs are Saturday and Sunday for all employees
+  const [weekOffDays] = useState(['Saturday', 'Sunday']);
+  const [defaultWeekoffs] = useState(['Saturday', 'Sunday']);
+  const [hasDefaultWeekoffs] = useState(true);
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [searchDate, setSearchDate] = useState('');
+  const [allocationMonth, setAllocationMonth] = useState(new Date().toISOString().slice(0, 7)); // Format: YYYY-MM
   const [typeFilter, setTypeFilter] = useState('all');
   const [filteredDailyAttendance, setFilteredDailyAttendance] = useState([]);
   const [showProjectModal, setShowProjectModal] = useState(false);
@@ -80,25 +81,7 @@ const AddAttendance = () => {
   };
 
   const isWeekOffForDate = (date) => {
-    if (!allWeekOffs || allWeekOffs.length === 0) {
-      return false;
-    }
-    
-    const weekDates = getWeekDates(date);
-    const weekStart = formatDateLocal(weekDates[0]);
-    const weekEnd = formatDateLocal(weekDates[6]);
-    
-    // Find weekoff record for this week
-    const weekOff = allWeekOffs.find(wo => 
-      wo.week_start === weekStart && wo.week_end === weekEnd
-    );
-    
-    if (weekOff && weekOff.off_days && Array.isArray(weekOff.off_days)) {
-      const dayOfWeek = date.toLocaleDateString('en-US', { weekday: 'long' });
-      return weekOff.off_days.includes(dayOfWeek);
-    }
-    
-    // If no specific weekoff found, check if it's a default weekend (Saturday/Sunday)
+    // Default weekoffs are Saturday and Sunday for all employees
     const dayOfWeek = date.toLocaleDateString('en-US', { weekday: 'long' });
     return dayOfWeek === 'Saturday' || dayOfWeek === 'Sunday';
   };
@@ -127,8 +110,6 @@ const AddAttendance = () => {
     if (user?.employeeId) {
       fetchProjects();
       fetchDailyAttendance();
-      fetchWeekOffs();
-      fetchDefaultWeekoffs();
     } else if (user) {
       // If user exists but no employeeId, logout
       toast.error('Employee ID not found. Logging out...');
@@ -137,17 +118,7 @@ const AddAttendance = () => {
     }
   }, [user, navigate]);
 
-  useEffect(() => {
-    if (allWeekOffs.length > 0) {
-      const weekDates = getWeekDates(currentWeek);
-      const weekStart = formatDateLocal(weekDates[0]);
-      const weekEnd = formatDateLocal(weekDates[6]);
-      const currentWeekOff = allWeekOffs.find(
-        (wo) => wo.week_start === weekStart && wo.week_end === weekEnd
-      );
-      setWeekOffDays(currentWeekOff ? currentWeekOff.off_days || [] : []);
-    }
-  }, [currentWeek, allWeekOffs]);
+
 
   useEffect(() => {
     filterDailyAttendance();
@@ -160,64 +131,8 @@ const AddAttendance = () => {
     }
   }, [activeTab, selectedMonth, selectedYear, user]);
 
-  const fetchWeekOffs = async () => {
-    try {
-      if (!user?.employeeId) {
-        return;
-      }
 
-      const response = await api.get(`/weekoffs/${user.employeeId}`);
-      console.log('Weekoffs fetched:', response.data); // Debug log
-      setAllWeekOffs(response.data || []);
-    } catch (error) {
-      console.error('Error fetching week-offs:', error);
-      const errorMessage = error.response?.data?.detail || 'Error fetching week-offs';
-      setMessage(errorMessage);
-      toast.error(errorMessage);
-      setTimeout(() => setMessage(''), 5000);
-      if (error.response?.status === 401 || error.response?.status === 403) {
-        toast.error('Session expired. Logging out...');
-        navigate('/login');
-      }
-    }
-  };
 
-  const fetchDefaultWeekoffs = async () => {
-    try {
-      if (!user?.employeeId) {
-        return;
-      }
-
-      const response = await weekoffAPI.getDefaultWeekoffs(user.employeeId);
-      setDefaultWeekoffs(response.default_off_days || []);
-      setHasDefaultWeekoffs(true);
-    } catch (error) {
-      console.error('Error fetching default weekoffs:', error);
-      // Set default weekoffs as Saturday and Sunday if API fails
-      setDefaultWeekoffs(['Saturday', 'Sunday']);
-      setHasDefaultWeekoffs(true);
-    }
-  };
-
-  const setDefaultWeekoffsForEmployee = async () => {
-    try {
-      if (!user?.employeeId) {
-        toast.warn('Employee ID not found');
-        return;
-      }
-
-      setLoading(true);
-      await weekoffAPI.setDefaultWeekoffs(user.employeeId);
-      toast.success('Default weekoffs set successfully');
-      await fetchWeekOffs(); // Refresh the weekoffs
-    } catch (error) {
-      console.error('Error setting default weekoffs:', error);
-      const errorMessage = error.response?.data?.detail || 'Error setting default weekoffs';
-      toast.error(errorMessage);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const filterDailyAttendance = () => {
     let filtered = [...dailyAttendance];
@@ -293,9 +208,18 @@ const AddAttendance = () => {
     }
   };
 
-  const handleShowProjects = (record) => {
+  const handleShowProjects = async (record) => {
     setSelectedRecord(record);
     setShowProjectModal(true);
+    
+    // Auto-detect month from the selected date and fetch projects
+    if (record.date) {
+      const dateObj = new Date(record.date);
+      const monthStr = dateObj.toISOString().slice(0, 7); // Format: YYYY-MM
+      setAllocationMonth(monthStr);
+      // Fetch projects for this month
+      await fetchProjects(monthStr);
+    }
   };
 
   const handleCloseProjectModal = () => {
@@ -303,15 +227,18 @@ const AddAttendance = () => {
     setSelectedRecord(null);
   };
 
-  const fetchProjects = async () => {
+  const fetchProjects = async (month = null) => {
     try {
       if (!user?.employeeId) {
         return;
       }
 
-      const response = await api.get('/attendance/active-projects', {
-        params: { employee_id: user.employeeId }
-      });
+      const params = { employee_id: user.employeeId };
+      if (month) {
+        params.month = month;
+      }
+
+      const response = await api.get('/attendance/active-projects', { params });
       setProjects(response.data || []);
     } catch (error) {
       console.error('Error fetching projects:', error);
@@ -430,9 +357,19 @@ const AddAttendance = () => {
     }));
   };
 
-  const openProjectPopup = (index) => {
+  const openProjectPopup = async (index) => {
     setSelectedRowIndex(index);
     setShowProjectPopup(true);
+    
+    // Auto-detect month from the selected date and fetch projects
+    const selectedDate = attendanceData[index]?.date;
+    if (selectedDate) {
+      const dateObj = new Date(selectedDate);
+      const monthStr = dateObj.toISOString().slice(0, 7); // Format: YYYY-MM
+      setAllocationMonth(monthStr);
+      // Fetch projects for this month
+      await fetchProjects(monthStr);
+    }
   };
 
   const handleProjectSelect = (selectedProjects) => {
@@ -481,57 +418,7 @@ const AddAttendance = () => {
     setCurrentWeek(newDate);
   };
 
-  const toggleWeekOff = (day) => {
-    setWeekOffDays(prev => {
-      if (prev.includes(day)) {
-        return prev.filter(d => d !== day);
-      }
-      if (prev.length >= 2) {
-        toast.info('You can select up to 2 week-off days');
-        setTimeout(() => setMessage(''), 2500);
-        return prev;
-      }
-      return [...prev, day];
-    });
-  };
 
-  const submitWeekOffs = async () => {
-    try {
-      if (!user?.employeeId) {
-        toast.warn('Employee ID not found');
-        setTimeout(() => setMessage(''), 5000);
-        return;
-      }
-
-      const weekDates = getWeekDates(currentWeek);
-      const week_start = formatDateLocal(weekDates[0]);
-      const week_end = formatDateLocal(weekDates[6]);
-
-      const payload = {
-        employee_id: user.employeeId,
-        week_start,
-        week_end,
-        off_days: weekOffDays
-      };
-
-      setLoading(true);
-      const response = await api.post('/weekoffs', payload);
-      toast.success('Week-off saved successfully');
-      setTimeout(() => setMessage(''), 3000);
-      await fetchWeekOffs();
-    } catch (error) {
-      console.error('Error saving week-offs:', error);
-      const errorMessage = error.response?.data?.detail || 'Error saving week-offs';
-      toast.error(errorMessage);
-      setTimeout(() => setMessage(''), 5000);
-      if (error.response?.status === 401 || error.response?.status === 403) {
-        toast.error('Session expired. Logging out...');
-        navigate('/login');
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const submitAttendance = async () => {
     try {
@@ -556,18 +443,22 @@ const AddAttendance = () => {
       }
 
       const hasValidData = Object.values(attendanceData).some(row =>
-        !weekOffDays.includes(row.day) && (
+        !weekOffDays.includes(row.day) && 
+        !row.submitted && (  // Only check unsubmitted days
           row.status || row.hours > 0 || row.projects.length > 0
         )
       );
       if (!hasValidData) {
-        toast.warn('Please provide attendance data for at least one non-week-off day');
+        toast.warn('Please provide attendance data for at least one unsubmitted non-week-off day');
         setTimeout(() => setMessage(''), 5000);
         return;
       }
 
       const invalidHours = Object.values(attendanceData).some(row =>
-        !weekOffDays.includes(row.day) && (row.hours < 0 || row.hours > 24)
+        !weekOffDays.includes(row.day) && 
+        !row.submitted && (  // Only check unsubmitted days
+          row.hours < 0 || row.hours > 24
+        )
       );
       if (invalidHours) {
         toast.warn('Total hours must be between 0 and 24 for non-week-off days');
@@ -579,7 +470,9 @@ const AddAttendance = () => {
       const dataToSubmit = {};
 
       Object.values(attendanceData).forEach(row => {
-        if (!weekOffDays.includes(row.day) && (
+        // Only include unsubmitted days that are not week-offs and have valid data
+        if (!weekOffDays.includes(row.day) && 
+            !row.submitted && (  // Only include unsubmitted days
           row.status || row.hours > 0 || row.projects.length > 0
         )) {
           const project_ids = row.projects
@@ -609,7 +502,7 @@ const AddAttendance = () => {
       });
 
       if (Object.keys(dataToSubmit).length === 0) {
-        toast.error('No valid attendance data to submit for non-week-off days');
+        toast.error('No valid unsubmitted attendance data to submit for non-week-off days');
         setTimeout(() => setMessage(''), 5000);
         setLoading(false);
         return;
@@ -649,9 +542,33 @@ const AddAttendance = () => {
   const ProjectPopup = ({ onClose, onSave, existingProjects = [] }) => {
     const [selectedProjects, setSelectedProjects] = useState(existingProjects);
 
+    // Calculate remaining days for a project based on current selections (memoized)
+    // Only calculates for projects with <5 days allocated to optimize performance
+    const calculateRemainingDays = useCallback((projectId) => {
+      const project = projects.find(p => p.project_id === projectId);
+      if (!project || project.allocated_days === undefined) return 0;
+      
+      // Early return for projects with >=5 days allocated (no need for dynamic calculation)
+      if (project.allocated_days >= 5) return project.allocated_days - project.consumed_days;
+      
+      // Calculate total hours selected for this project across all selected projects
+      const totalHoursForProject = selectedProjects
+        .filter(p => p.projectId === projectId)
+        .reduce((total, p) => {
+          const projectHours = p.subtasks.reduce((subtotal, st) => subtotal + (parseFloat(st.hours) || 0), 0);
+          return total + projectHours;
+        }, 0);
+      
+      const totalDaysForProject = totalHoursForProject / 8.0;
+      const remainingDays = project.allocated_days - project.consumed_days - totalDaysForProject;
+      
+      return Math.max(0, remainingDays);
+    }, [projects, selectedProjects]);
+
     useEffect(() => {
       console.log('Existing Projects in ProjectPopup:', existingProjects);
     }, [existingProjects]);
+
 
     const addProject = () => {
       setSelectedProjects([
@@ -699,29 +616,122 @@ const AddAttendance = () => {
 
     return (
       <div className="fixed inset-0 bg-transparent backdrop-blur-[2px] flex items-center justify-center z-50">
-        <div className="bg-gradient-to-br from-white via-gray-50 to-blue-50 rounded-xl shadow-2xl max-w-2xl w-full mx-4 max-h-[80vh] overflow-y-auto border border-gray-200">
-          <div className="flex justify-between items-center p-6 border-b border-gray-200 bg-gradient-to-r from-gray-600 to-blue-600 rounded-t-xl">
+        <div className="bg-gradient-to-br from-white via-gray-50 to-green-50 rounded-xl shadow-2xl max-w-2xl w-full mx-4 max-h-[80vh] overflow-y-auto border border-gray-200">
+          <div className="flex justify-between items-center p-6 border-b border-gray-200 bg-gradient-to-r from-gray-600 to-[#2D5016] rounded-t-xl">
             <h3 className="font-semibold text-white">Select Projects & Subtasks</h3>
-            <button onClick={onClose} className="text-blue-100 hover:text-white transition-colors p-1 rounded-full hover:bg-blue-500">
+            <button onClick={onClose} className="text-green-100 hover:text-white transition-colors p-1 rounded-full hover:bg-[#2D5016]">
               <X size={24} />
             </button>
           </div>
 
           <div className="space-y-4 p-6">
+            {/* Auto-detected Month Info */}
+            <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+              <div className="flex items-center gap-2">
+                <Calendar className="w-4 h-4 text-[#2D5016]" />
+                <span className="text-sm font-medium text-green-800">
+                  Projects for {new Date(allocationMonth + '-01').toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+                </span>
+              </div>
+            </div>
+
+            {/* Allocation Summary - Show all projects, dynamic calculations only for <5 days */}
+            {selectedProjects.length > 0 && (
+              <div className={`border rounded-lg p-4 ${
+                selectedProjects.some(p => {
+                  const projectData = projects.find(proj => proj.project_id === p.projectId);
+                  return projectData && projectData.allocated_days !== undefined && projectData.allocated_days < 5 && calculateRemainingDays(p.projectId) < 0;
+                }) 
+                  ? 'bg-red-50 border-red-200' 
+                  : 'bg-green-50 border-green-200'
+              }`}>
+                <h4 className={`text-sm font-semibold mb-2 ${
+                  selectedProjects.some(p => {
+                    const projectData = projects.find(proj => proj.project_id === p.projectId);
+                    return projectData && projectData.allocated_days !== undefined && projectData.allocated_days < 5 && calculateRemainingDays(p.projectId) < 0;
+                  })
+                    ? 'text-red-800'
+                    : 'text-green-800'
+                }`}>
+                  Allocation Summary
+                  {selectedProjects.some(p => {
+                    const projectData = projects.find(proj => proj.project_id === p.projectId);
+                    return projectData && projectData.allocated_days !== undefined && projectData.allocated_days < 5 && calculateRemainingDays(p.projectId) < 0;
+                  }) && 
+                    ' - ⚠️ Over-allocation detected!'}
+                </h4>
+                <div className="space-y-1 text-xs">
+                  {selectedProjects.map((project, index) => {
+                    if (!project.projectId) return null;
+                    const projectData = projects.find(p => p.project_id === project.projectId);
+                    if (!projectData) return null;
+                    
+                    const totalHours = project.subtasks.reduce((sum, st) => sum + (parseFloat(st.hours) || 0), 0);
+                    const totalDays = totalHours / 8.0;
+                    const isLowAllocation = projectData.allocated_days < 5;
+                    
+                    if (isLowAllocation) {
+                      // Dynamic calculation for <5 days projects
+                      const dynamicRemaining = calculateRemainingDays(project.projectId);
+                      const isOverAllocated = dynamicRemaining < 0;
+                      
+                      return (
+                        <div key={index} className="flex justify-between">
+                          <span className={isOverAllocated ? 'text-red-700' : 'text-green-700'}>
+                            {projectData.project_name}
+                          </span>
+                          <span className={isOverAllocated ? 'text-red-600' : 'text-green-600'}>
+                            {totalDays.toFixed(1)} days selected, {dynamicRemaining.toFixed(1)} remaining
+                            {isOverAllocated && ' ⚠️'}
+                          </span>
+                        </div>
+                      );
+                    } else {
+                      // Static display for ≥5 days projects
+                      return (
+                        <div key={index} className="flex justify-between">
+                          <span className="text-green-700">
+                            {projectData.project_name}
+                          </span>
+                          <span className="text-[#2D5016]">
+                            {totalDays.toFixed(1)} days selected ({projectData.allocated_days} allocated, {projectData.remaining_days.toFixed(1)} remaining)
+                          </span>
+                        </div>
+                      );
+                    }
+                  })}
+                </div>
+              </div>
+            )}
+
             {selectedProjects.map((project, projectIndex) => (
               <div key={projectIndex} className="border border-gray-200 rounded-lg p-4 bg-gray-50">
                 <div className="flex items-center gap-3 mb-3">
                   <select
                     value={project.projectId || ''}
                     onChange={(e) => updateProject(projectIndex, 'projectId', e.target.value)}
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#2D5016] focus:border-transparent"
                   >
                     <option value="">Select Project</option>
-                    {projects.map(p => (
-                      <option key={p.project_id} value={String(p.project_id)}>
-                        {p.project_name_commercial || p.project_name}
-                      </option>
-                    ))}
+                    {projects
+                      .filter(p => p.allocated_days !== undefined) // Show all projects with allocated days
+                      .map(p => {
+                        const dynamicRemaining = calculateRemainingDays(p.project_id);
+                        const isLowAllocation = p.allocated_days < 5;
+                        return (
+                          <option key={p.project_id} value={String(p.project_id)}>
+                            {p.project_name_commercial || p.project_name}
+                            {p.allocated_days !== undefined && (
+                              isLowAllocation 
+                                ? ` (${p.allocated_days} allocated, ${dynamicRemaining.toFixed(1)} remaining)` 
+                                : ` (${p.allocated_days} allocated, ${p.remaining_days.toFixed(1)} remaining)`
+                            )}
+                          </option>
+                        );
+                      })}
+                    {projects.filter(p => p.allocated_days !== undefined).length === 0 && (
+                      <option value="" disabled>No projects with allocated days found</option>
+                    )}
                   </select>
                   <button
                     onClick={() => removeProject(projectIndex)}
@@ -740,7 +750,7 @@ const AddAttendance = () => {
                         value={subtask.name}
                         onChange={(e) => updateSubtask(projectIndex, subtaskIndex, 'name', e.target.value)}
                         placeholder="Enter subtask"
-                        className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#2D5016] focus:border-transparent"
                       />
                       <input
                         type="number"
@@ -750,7 +760,7 @@ const AddAttendance = () => {
                         min="0"
                         max="24"
                         step="0.5"
-                        className="w-24 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        className="w-24 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#2D5016] focus:border-transparent"
                       />
                       <button
                         onClick={() => removeSubtask(projectIndex, subtaskIndex)}
@@ -762,7 +772,7 @@ const AddAttendance = () => {
                   ))}
                   <button
                     onClick={() => addSubtask(projectIndex)}
-                    className="text-blue-600 hover:text-blue-800 text-sm flex items-center gap-1"
+                    className="text-[#2D5016] hover:text-green-800 text-sm flex items-center gap-1"
                   >
                     <Plus size={16} /> Add Subtask
                   </button>
@@ -770,7 +780,12 @@ const AddAttendance = () => {
               </div>
             ))}
             {selectedProjects.length === 0 && (
-              <p className="text-gray-500 text-center">No projects selected</p>
+              <div className="text-center p-4">
+                <p className="text-gray-500 mb-2">No projects selected</p>
+                <p className="text-sm text-[#2D5016] bg-green-50 border border-green-200 rounded-lg p-3">
+                  ℹ️ All projects are available for selection. Projects with less than 5 days allocated will show dynamic monitoring.
+                </p>
+              </div>
             )}
           </div>
 
@@ -794,7 +809,7 @@ const AddAttendance = () => {
                   console.log('Saving selectedProjects:', selectedProjects);
                   onSave(selectedProjects.filter(p => p.projectId && p.projectName));
                 }}
-                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                className="px-6 py-2 bg-[#2D5016] text-white rounded-lg hover:bg-green-700 transition-colors"
               >
                 Save
               </button>
@@ -819,10 +834,10 @@ const AddAttendance = () => {
    
     <div className="max-w-6xl mx-auto p-6 min-h-screen">
       <div className="bg-white rounded-2xl shadow-xl overflow-hidden">
-        <div className="bg-gradient-to-r from-blue-500 to-indigo-600 text-white p-6">
+        <div className="bg-gradient-to-r from-[#2D5016] to-green-600 text-white p-6">
          
           <h1 className="text-medium font-bold flex items-center gap-3">
-            <Calendar className="text-blue-200" />
+            <Calendar className="text-green-200" />
             Attendance Management
           </h1>
           {message && (
@@ -836,7 +851,7 @@ const AddAttendance = () => {
         
           <nav className="grid grid-cols-3 gap-2 px-6">
             {[
-              { id: 'add', label: 'Add Attendance', icon: Plus },
+              { id: 'add', label: 'Book Your Time', icon: Plus },
               { id: 'calendar', label: 'Calendar View', icon: Calendar },
               { id: 'daily', label: 'Daily Attendance', icon: Clock }
             ].map(({ id, label, icon: Icon }) => (
@@ -845,7 +860,7 @@ const AddAttendance = () => {
                 onClick={() => setActiveTab(id)}
                 className={`w-full justify-center py-4 px-2 border-b-2 font-medium text-sm flex items-center gap-2 transition-colors ${activeTab === id
             
-                  ? 'border-blue-500 text-blue-600'
+                  ? 'border-[#2D5016] text-[#2D5016]'
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                   }`}
               >
@@ -882,102 +897,15 @@ const AddAttendance = () => {
                 </button>
               </div>
 
-              <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-4">
-                <div className="space-y-4">
-                  {/* Default Weekoffs Info */}
-                  {hasDefaultWeekoffs && (
-                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <h5 className="text-sm font-semibold text-blue-800">Default Weekoffs</h5>
-                          <p className="text-xs text-blue-600 mt-1">
-                            Default weekoffs are: {defaultWeekoffs.join(', ')}
-                          </p>
-                        </div>
-                        <button
-                          onClick={setDefaultWeekoffsForEmployee}
-                          disabled={loading}
-                          className="px-3 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 transition-colors disabled:opacity-50"
-                        >
-                          Set Default
-                        </button>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Weekoff Selection */}
-                  <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                    <div className="md:w-1/4">
-                      <h4 className="text-md font-semibold text-gray-800">Select your week-off's</h4>
-                      <p className="text-xs text-gray-500 mt-1">Choose up to 2 days (Default: Saturday, Sunday)</p>
-                    </div>
-                    <div className="flex-1">
-                      <div className="flex flex-wrap gap-3">
-                        {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map((day) => {
-                          const isDefault = defaultWeekoffs.includes(day);
-                          const isSelected = weekOffDays.includes(day);
-                          return (
-                            <label 
-                              key={day} 
-                              className={`inline-flex items-center gap-2 px-3 py-2 border rounded-lg text-sm cursor-pointer select-none transition-colors ${
-                                isDefault 
-                                  ? 'border-blue-300 bg-blue-50 text-blue-800' 
-                                  : isSelected
-                                  ? 'border-gray-400 bg-gray-100 text-gray-800'
-                                  : 'border-gray-300 bg-gray-50 text-gray-800 hover:bg-gray-100'
-                              }`}
-                            >
-                              <input
-                                type="checkbox"
-                                checked={isSelected}
-                                onChange={() => toggleWeekOff(day)}
-                                disabled={loading}
-                                className="sr-only"
-                              />
-                              <div className={`w-4 h-4 border-2 rounded flex items-center justify-center ${
-                                isSelected 
-                                  ? 'border-blue-600 bg-blue-600' 
-                                  : 'border-gray-400'
-                              }`}>
-                                {isSelected && (
-                                  <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
-                                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                                  </svg>
-                                )}
-                              </div>
-                              <span className="flex items-center gap-1">
-                                {day}
-                                {isDefault && (
-                                  <span className="text-xs text-blue-600 font-medium">(Default)</span>
-                                )}
-                              </span>
-                            </label>
-                          );
-                        })}
-                      </div>
-                    </div>
-                    <div className="md:w-1/4 flex md:justify-end">
-                      <button
-                        onClick={submitWeekOffs}
-                        disabled={loading || weekOffDays.length === 0}
-                        className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors disabled:opacity-50"
-                      >
-                        Save Week-Offs
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
 
               <div className="bg-white rounded-xl shadow-lg overflow-hidden border border-gray-200">
                 <div className="overflow-x-auto">
                   <table className="w-full">
-                    <thead className="bg-gradient-to-r from-blue-500 to-indigo-600 text-white p-6">
+                    <thead className="bg-gradient-to-r from-[#2D5016] to-green-600 text-white p-6">
                       <tr>
                         <th className="px-4 py-4 text-left font-semibold">Day</th>
                         <th className="px-4 py-4 text-left font-semibold">Date</th>
                         <th className="px-4 py-4 text-left font-semibold">Action</th>
-                        <th className="px-4 py-4 text-left font-semibold">Status</th>
                         <th className="px-4 py-4 text-left font-semibold">Hours</th>
                         <th className="px-4 py-4 text-left font-semibold">Projects & Subtasks</th>
                         <th className="px-4 py-4 text-left font-semibold">Actions</th>
@@ -1001,20 +929,13 @@ const AddAttendance = () => {
                               <select
                                 value={row.status}
                                 onChange={(e) => handleStatusChange(index, e.target.value)}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#2D5016] focus:border-transparent bg-white"
                               >
                                 <option value="">Select Action</option>
                                 <option value="Present">Present</option>
                                 <option value="Leave">Leave</option>
                                 <option value="WFH">Work From Home</option>
                               </select>
-                            )}
-                          </td>
-                          <td className="px-4 py-4">
-                            {weekOffDays.includes(row.day) ? (
-                              <span className="text-gray-400 text-sm">Week-off</span>
-                            ) : (
-                              <span className="text-gray-900 text-sm">{row.status || 'Not set'}</span>
                             )}
                           </td>
                           <td className="px-4 py-4">
@@ -1031,7 +952,7 @@ const AddAttendance = () => {
                               <div className="space-y-2">
                                 <button
                                   onClick={() => openProjectPopup(index)}
-                                  className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-lg hover:from-blue-600 hover:to-indigo-600 transition-all duration-200 shadow-sm"
+                                  className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-gradient-to-r from-[#2D5016] to-green-600 text-white rounded-lg hover:from-green-600 hover:to-green-700 transition-all duration-200 shadow-sm"
                                 >
                                   <Edit3 size={16} />
                                   {row.projects.length > 0 ? 'Edit Projects' : 'Projects'}
@@ -1050,7 +971,7 @@ const AddAttendance = () => {
                             <button
                               title="View details"
                               onClick={() => handleShowProjects({ date: row.date, projects: row.projects, hours: row.hours, status: row.status })}
-                              className="inline-flex items-center justify-center p-2 text-blue-600 rounded-full "
+                              className="inline-flex items-center justify-center p-2 text-[#2D5016] rounded-full "
                               disabled={weekOffDays.includes(row.day)}
                             >
                               <Eye className="h-4 w-4" />
@@ -1087,7 +1008,7 @@ const AddAttendance = () => {
                       setSelectedMonth(newDate.getMonth());
                       setSelectedYear(newDate.getFullYear());
                     }}
-                    className="flex items-center gap-2 px-3 py-2 text-sm bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors"
+                    className="flex items-center gap-2 px-3 py-2 text-sm bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition-colors"
                   >
                     <ChevronLeft className="h-4 w-4" />
                     Previous
@@ -1096,7 +1017,7 @@ const AddAttendance = () => {
                     <select
                       value={selectedMonth}
                       onChange={(e) => setSelectedMonth(parseInt(e.target.value))}
-                      className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#2D5016] focus:border-[#2D5016]"
                     >
                       {Array.from({ length: 12 }, (_, i) => (
                         <option key={i} value={i}>
@@ -1107,7 +1028,7 @@ const AddAttendance = () => {
                     <select
                       value={selectedYear}
                       onChange={(e) => setSelectedYear(parseInt(e.target.value))}
-                      className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#2D5016] focus:border-[#2D5016]"
                     >
                       {Array.from({ length: 5 }, (_, i) => (
                         <option key={i} value={new Date().getFullYear() - 2 + i}>
@@ -1122,7 +1043,7 @@ const AddAttendance = () => {
                       setSelectedMonth(newDate.getMonth());
                       setSelectedYear(newDate.getFullYear());
                     }}
-                    className="flex items-center gap-2 px-3 py-2 text-sm bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors"
+                    className="flex items-center gap-2 px-3 py-2 text-sm bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition-colors"
                   >
                     Next
                     <ChevronRight className="h-4 w-4" />
@@ -1131,7 +1052,7 @@ const AddAttendance = () => {
               </div>
 
               <div className="bg-white rounded-xl shadow-lg overflow-hidden border border-gray-200">
-                <div className="grid grid-cols-7 bg-gradient-to-r from-gray-600 to-blue-600">
+                <div className="grid grid-cols-7 bg-gradient-to-r from-gray-600 to-[#2D5016]">
                   {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
                     <div key={day} className="p-4 text-center font-semibold text-white">
                       {day}
@@ -1161,10 +1082,10 @@ const AddAttendance = () => {
                         <div
                           key={dateStr}
                           className={`min-h-[120px] p-2 border-b border-r border-gray-200 ${isCurrentMonth ? 'bg-white' : 'bg-gray-50'
-                            } ${isToday ? 'bg-blue-50 border-blue-200' : ''}`}
+                            } ${isToday ? 'bg-green-50 border-green-200' : ''}`}
                         >
                           <div className={`text-sm font-medium mb-2 ${isCurrentMonth ? 'text-gray-900' : 'text-gray-400'
-                            } ${isToday ? 'text-blue-600 font-bold' : ''}`}>
+                            } ${isToday ? 'text-[#2D5016] font-bold' : ''}`}>
                             {currentDate.getDate()}
                           </div>
                           {isWeekOff && isCurrentMonth ? (
@@ -1178,7 +1099,7 @@ const AddAttendance = () => {
                               <div className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${attendanceRecord.status === 'Present'
                                 ? 'bg-green-100 text-green-800 border border-green-200'
                                 : attendanceRecord.status === 'WFH'
-                                  ? 'bg-blue-100 text-blue-800 border border-blue-200'
+                                  ? 'bg-green-100 text-green-800 border border-green-200'
                                   : attendanceRecord.status === 'Leave'
                                     ? 'bg-red-100 text-red-800 border border-red-200'
                                     : 'bg-gray-100 text-gray-800 border border-gray-200'
@@ -1216,7 +1137,7 @@ const AddAttendance = () => {
                     <span className="text-sm text-gray-700">Present</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <div className="w-4 h-4 bg-blue-100 border border-blue-200 rounded"></div>
+                    <div className="w-4 h-4 bg-green-100 border border-green-200 rounded"></div>
                     <span className="text-sm text-gray-700">Work From Home</span>
                   </div>
                   <div className="flex items-center gap-2">
@@ -1228,7 +1149,7 @@ const AddAttendance = () => {
                     <span className="text-sm text-gray-700">Week-off</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <div className="w-4 h-4 bg-blue-50 border border-blue-200 rounded"></div>
+                    <div className="w-4 h-4 bg-green-50 border border-green-200 rounded"></div>
                     <span className="text-sm text-gray-700">Today</span>
                   </div>
                 </div>
@@ -1246,7 +1167,7 @@ const AddAttendance = () => {
                     <select
                       value={selectedMonth}
                       onChange={(e) => setSelectedMonth(parseInt(e.target.value))}
-                      className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                      className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#2D5016] focus:border-transparent text-sm"
                     >
                       {Array.from({ length: 12 }, (_, i) => (
                         <option key={i} value={i}>
@@ -1257,7 +1178,7 @@ const AddAttendance = () => {
                     <select
                       value={selectedYear}
                       onChange={(e) => setSelectedYear(parseInt(e.target.value))}
-                      className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                      className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#2D5016] focus:border-transparent text-sm"
                     >
                       {Array.from({ length: 5 }, (_, i) => {
                         const year = new Date().getFullYear() - 2 + i;
@@ -1271,7 +1192,7 @@ const AddAttendance = () => {
                     <select
                       value={typeFilter}
                       onChange={(e) => setTypeFilter(e.target.value)}
-                      className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                      className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#2D5016] focus:border-transparent text-sm"
                     >
                       <option value="all">All Types</option>
                       <option value="Full-Time">Full-Time</option>
@@ -1284,7 +1205,7 @@ const AddAttendance = () => {
                       type="date"
                       value={searchDate}
                       onChange={(e) => setSearchDate(e.target.value)}
-                      className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                      className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#2D5016] focus:border-transparent text-sm"
                       placeholder="Search by date"
                     />
                     {searchDate && (
@@ -1323,7 +1244,7 @@ const AddAttendance = () => {
                   </div>
                   <div className="overflow-x-auto">
                     <table className="min-w-full divide-y divide-gray-200">
-                      <thead className="bg-gradient-to-r from-blue-50 to-indigo-50">
+                      <thead className="bg-gradient-to-r from-[#2D5016] to-green-600">
                         <tr>
                           <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                             Day
@@ -1382,7 +1303,7 @@ const AddAttendance = () => {
                               <div className="text-sm text-gray-900">
                                 <button
                                   onClick={() => handleShowProjects(record)}
-                                  className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 hover:bg-blue-200 transition-colors duration-200"
+                                  className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 hover:bg-green-200 transition-colors duration-200"
                                 >
                                   <Eye className="h-3 w-3 mr-1" />
                                   View Details
@@ -1424,7 +1345,7 @@ const AddAttendance = () => {
       {showProjectModal && selectedRecord && (
         <div className="fixed inset-0 bg-transparent backdrop-blur-[2px] flex items-center justify-center z-50">
           <div className="bg-gradient-to-br from-white via-gray-50 to-blue-50 rounded-xl shadow-2xl max-w-2xl w-full mx-4 max-h-[80vh] overflow-y-auto border border-gray-200">
-            <div className="flex justify-between items-center p-6 border-b border-gray-200 bg-gradient-to-r from-gray-600 to-blue-600 rounded-t-xl">
+            <div className="flex justify-between items-center p-6 border-b border-gray-200 bg-gradient-to-r from-gray-600 to-[#2D5016] rounded-t-xl">
               <h3 className="font-semibold text-white">
                 Projects for {new Date(selectedRecord.date).toLocaleDateString('en-US', {
                   weekday: 'long',
@@ -1474,7 +1395,7 @@ const AddAttendance = () => {
                         <div className="space-y-1">
                           {project.subtasks.map((subtask, subIndex) => (
                             <div key={subIndex} className="flex items-center text-sm text-gray-600">
-                              <div className="w-2 h-2 bg-blue-400 rounded-full mr-2"></div>
+                              <div className="w-2 h-2 bg-green-400 rounded-full mr-2"></div>
                               {subtask.name} - {subtask.hours} hours
                              
                             </div>
@@ -1501,7 +1422,7 @@ const AddAttendance = () => {
 
       {loading && (
         <div className="fixed inset-0 bg-transparent bg-opacity-30 flex items-center justify-center z-50">
-          <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+          <div className="w-12 h-12 border-4 border-[#2D5016] border-t-transparent rounded-full animate-spin"></div>
         </div>
       )}
       </div>

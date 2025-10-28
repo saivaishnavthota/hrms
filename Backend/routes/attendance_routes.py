@@ -214,6 +214,12 @@ async def save_attendance(
                         detail=f"Negative hours ({st.hours}) for sub_task '{st.sub_task}' on date {entry.date}"
                     )
                 
+                if st.hours > 8.0:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Hours ({st.hours}) cannot exceed 8 hours for sub_task '{st.sub_task}' on date {entry.date}"
+                    )
+                
                 # Parse the date to get the month for allocation validation
                 if isinstance(entry.date, str):
                     entry_date_obj = datetime.strptime(entry.date, "%Y-%m-%d").date()
@@ -283,6 +289,13 @@ async def save_attendance(
             # Calculate total hours from subtask hours (using float)
             total_hours = sum(float(st.hours) for st in sub_tasks if st.hours is not None) if sub_tasks else 0.0
             print(f"Calculated total_hours for {entry.date}: {total_hours}")  # Debug log
+            
+            # Validate maximum 8 hours per day
+            if total_hours > 8.0:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Total hours ({total_hours}) cannot exceed 8 hours per day for date {entry.date}"
+                )
             
             # Calculate days to consume (assuming 1 day = 8 hours, or use fractional days)
             days_to_consume = total_hours / 8.0 if total_hours > 0 else 1.0

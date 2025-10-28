@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { softwareRequestAPI } from '@/lib/api';
 import { getCurrentUser } from '@/lib/auth';
-import { Search, CheckCircle, Clock, XCircle, Eye } from 'lucide-react';
+import { Search, CheckCircle, Clock, XCircle, Eye, Plus, Edit, Trash2, X } from 'lucide-react';
 import { toast } from 'react-toastify';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -45,10 +45,20 @@ const SoftwareRequest = () => {
     additional_info: '',
     manager_id: 'none', // Use 'none' instead of empty string
     it_admin_id: '',
-    business_unit_id: 'none', // Use 'none' instead of empty string
     software_duration: 'none', // Use 'none' instead of empty string
-    asset_id: 'none', // New field for asset selection
+    asset_id: '', // Made mandatory - removed 'none' default
   });
+  
+  // Store common fields that remain the same for all requests
+  const [commonFields, setCommonFields] = useState({
+    additional_info: '',
+    manager_id: 'none',
+    it_admin_id: '',
+    software_duration: 'none',
+    asset_id: '',
+  });
+  const [softwareRequests, setSoftwareRequests] = useState([]);
+  const [currentSoftwareIndex, setCurrentSoftwareIndex] = useState(0);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [loading, setLoading] = useState(false);
@@ -59,6 +69,7 @@ const SoftwareRequest = () => {
   const [complianceSubmitting, setComplianceSubmitting] = useState(false);
   const [viewAnswersModalOpen, setViewAnswersModalOpen] = useState(false);
   const [viewAnswersData, setViewAnswersData] = useState([]);
+  const [complianceModalOpen, setComplianceModalOpen] = useState(false);
 
   const currentUser = getCurrentUser();
   const employeeId = currentUser?.userId;
@@ -105,7 +116,6 @@ const SoftwareRequest = () => {
     software_name: item.software_name,
     software_version: item.software_version || 'N/A',
     additional_info: item.additional_info || '',
-    business_unit_name: item.business_unit_name || 'N/A',
     software_duration: item.software_duration || 'N/A',
     submitted_on: formatDate(item.created_at),
     status: mapStatus(item.status),
@@ -176,18 +186,164 @@ const SoftwareRequest = () => {
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    setFormData({ ...formData, [name]: value });
+    if (name === 'software_name' || name === 'software_version') {
+      setFormData({ ...formData, [name]: value });
+    } else {
+      // Update common fields for other inputs
+      setCommonFields({ ...commonFields, [name]: value });
+    }
   };
 
   const handleSelectChange = (name, value) => {
-    setFormData({ ...formData, [name]: value });
+    if (name === 'software_name' || name === 'software_version') {
+      setFormData({ ...formData, [name]: value });
+    } else {
+      // Update common fields for other selects
+      setCommonFields({ ...commonFields, [name]: value });
+    }
+  };
+
+  // Add new software to the list
+  const addSoftwareRequest = () => {
+    if (!formData.software_name.trim()) {
+      toast.error('Please enter software name');
+      return;
+    }
+    if (!commonFields.asset_id) {
+      toast.error('Please select an asset');
+      return;
+    }
+    if (!commonFields.it_admin_id) {
+      toast.error('Please select an IT admin');
+      return;
+    }
+
+    const newSoftware = {
+      id: Date.now(), // Temporary ID for UI
+      software_name: formData.software_name,
+      software_version: formData.software_version,
+      additional_info: commonFields.additional_info,
+      manager_id: commonFields.manager_id === 'none' ? null : parseInt(commonFields.manager_id),
+      it_admin_id: parseInt(commonFields.it_admin_id),
+      software_duration: commonFields.software_duration === 'none' ? null : commonFields.software_duration,
+      asset_id: parseInt(commonFields.asset_id),
+    };
+
+    setSoftwareRequests([...softwareRequests, newSoftware]);
+    
+    // Reset only software name and version for next software
+    setFormData({
+      ...formData,
+      software_name: '',
+      software_version: '',
+    });
+    
+    toast.success('Software added to request list');
+  };
+
+  // Remove software from the list
+  const removeSoftwareRequest = (index) => {
+    const updatedRequests = softwareRequests.filter((_, i) => i !== index);
+    setSoftwareRequests(updatedRequests);
+    if (currentSoftwareIndex >= updatedRequests.length) {
+      setCurrentSoftwareIndex(Math.max(0, updatedRequests.length - 1));
+    }
+  };
+
+  // Edit software in the list
+  const editSoftwareRequest = (index) => {
+    const software = softwareRequests[index];
+    setFormData({
+      software_name: software.software_name,
+      software_version: software.software_version,
+      additional_info: software.additional_info,
+      manager_id: software.manager_id ? software.manager_id.toString() : 'none',
+      it_admin_id: software.it_admin_id.toString(),
+      software_duration: software.software_duration || 'none',
+      asset_id: software.asset_id.toString(),
+    });
+    
+    // Update common fields with the current software's values
+    setCommonFields({
+      additional_info: software.additional_info,
+      manager_id: software.manager_id ? software.manager_id.toString() : 'none',
+      it_admin_id: software.it_admin_id.toString(),
+      software_duration: software.software_duration || 'none',
+      asset_id: software.asset_id.toString(),
+    });
+    
+    setCurrentSoftwareIndex(index);
+  };
+
+  // Update software in the list
+  const updateSoftwareRequest = () => {
+    if (!formData.software_name.trim()) {
+      toast.error('Please enter software name');
+      return;
+    }
+    if (!commonFields.asset_id) {
+      toast.error('Please select an asset');
+      return;
+    }
+    if (!commonFields.it_admin_id) {
+      toast.error('Please select an IT admin');
+      return;
+    }
+
+    const updatedSoftware = {
+      id: softwareRequests[currentSoftwareIndex].id,
+      software_name: formData.software_name,
+      software_version: formData.software_version,
+      additional_info: commonFields.additional_info,
+      manager_id: commonFields.manager_id === 'none' ? null : parseInt(commonFields.manager_id),
+      it_admin_id: parseInt(commonFields.it_admin_id),
+      software_duration: commonFields.software_duration === 'none' ? null : commonFields.software_duration,
+      asset_id: parseInt(commonFields.asset_id),
+    };
+
+    const updatedRequests = [...softwareRequests];
+    updatedRequests[currentSoftwareIndex] = updatedSoftware;
+    setSoftwareRequests(updatedRequests);
+
+    // Reset only software name and version
+    setFormData({
+      ...formData,
+      software_name: '',
+      software_version: '',
+    });
+    setCurrentSoftwareIndex(0);
+    
+    toast.success('Software updated successfully');
+  };
+
+  // Clear all software requests
+  const clearAllSoftwareRequests = () => {
+    setSoftwareRequests([]);
+    setCurrentSoftwareIndex(0);
+    setFormData({
+      software_name: '',
+      software_version: '',
+      additional_info: '',
+      manager_id: 'none',
+      it_admin_id: '',
+      software_duration: 'none',
+      asset_id: '',
+    });
+    setCommonFields({
+      additional_info: '',
+      manager_id: 'none',
+      it_admin_id: '',
+      software_duration: 'none',
+      asset_id: '',
+    });
   };
 
   const handleComplianceAnswerChange = (questionId, value) => {
     setComplianceAnswers((prev) => ({ ...prev, [questionId]: value }));
   };
 
-  const handleSubmit = async (e) => {
+  // Handle single software request submission
+  const handleSingleSubmit = async (e) => {
     e.preventDefault();
     if (formSubmitting) return;
     setFormSubmitting(true);
@@ -198,33 +354,163 @@ const SoftwareRequest = () => {
       return;
     }
 
+    // Validate single software request
+    if (!formData.software_name.trim()) {
+      toast.error('Please enter software name');
+      setFormSubmitting(false);
+      return;
+    }
+    if (!commonFields.asset_id) {
+      toast.error('Please select an asset');
+      setFormSubmitting(false);
+      return;
+    }
+    if (!commonFields.it_admin_id) {
+      toast.error('Please select an IT admin');
+      setFormSubmitting(false);
+      return;
+    }
+
     try {
-      // Map 'none' to null for optional fields
       const submitData = {
-        ...formData,
+        software_name: formData.software_name,
+        software_version: formData.software_version,
+        additional_info: commonFields.additional_info,
+        manager_id: commonFields.manager_id === 'none' ? null : parseInt(commonFields.manager_id),
+        it_admin_id: parseInt(commonFields.it_admin_id),
+        software_duration: commonFields.software_duration === 'none' ? null : commonFields.software_duration,
+        asset_id: parseInt(commonFields.asset_id),
         employee_id: employeeId,
-        manager_id: formData.manager_id === 'none' ? null : parseInt(formData.manager_id),
-        business_unit_id: formData.business_unit_id === 'none' ? null : parseInt(formData.business_unit_id),
-        software_duration: formData.software_duration === 'none' ? null : formData.software_duration,
-        asset_id: formData.asset_id === 'none' ? null : parseInt(formData.asset_id),
       };
+
+      console.log('Submitting single software request:', submitData);
       const response = await softwareRequestAPI.createSoftwareRequest(submitData);
+      
+      // Map response to the expected format and add to requests
       const newRequest = mapRequest(response, requests.length);
       setRequests([...requests, newRequest]);
+      
       toast.success('Software request created successfully!');
+      
+      // Reset form
       setFormData({
         software_name: '',
         software_version: '',
         additional_info: '',
         manager_id: 'none',
         it_admin_id: '',
-        business_unit_id: 'none',
         software_duration: 'none',
-        asset_id: 'none',
+        asset_id: '',
+      });
+      setCommonFields({
+        additional_info: '',
+        manager_id: 'none',
+        it_admin_id: '',
+        software_duration: 'none',
+        asset_id: '',
       });
     } catch (err) {
       console.error('Create Software Request Error:', err.response || err);
       toast.error(err.response?.data?.detail || 'Failed to create software request.');
+    } finally {
+      setFormSubmitting(false);
+    }
+  };
+
+  // Handle multiple software requests submission
+  const handleMultipleSubmit = async (e) => {
+    e.preventDefault();
+    if (formSubmitting) return;
+    setFormSubmitting(true);
+
+    if (!employeeId) {
+      toast.error('User not authenticated. Please log in.');
+      setFormSubmitting(false);
+      return;
+    }
+
+    // Check if there's form data that hasn't been added to the list yet
+    const hasFormData = formData.software_name.trim() && commonFields.asset_id && commonFields.it_admin_id;
+    
+    if (softwareRequests.length === 0 && !hasFormData) {
+      toast.error('Please add at least one software request before submitting.');
+      setFormSubmitting(false);
+      return;
+    }
+
+    try {
+      // Prepare all requests to submit
+      let allRequestsToSubmit = [...softwareRequests];
+      
+      // If there's form data that hasn't been added to the list, include it
+      if (hasFormData) {
+        const formSoftware = {
+          id: Date.now(), // Temporary ID for UI
+          software_name: formData.software_name,
+          software_version: formData.software_version,
+          additional_info: commonFields.additional_info,
+          manager_id: commonFields.manager_id === 'none' ? null : parseInt(commonFields.manager_id),
+          it_admin_id: parseInt(commonFields.it_admin_id),
+          software_duration: commonFields.software_duration === 'none' ? null : commonFields.software_duration,
+          asset_id: parseInt(commonFields.asset_id),
+        };
+        allRequestsToSubmit.push(formSoftware);
+      }
+
+      console.log('Submitting software requests:', allRequestsToSubmit);
+      console.log('Number of requests to submit:', allRequestsToSubmit.length);
+      
+      // Submit all software requests
+      const submitPromises = allRequestsToSubmit.map((software, index) => {
+        const submitData = {
+          ...software,
+          employee_id: employeeId,
+        };
+        console.log(`Submitting request ${index + 1}:`, submitData);
+        return softwareRequestAPI.createSoftwareRequest(submitData);
+      });
+
+      console.log('Starting Promise.all with', submitPromises.length, 'promises');
+      const responses = await Promise.allSettled(submitPromises);
+      console.log('All requests submitted successfully:', responses);
+      
+      // Check for failures
+      const successfulResponses = [];
+      const failedResponses = [];
+      
+      responses.forEach((result, index) => {
+        if (result.status === 'fulfilled') {
+          successfulResponses.push(result.value);
+        } else {
+          failedResponses.push({ index, error: result.reason });
+          console.error(`Request ${index + 1} failed:`, result.reason);
+        }
+      });
+      
+      if (failedResponses.length > 0) {
+        toast.error(`${failedResponses.length} request(s) failed. ${successfulResponses.length} request(s) submitted successfully.`);
+      }
+      
+      if (successfulResponses.length > 0) {
+        // Map successful responses to the expected format and add to requests
+        const newRequests = successfulResponses.map((response, index) => 
+          mapRequest(response, requests.length + index)
+        );
+        
+        setRequests([...requests, ...newRequests]);
+        
+        if (failedResponses.length === 0) {
+          toast.success(`${successfulResponses.length} software request(s) created successfully!`);
+        }
+        
+        // Clear the software requests list and form
+        clearAllSoftwareRequests();
+      } else {
+        toast.error('All requests failed. Please try again.');
+      }
+    } catch (err) {
+      console.error('Create Software Request Error:', err.response || err);
+      toast.error(err.response?.data?.detail || 'Failed to create software requests.');
     } finally {
       setFormSubmitting(false);
     }
@@ -255,6 +541,7 @@ const SoftwareRequest = () => {
       );
       setSelectedRequestId(null);
       setComplianceAnswers({});
+      setComplianceModalOpen(false);
     } catch (err) {
       console.error('Submit compliance answers error:', err);
       toast.error(err.response?.data?.detail || 'Failed to submit compliance answers.');
@@ -333,9 +620,6 @@ const SoftwareRequest = () => {
         <TabsList>
           <TabsTrigger value="requests">My Requests</TabsTrigger>
           <TabsTrigger value="new-request">New Request</TabsTrigger>
-          {selectedRequestId && (
-            <TabsTrigger value="compliance">Compliance Questions</TabsTrigger>
-          )}
         </TabsList>
 
         <TabsContent value="requests">
@@ -401,7 +685,6 @@ const SoftwareRequest = () => {
                     <TableHead className="w-12 text-center font-semibold text-gray-700 px-6 py-4">S.NO</TableHead>
                     <TableHead className="text-left font-semibold text-gray-700 px-6 py-4">SOFTWARE</TableHead>
                     <TableHead className="text-left font-semibold text-gray-700 px-6 py-4">VERSION</TableHead>
-                    <TableHead className="text-left font-semibold text-gray-700 px-6 py-4">BUSINESS UNIT</TableHead>
                     <TableHead className="text-left font-semibold text-gray-700 px-6 py-4">DURATION</TableHead>
                     <TableHead className="text-left font-semibold text-gray-700 px-6 py-4">SUBMITTED ON</TableHead>
                     <TableHead className="text-left font-semibold text-gray-700 px-6 py-4">STATUS</TableHead>
@@ -414,7 +697,6 @@ const SoftwareRequest = () => {
                       <TableCell className="text-center text-gray-600 px-6 py-4">{(currentPage - 1) * pageSize + index + 1}</TableCell>
                       <TableCell className="px-6 py-4 text-gray-700">{request.software_name}</TableCell>
                       <TableCell className="px-6 py-4 text-gray-700">{request.software_version}</TableCell>
-                      <TableCell className="px-6 py-4 text-gray-700">{request.business_unit_name}</TableCell>
                       <TableCell className="px-6 py-4 text-gray-700">{request.software_duration}</TableCell>
                       <TableCell className="px-6 py-4 text-gray-700">{request.submitted_on}</TableCell>
                       <TableCell className="px-6 py-4">{getStatusBadge(request.status)}</TableCell>
@@ -424,7 +706,10 @@ const SoftwareRequest = () => {
                             variant="ghost"
                             size="sm"
                             className="h-8 p-2 text-blue-600 hover:bg-blue-50"
-                            onClick={() => setSelectedRequestId(request.requestId)}
+                            onClick={() => {
+                              setSelectedRequestId(request.requestId);
+                              setComplianceModalOpen(true);
+                            }}
                           >
                             Answer Compliance Questions
                           </Button>
@@ -466,8 +751,93 @@ const SoftwareRequest = () => {
 
         <TabsContent value="new-request">
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">Create New Software Request</h2>
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="flex justify-between items-center mb-4">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900">Create New Software Request</h2>
+                {softwareRequests.length === 0 ? (
+                  <p className="text-sm text-gray-600 mt-1">
+                    Fill out the form below and click "Submit Request" for a single software request, 
+                    or click "Add Software" to add multiple software requests.
+                  </p>
+                ) : (
+                  <p className="text-sm text-blue-600 mt-1">
+                    Multiple software request mode: {softwareRequests.length} software(s) added. 
+                    {(() => {
+                      const hasFormData = formData.software_name.trim() && commonFields.asset_id && commonFields.it_admin_id;
+                      const totalRequests = softwareRequests.length + (hasFormData ? 1 : 0);
+                      return hasFormData 
+                        ? ` Form data will be included automatically. Click "Submit ${totalRequests} Request(s)" to submit all requests.`
+                        : ` Click "Submit ${totalRequests} Request(s)" to submit all requests.`;
+                    })()}
+                  </p>
+                )}
+              </div>
+              {softwareRequests.length > 0 && (
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={clearAllSoftwareRequests}
+                    className="text-red-600 hover:text-red-700"
+                  >
+                    Clear All
+                  </Button>
+                  <span className="text-sm text-gray-600 self-center">
+                    {softwareRequests.length} software(s) added
+                  </span>
+                </div>
+              )}
+            </div>
+            
+            {/* Software Requests List */}
+            {softwareRequests.length > 0 && (
+              <div className="mb-6 p-4 bg-gray-50 rounded-lg">
+                <h3 className="text-md font-medium text-gray-700 mb-3">Software Requests ({softwareRequests.length})</h3>
+                <div className="space-y-2">
+                  {softwareRequests.map((software, index) => {
+                    const asset = employeeAssets.find(a => a.asset_id === software.asset_id);
+                    const itAdmin = itAdmins.find(a => a.id === software.it_admin_id);
+                    const manager = managers.find(m => m.id === software.manager_id);
+                    
+                    return (
+                      <div key={software.id} className="flex items-center justify-between p-3 bg-white rounded border">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-4">
+                            <span className="font-medium text-gray-900">{software.software_name}</span>
+                            {software.software_version && (
+                              <span className="text-sm text-gray-600">v{software.software_version}</span>
+                            )}
+                            <span className="text-sm text-gray-500">
+                              Asset: {asset ? `${asset.asset_name} (${asset.asset_tag})` : 'N/A'}
+                            </span>
+                            <span className="text-sm text-gray-500">
+                              IT Admin: {itAdmin ? itAdmin.name : 'N/A'}
+                            </span>
+                          </div>
+                          {software.additional_info && (
+                            <p className="text-sm text-gray-600 mt-1">{software.additional_info}</p>
+                          )}
+                        </div>
+                        <div className="flex gap-2">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => removeSoftwareRequest(index)}
+                            className="text-red-600 hover:text-red-700 flex items-center gap-1"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                            Remove
+                          </Button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            <form onSubmit={softwareRequests.length === 0 ? handleSingleSubmit : handleMultipleSubmit} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700">Software Name</label>
                 <Input
@@ -490,30 +860,10 @@ const SoftwareRequest = () => {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700">Business Unit</label>
-                <Select
-                  name="business_unit_id"
-                  value={formData.business_unit_id}
-                  onValueChange={(value) => handleSelectChange('business_unit_id', value)}
-                >
-                  <SelectTrigger className="mt-1">
-                    <SelectValue placeholder="Select Business Unit" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">None</SelectItem>
-                    {locations.map((location) => (
-                      <SelectItem key={location.id} value={location.id.toString()}>
-                        {location.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
                 <label className="block text-sm font-medium text-gray-700">Software Duration</label>
                 <Select
                   name="software_duration"
-                  value={formData.software_duration}
+                  value={commonFields.software_duration}
                   onValueChange={(value) => handleSelectChange('software_duration', value)}
                 >
                   <SelectTrigger className="mt-1">
@@ -530,17 +880,19 @@ const SoftwareRequest = () => {
                 </Select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700">Asset (Optional)</label>
+                <label className="block text-sm font-medium text-gray-700">
+                  Asset <span className="text-red-500">*</span>
+                </label>
                 <Select
                   name="asset_id"
-                  value={formData.asset_id}
+                  value={commonFields.asset_id}
                   onValueChange={(value) => handleSelectChange('asset_id', value)}
+                  required
                 >
                   <SelectTrigger className="mt-1">
                     <SelectValue placeholder="Select Asset" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="none">No Asset Selected</SelectItem>
                     {employeeAssets.map((asset) => (
                       <SelectItem key={asset.asset_id} value={asset.asset_id.toString()}>
                         {asset.asset_name} ({asset.asset_tag}) - {asset.asset_type}
@@ -550,7 +902,7 @@ const SoftwareRequest = () => {
                   </SelectContent>
                 </Select>
                 {employeeAssets.length === 0 && (
-                  <p className="text-sm text-gray-500 mt-1">
+                  <p className="text-sm text-red-500 mt-1">
                     No assets allocated to you. Contact your manager to request asset allocation.
                   </p>
                 )}
@@ -559,7 +911,7 @@ const SoftwareRequest = () => {
                 <label className="block text-sm font-medium text-gray-700">Additional Info</label>
                 <Textarea
                   name="additional_info"
-                  value={formData.additional_info}
+                  value={commonFields.additional_info}
                   onChange={handleInputChange}
                   className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50"
                   rows="4"
@@ -569,7 +921,7 @@ const SoftwareRequest = () => {
                 <label className="block text-sm font-medium text-gray-700">Manager</label>
                 <Select
                   name="manager_id"
-                  value={formData.manager_id}
+                  value={commonFields.manager_id}
                   onValueChange={(value) => handleSelectChange('manager_id', value)}
                 >
                   <SelectTrigger className="mt-1">
@@ -589,7 +941,7 @@ const SoftwareRequest = () => {
                 <label className="block text-sm font-medium text-gray-700">IT Admin</label>
                 <Select
                   name="it_admin_id"
-                  value={formData.it_admin_id}
+                  value={commonFields.it_admin_id}
                   onValueChange={(value) => handleSelectChange('it_admin_id', value)}
                   required
                 >
@@ -605,62 +957,48 @@ const SoftwareRequest = () => {
                   </SelectContent>
                 </Select>
               </div>
-              <Button
-                type="submit"
-                className="bg-blue-500 hover:bg-blue-600 text-white"
-                disabled={formSubmitting}
-              >
-                {formSubmitting ? 'Submitting...' : 'Submit Request'}
-              </Button>
+              <div className="flex gap-3">
+                <Button
+                  type="button"
+                  onClick={addSoftwareRequest}
+                  className="bg-blue-500 hover:bg-blue-600 text-white flex items-center gap-2"
+                >
+                  <Plus className="h-4 w-4" />
+                  Add Software
+                </Button>
+                
+                {/* Show submit button for single request when no software in list */}
+                {softwareRequests.length === 0 && (
+                  <Button
+                    type="button"
+                    onClick={handleSingleSubmit}
+                    className="bg-green-600 hover:bg-green-700 text-white"
+                    disabled={formSubmitting}
+                  >
+                    {formSubmitting ? 'Submitting...' : 'Submit Request'}
+                  </Button>
+                )}
+                
+                {/* Show submit button for multiple requests when software list has items */}
+                {softwareRequests.length > 0 && (
+                  <Button
+                    type="button"
+                    onClick={handleMultipleSubmit}
+                    className="bg-green-600 hover:bg-green-700 text-white"
+                    disabled={formSubmitting}
+                  >
+                    {formSubmitting ? 'Submitting...' : (() => {
+                      const hasFormData = formData.software_name.trim() && commonFields.asset_id && commonFields.it_admin_id;
+                      const totalRequests = softwareRequests.length + (hasFormData ? 1 : 0);
+                      return `Submit ${totalRequests} Request(s)`;
+                    })()}
+                  </Button>
+                )}
+              </div>
             </form>
           </div>
         </TabsContent>
 
-        <TabsContent value="compliance">
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">
-              Compliance Questions for{' '}
-              {requests.find((req) => req.requestId === selectedRequestId)?.software_name || 'Selected Request'}
-            </h2>
-            {complianceQuestions.length === 0 ? (
-              <div className="text-center text-gray-600">No compliance questions available.</div>
-            ) : (
-              <div className="space-y-4">
-                {complianceQuestions.map((question) => (
-                  <div key={question.id} className="space-y-2">
-                    <label className="block text-sm font-medium text-gray-700">
-                      {question.question_text}
-                    </label>
-                    <Textarea
-                      value={complianceAnswers[question.id] || ''}
-                      onChange={(e) => handleComplianceAnswerChange(question.id, e.target.value)}
-                      className="w-full"
-                      rows={1}
-                      placeholder="Enter your answer"
-                      required
-                    />
-                  </div>
-                ))}
-                <div className="flex gap-2">
-                  <Button
-                    onClick={() => handleComplianceSubmit(selectedRequestId)}
-                    className="bg-blue-500 hover:bg-blue-600 text-white"
-                    disabled={complianceSubmitting}
-                  >
-                    {complianceSubmitting ? 'Submitting...' : 'Submit Answers'}
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onClick={() => setSelectedRequestId(null)}
-                    disabled={complianceSubmitting}
-                  >
-                    Cancel
-                  </Button>
-                </div>
-              </div>
-            )}
-          </div>
-        </TabsContent>
       </Tabs>
 
       <Dialog open={viewAnswersModalOpen} onOpenChange={setViewAnswersModalOpen}>
@@ -684,6 +1022,60 @@ const SoftwareRequest = () => {
           <DialogFooter>
             <Button variant="outline" onClick={() => setViewAnswersModalOpen(false)}>
               Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={complianceModalOpen} onOpenChange={setComplianceModalOpen}>
+        <DialogContent className="sm:max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle>
+              Compliance Questions for{' '}
+              {requests.find((req) => req.requestId === selectedRequestId)?.software_name || 'Selected Request'}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 max-h-[60vh] overflow-y-auto">
+            {complianceQuestions.length === 0 ? (
+              <div className="text-center text-gray-600">No compliance questions available.</div>
+            ) : (
+              <div className="space-y-4">
+                {complianceQuestions.map((question) => (
+                  <div key={question.id} className="space-y-2">
+                    <label className="block text-sm font-medium text-gray-700">
+                      {question.question_text}
+                    </label>
+                    <Textarea
+                      value={complianceAnswers[question.id] || ''}
+                      onChange={(e) => handleComplianceAnswerChange(question.id, e.target.value)}
+                      className="w-full"
+                      rows={1}
+                      placeholder="Enter your answer"
+                      required
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button
+              onClick={() => handleComplianceSubmit(selectedRequestId)}
+              className="bg-blue-500 hover:bg-blue-600 text-white"
+              disabled={complianceSubmitting}
+            >
+              {complianceSubmitting ? 'Submitting...' : 'Submit Answers'}
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setComplianceModalOpen(false);
+                setSelectedRequestId(null);
+                setComplianceAnswers({});
+              }}
+              disabled={complianceSubmitting}
+            >
+              Cancel
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -732,10 +732,8 @@ export const deleteMaintenance = async (id) => {
 // Software request API endpoints
 export const softwareRequestAPI = {
   createSoftwareRequest: async (data) => {
-   
     const response = await api.post('/software_requests/', {
       ...data,
-      business_unit_id: data.business_unit_id || null, 
       software_duration: data.software_duration || null, 
     });
     return response.data;

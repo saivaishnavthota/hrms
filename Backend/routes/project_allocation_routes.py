@@ -113,8 +113,10 @@ def get_employee_allocations(
         except ValueError:
             raise HTTPException(status_code=400, detail="Invalid end_month format. Use YYYY-MM")
     
-    # Build query
-    query = select(ProjectAllocation).where(ProjectAllocation.employee_id == employee_id)
+    # Build query with project name join
+    query = select(ProjectAllocation, Project.project_name).join(
+        Project, ProjectAllocation.project_id == Project.project_id
+    ).where(ProjectAllocation.employee_id == employee_id)
     
     if start_month:
         query = query.where(ProjectAllocation.month >= start_month)
@@ -124,25 +126,30 @@ def get_employee_allocations(
     
     query = query.order_by(ProjectAllocation.month, ProjectAllocation.project_id)
     
-    allocations = session.exec(query).all()
+    results = session.exec(query).all()
     
     # Group by month
     result = {}
-    for allocation in allocations:
+    for allocation, project_name in results:
         month = allocation.month
         if month not in result:
             result[month] = []
         
         remaining_days = allocation.allocated_days - allocation.consumed_days
         result[month].append({
+            "id": allocation.id,
+            "employee_id": allocation.employee_id,
             "project_id": allocation.project_id,
-            "project_name": allocation.project.project_name if allocation.project else "Unknown",
+            "project_name": project_name,
             "allocated_days": allocation.allocated_days,
             "consumed_days": allocation.consumed_days,
             "remaining_days": max(0, remaining_days),
             "employee_name": allocation.employee_name,
+            "employee_email": getattr(allocation, 'employee_email', None),
             "company": allocation.company,
-            "client": allocation.client
+            "client": allocation.client,
+            "month": allocation.month,
+            "allocation_percentage": (allocation.consumed_days / allocation.allocated_days * 100) if allocation.allocated_days > 0 else 0
         })
     
     return {

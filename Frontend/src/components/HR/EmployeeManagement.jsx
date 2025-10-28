@@ -344,9 +344,9 @@ const EmployeeManagement = () => {
           {isSuperHR && (
             <div className="flex gap-3">
               <button 
-                onClick={() => setIsImportModalOpen(true)}
-                className="flex items-center gap-2 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white px-6 py-3 rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
-              >
+  onClick={() => setIsImportModalOpen(true)}
+  className="flex items-center gap-2 bg-black hover:bg-gray-800 text-white px-6 py-3 rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
+>
                 <Upload className="h-5 w-5" />
                 Bulk Import
               </button>

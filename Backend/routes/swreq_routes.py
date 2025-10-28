@@ -49,7 +49,8 @@ async def create_software_request(
             raise HTTPException(status_code=404, detail="Manager not found")
 
     # Validate business unit (if provided)
-    if request.business_unit_id:
+    business_unit = None
+    if hasattr(request, 'business_unit_id') and request.business_unit_id:
         business_unit = session.get(Location, request.business_unit_id)
         if not business_unit:
             raise HTTPException(status_code=404, detail="Business Unit not found")
@@ -81,7 +82,7 @@ async def create_software_request(
         software_name=request.software_name,
         software_version=request.software_version,
         additional_info=request.additional_info,
-        business_unit_id=request.business_unit_id,
+        business_unit_id=getattr(request, 'business_unit_id', None),
         software_duration=request.software_duration,
         status="Pending"
     )
@@ -98,7 +99,7 @@ async def create_software_request(
     approve_url = f"{base_url}/{request_id}/manager-action?action=Approved" if manager else None
     reject_url = f"{base_url}/{request_id}/manager-action?action=Rejected" if manager else None
 
-    business_unit_name = business_unit.name if request.business_unit_id and business_unit else None
+    business_unit_name = business_unit.name if business_unit else None
     await send_new_request_email(
         manager_name=manager.name if manager else None,
         manager_email=manager.company_email if manager else None,

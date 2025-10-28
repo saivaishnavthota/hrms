@@ -43,6 +43,8 @@ const EmployeeAllocationDashboard = () => {
   const [allocations, setAllocations] = useState({});
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
   const [dateRange, setDateRange] = useState({
     startMonth: '',
     endMonth: ''
@@ -189,6 +191,18 @@ const EmployeeAllocationDashboard = () => {
     emp.email?.toLowerCase().includes(searchTerm.toLowerCase())
   ) : [];
 
+  // Pagination logic
+  const totalItems = filteredEmployees.length;
+  const totalPages = Math.ceil(totalItems / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedEmployees = filteredEmployees.slice(startIndex, endIndex);
+
+  // Reset to first page when search term changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm]);
+
 
   const getMonthColumns = () => {
     const months = Object.keys(allocations).sort();
@@ -282,20 +296,20 @@ const EmployeeAllocationDashboard = () => {
     const url = window.URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `team_allocation_${new Date().toISOString().split('T')[0]}.csv`;
+    link.download = `employee-allocation-dashboard-${new Date().toISOString().split('T')[0]}.csv`;
     link.click();
     window.URL.revokeObjectURL(url);
     
-    toast.success('Team allocation data exported successfully');
+    toast.success('Data exported successfully');
   };
 
   return (
-    <div className="p-6 bg-gray-50 min-h-screen">
+    <div className="p-6 bg-gray-50 min-h-screen" style={{ fontFamily: 'Arial, sans-serif' }}>
       <div className="max-w-7xl mx-auto">
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Team Allocation Dashboard</h1>
-            <p className="text-gray-600 mt-1">View project allocations for all employees assigned to you</p>
+            <h4 className="font-heading-md text-gray-700" style={{ fontFamily: 'Arial, sans-serif' }}>Employee Allocation Dashboard</h4>
+            <p className="font-body-md text-gray-600 mt-1" style={{ fontFamily: 'Arial, sans-serif' }}>View project allocations for all employees assigned to you</p>
           </div>
           
           <div className="flex gap-3">
@@ -323,7 +337,7 @@ const EmployeeAllocationDashboard = () => {
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div className="text-center p-4 bg-blue-50 rounded-lg">
-                <div className="text-2xl font-bold text-blue-600">
+                <div className="font-heading-md text-blue-600">
                   {searchTerm ? 
                     employees.filter(emp => 
                       emp.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -331,12 +345,12 @@ const EmployeeAllocationDashboard = () => {
                     ).length 
                     : employees.length}
                 </div>
-                <div className="text-sm text-blue-700">
+                <div className="font-body-sm text-blue-700">
                   {searchTerm ? 'Filtered Employees' : 'Total Employees'}
                 </div>
               </div>
               <div className="text-center p-4 bg-green-50 rounded-lg">
-                <div className="text-2xl font-bold text-green-600">
+                <div className="font-heading-md text-green-600">
                   {(() => {
                     const employeesWithAllocations = new Set();
                     Object.values(allocations).forEach(monthAllocations => {
@@ -347,10 +361,10 @@ const EmployeeAllocationDashboard = () => {
                     return employeesWithAllocations.size;
                   })()}
                 </div>
-                <div className="text-sm text-green-700">With Allocations</div>
+                <div className="font-body-sm text-green-700">With Allocations</div>
               </div>
               <div className="text-center p-4 bg-orange-50 rounded-lg">
-                <div className="text-2xl font-bold text-orange-600">
+                <div className="font-heading-md text-orange-600">
                   {(() => {
                     const employeesWithAllocations = new Set();
                     Object.values(allocations).forEach(monthAllocations => {
@@ -361,10 +375,10 @@ const EmployeeAllocationDashboard = () => {
                     return employees.length - employeesWithAllocations.size;
                   })()}
                 </div>
-                <div className="text-sm text-orange-700">No Allocations</div>
+                <div className="font-body-sm text-orange-700">No Allocations</div>
               </div>
               <div className="text-center p-4 bg-purple-50 rounded-lg">
-                <div className="text-2xl font-bold text-purple-600">
+                <div className="font-heading-md text-purple-600">
                   {(() => {
                     const uniqueProjects = new Set();
                     Object.values(allocations).forEach(monthAllocations => {
@@ -375,7 +389,7 @@ const EmployeeAllocationDashboard = () => {
                     return uniqueProjects.size;
                   })()}
                 </div>
-                <div className="text-sm text-purple-700">Total Projects</div>
+                <div className="font-body-sm text-purple-700">Total Projects</div>
               </div>
             </div>
           </CardContent>
@@ -387,8 +401,9 @@ const EmployeeAllocationDashboard = () => {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Calendar className="w-5 h-5" />
-              Date Range Filter
+              Date Range Filter (Optional)
             </CardTitle>
+            <p className="font-body-sm text-gray-600">Leave empty to show all allocations, or select months to filter</p>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -522,19 +537,20 @@ const EmployeeAllocationDashboard = () => {
                       });
 
                       // Render grouped employee-project combinations
-                      return Object.values(employeeProjectGroups).map((group, index) => (
+                      // Apply pagination to grouped data
+                      const groupedValues = Object.values(employeeProjectGroups);
+                      const paginatedGroups = groupedValues.slice(startIndex, endIndex);
+                      
+                      return paginatedGroups.map((group, index) => (
                         <TableRow key={`group-${index}`}>
                           <TableCell className="font-medium">
                             <div className="space-y-1">
-                              <div className="font-semibold">{group.employee_name}</div>
+                              <div className="font-md" style={{ fontFamily: '"Corporative Sans RD", Arial, sans-serif', fontSize: '18.4px' }}>{group.employee_name}</div>
                               <div className="text-xs text-gray-500">{group.employee_email}</div>
                             </div>
                           </TableCell>
                           <TableCell className="font-medium">
-                            <div className="space-y-1">
-                              <div className="font-semibold">{group.project_name}</div>
-                              <div className="text-xs text-gray-500">Project Name</div>
-                            </div>
+                            <div className="font-semibold">{group.project_name}</div>
                           </TableCell>
                           <TableCell>{group.client || '-'}</TableCell>
                           {getMonthColumns().map((monthCol) => (
@@ -553,9 +569,9 @@ const EmployeeAllocationDashboard = () => {
                               )}
                             </TableCell>
                           ))}
-                          <TableCell className="text-center font-medium">
+                          <TableCell className="text-center font-subheading-sm">
                             <div className="space-y-1">
-                              <div className="text-sm font-semibold">{group.total_allocated}.0 days</div>
+                              <div className="font-body-sm font-semibold">{group.total_allocated}.0 days</div>
                               <div className="text-xs text-gray-500">Total Allocated</div>
                             </div>
                           </TableCell>
@@ -584,6 +600,103 @@ const EmployeeAllocationDashboard = () => {
                   </TableBody>
                 </Table>
               </div>
+              
+              {/* Pagination Controls */}
+              {(() => {
+                const employeeProjectGroups = {};
+                Object.entries(allocations).forEach(([month, monthAllocations]) => {
+                  monthAllocations.forEach(allocation => {
+                    const matchesSearch = !searchTerm || 
+                      allocation.employee_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                      allocation.employee_email?.toLowerCase().includes(searchTerm.toLowerCase());
+                    
+                    if (!matchesSearch) return;
+                    
+                    const groupKey = `${allocation.employee_id}-${allocation.project_name}-${allocation.client}`;
+                    if (!employeeProjectGroups[groupKey]) {
+                      employeeProjectGroups[groupKey] = { employee_name: allocation.employee_name };
+                    }
+                  });
+                });
+                
+                const totalFilteredGroups = Object.keys(employeeProjectGroups).length;
+                
+                return totalFilteredGroups > 0 && (
+                  <div className="flex items-center justify-between mt-6 px-4">
+                    <div className="flex items-center space-x-2">
+                      <p className="text-sm text-gray-700">Rows per page:</p>
+                      <Select value={itemsPerPage.toString()} onValueChange={(value) => {
+                        setItemsPerPage(parseInt(value));
+                        setCurrentPage(1);
+                      }}>
+                        <SelectTrigger className="w-20">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="5">5</SelectItem>
+                          <SelectItem value="10">10</SelectItem>
+                          <SelectItem value="20">20</SelectItem>
+                          <SelectItem value="50">50</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    
+                    <div className="flex items-center space-x-2">
+                      <p className="text-sm text-gray-700">
+                        Showing {startIndex + 1} to {Math.min(endIndex, totalFilteredGroups)} of {totalFilteredGroups} entries
+                      </p>
+                    </div>
+
+                    <div className="flex items-center space-x-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                        disabled={currentPage === 1}
+                      >
+                        Previous
+                      </Button>
+                      
+                      <div className="flex items-center space-x-1">
+                        {Array.from({ length: Math.min(5, Math.ceil(totalFilteredGroups / itemsPerPage)) }, (_, i) => {
+                          const totalPages = Math.ceil(totalFilteredGroups / itemsPerPage);
+                          let pageNum;
+                          if (totalPages <= 5) {
+                            pageNum = i + 1;
+                          } else if (currentPage <= 3) {
+                            pageNum = i + 1;
+                          } else if (currentPage >= totalPages - 2) {
+                            pageNum = totalPages - 4 + i;
+                          } else {
+                            pageNum = currentPage - 2 + i;
+                          }
+                          
+                          return (
+                            <Button
+                              key={pageNum}
+                              variant={currentPage === pageNum ? "default" : "outline"}
+                              size="sm"
+                              onClick={() => setCurrentPage(pageNum)}
+                              className="w-8 h-8 p-0"
+                            >
+                              {pageNum}
+                            </Button>
+                          );
+                        })}
+                      </div>
+                      
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCurrentPage(prev => Math.min(prev + 1, Math.ceil(totalFilteredGroups / itemsPerPage)))}
+                        disabled={currentPage === Math.ceil(totalFilteredGroups / itemsPerPage)}
+                      >
+                        Next
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })()}
             </CardContent>
           </Card>
         ) : employees.length > 0 ? (

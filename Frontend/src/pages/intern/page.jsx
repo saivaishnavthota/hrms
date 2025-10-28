@@ -19,6 +19,7 @@ import {
 // Import Employee components (interns use the same components)
 import AddAttendance from '@/components/Employee/AddAttendance';
 import ApplyLeave from '@/components/Employee/ApplyLeave';
+import TimeManagement from '@/components/Employee/TimeManagement';
 import UploadDocuments from '@/components/Employee/UploadDocuments';
 import SubmitExpense from '@/components/Employee/SubmitExpense';
 import SetPassword from '@/components/Employee/SetPassword';
@@ -35,15 +36,10 @@ const InternPage = () => {
 
   const getPageInfo = (pathname) => {
     const routes = {
-      '/intern/add-attendance': {
-        title: 'Book Your Time',
-        description: 'Record your daily attendance and working hours',
-        content: <AddAttendance />
-      },
-      '/intern/apply-leave': {
-        title: 'Apply Leave',
-        description: 'Submit leave applications and manage your time off',
-        content: <ApplyLeave />
+      '/intern/time-management': {
+        title: 'Time Management',
+        description: 'Manage your attendance and leave applications',
+        content: <TimeManagement />
       },
       '/intern/upload-documents': {
         title: 'Upload Documents',

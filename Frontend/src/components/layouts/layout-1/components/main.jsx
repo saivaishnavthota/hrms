@@ -17,6 +17,7 @@ import {
   Settings,
   DollarSign,
   BarChart2,
+  BarChart3,
   CreditCard,
   CalendarSearch,
   FileIcon,
@@ -92,7 +93,7 @@ export function Main({ menu }) {
   ];
 
   const MANAGEMENT_ANALYTICS = [
-    { title: 'Dashboard', path: (isSuperHRPath ? '/super-hr/dashboard' : '/hr/dashboard'), icon: LayoutGrid },
+    { title: 'Home', path: (isSuperHRPath ? '/super-hr/dashboard' : '/hr/dashboard'), icon: LayoutGrid },
     {
       title: 'Leave Management',
       icon: CalendarCheck,
@@ -103,6 +104,7 @@ export function Main({ menu }) {
     { title: 'Attendance', path: (isSuperHRPath ? '/super-hr/employees-attendance' : '/hr/employees-attendance'), icon: CalendarCheck },
     { title: 'Holidays', path: (isSuperHRPath ? '/super-hr/holidays' : '/hr/holidays'), icon: CalendarSearch },
     { title: 'View Projects', path: (isSuperHRPath ? '/super-hr/view-projects' : '/hr/view-projects'), icon: FileIcon },
+    { title: 'Employee Allocations', path: (isSuperHRPath ? '/super-hr/employee-allocation-dashboard' : '/hr/employee-allocation-dashboard'), icon: BarChart3 },
     { title: 'Asset Allocations', path: (isSuperHRPath ? '/super-hr/asset-allocations' : '/hr/asset-allocations'), icon: Monitor },
     // New: My Activity tab (for both HR and Super-HR), and HR Config (only for Super HR)
     { title: 'My Activity', path: (isSuperHRPath ? '/super-hr/my-activity' : '/hr/my-activity'), icon: FileIcon },
@@ -126,7 +128,7 @@ export function Main({ menu }) {
 
   // Merge Admin’s management and IT items into a single second section
   const ADMIN_MANAGEMENT_ANALYTICS = [
-    findAdminItem('Dashboard'),
+    findAdminItem('Home'),
     findAdminItem('Leave Requests'),
     findAdminItem('Expense Management'),
     findAdminItem('Employee Attendance'),

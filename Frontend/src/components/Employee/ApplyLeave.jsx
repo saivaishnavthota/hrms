@@ -251,6 +251,25 @@ const getLeaveTypeColor = (leaveType) => {
         throw new Error('Missing employee ID. Please log in again.');
       }
 
+      // Validate leave balance before submitting
+      const requestedDays = calculateDays();
+      const leaveType = leaveData.leaveType;
+      
+      let availableDays = 0;
+      if (leaveType === 'Sick Leave') {
+        availableDays = balances.sick?.available || 0;
+      } else if (leaveType === 'Casual Leave') {
+        availableDays = balances.casual?.available || 0;
+      } else if (leaveType === 'Annual Leave') {
+        availableDays = balances.annual?.available || 0;
+      }
+      
+      if (availableDays < requestedDays) {
+        toast.error(`Insufficient leave balance. Available: ${availableDays} days, Requested: ${requestedDays} days for ${leaveType}`);
+        setIsSubmitting(false);
+        return;
+      }
+
       const response = await leaveAPI.applyLeave({
         employee_id: employeeId,
         leave_type: leaveData.leaveType,
@@ -500,6 +519,63 @@ useEffect(() => {
                 <option key={type} value={type}>{type}</option>
               ))}
             </select>
+            
+            {/* Show available balance for selected leave type */}
+            {leaveData.leaveType && (
+              <div className="mt-2 p-3 bg-gray-50 rounded-lg border">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium text-gray-700">
+                    Available Balance:
+                  </span>
+                  <span className={`text-sm font-semibold ${
+                    (() => {
+                      let available = 0;
+                      if (leaveData.leaveType === 'Sick Leave') {
+                        available = balances.sick?.available || 0;
+                      } else if (leaveData.leaveType === 'Casual Leave') {
+                        available = balances.casual?.available || 0;
+                      } else if (leaveData.leaveType === 'Annual Leave') {
+                        available = balances.annual?.available || 0;
+                      }
+                      return available > 0 ? 'text-green-600' : 'text-red-600';
+                    })()
+                  }`}>
+                    {(() => {
+                      if (leaveData.leaveType === 'Sick Leave') {
+                        return balances.sick?.available || 0;
+                      } else if (leaveData.leaveType === 'Casual Leave') {
+                        return balances.casual?.available || 0;
+                      } else if (leaveData.leaveType === 'Annual Leave') {
+                        return balances.annual?.available || 0;
+                      }
+                      return 0;
+                    })()} days
+                  </span>
+                </div>
+                {(() => {
+                  const requestedDays = calculateDays();
+                  const available = (() => {
+                    if (leaveData.leaveType === 'Sick Leave') {
+                      return balances.sick?.available || 0;
+                    } else if (leaveData.leaveType === 'Casual Leave') {
+                      return balances.casual?.available || 0;
+                    } else if (leaveData.leaveType === 'Annual Leave') {
+                      return balances.annual?.available || 0;
+                    }
+                    return 0;
+                  })();
+                  
+                  if (requestedDays > 0 && available < requestedDays) {
+                    return (
+                      <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded text-sm text-red-700">
+                        ⚠️ Insufficient balance! You need {requestedDays} days but only have {available} days available.
+                      </div>
+                    );
+                  }
+                  return null;
+                })()}
+              </div>
+            )}
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -558,8 +634,20 @@ useEffect(() => {
           <div className="flex gap-3 pt-4">
             <Button
               type="submit"
-              disabled={isSubmitting}
-              className="flex-1 bg-green-600 hover:bg-green-700 text-white"
+              disabled={isSubmitting || (() => {
+                if (!leaveData.leaveType) return false;
+                const requestedDays = calculateDays();
+                let availableDays = 0;
+                if (leaveData.leaveType === 'Sick Leave') {
+                  availableDays = balances.sick?.available || 0;
+                } else if (leaveData.leaveType === 'Casual Leave') {
+                  availableDays = balances.casual?.available || 0;
+                } else if (leaveData.leaveType === 'Annual Leave') {
+                  availableDays = balances.annual?.available || 0;
+                }
+                return availableDays < requestedDays;
+              })()}
+              className="flex-1 bg-green-600 hover:bg-green-700 text-white disabled:bg-gray-400 disabled:cursor-not-allowed"
             >
               {isSubmitting ? (
                 <div className="flex items-center gap-2">

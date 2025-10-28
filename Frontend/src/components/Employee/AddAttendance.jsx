@@ -457,11 +457,11 @@ const AddAttendance = () => {
       const invalidHours = Object.values(attendanceData).some(row =>
         !weekOffDays.includes(row.day) && 
         !row.submitted && (  // Only check unsubmitted days
-          row.hours < 0 || row.hours > 24
+          row.hours < 0 || row.hours > 8
         )
       );
       if (invalidHours) {
-        toast.warn('Total hours must be between 0 and 24 for non-week-off days');
+        toast.warn('Total hours must be between 0 and 8 for non-week-off days');
         setTimeout(() => setMessage(''), 5000);
         return;
       }
@@ -602,7 +602,39 @@ const AddAttendance = () => {
 
     const updateSubtask = (projectIndex, subtaskIndex, field, value) => {
       const updated = [...selectedProjects];
-      updated[projectIndex].subtasks[subtaskIndex][field] = field === 'hours' ? parseFloat(value) || 0 : value;
+      
+      if (field === 'hours') {
+        const hoursValue = parseFloat(value) || 0;
+        
+        // Validate individual subtask hours (max 8 per subtask)
+        if (hoursValue > 8) {
+          toast.warn('Maximum 8 hours allowed per subtask');
+          return;
+        }
+        
+        // Calculate total hours for all subtasks
+        let totalHours = 0;
+        updated.forEach(project => {
+          project.subtasks.forEach(subtask => {
+            if (project === updated[projectIndex] && subtask === updated[projectIndex].subtasks[subtaskIndex]) {
+              totalHours += hoursValue;
+            } else {
+              totalHours += parseFloat(subtask.hours || 0);
+            }
+          });
+        });
+        
+        // Validate total hours per day (max 8)
+        if (totalHours > 8) {
+          toast.warn('Maximum 8 hours allowed per day across all subtasks');
+          return;
+        }
+        
+        updated[projectIndex].subtasks[subtaskIndex][field] = hoursValue;
+      } else {
+        updated[projectIndex].subtasks[subtaskIndex][field] = value;
+      }
+      
       setSelectedProjects(updated);
     };
 
@@ -758,7 +790,7 @@ const AddAttendance = () => {
                         onChange={(e) => updateSubtask(projectIndex, subtaskIndex, 'hours', e.target.value)}
                         placeholder="Hours"
                         min="0"
-                        max="24"
+                        max="8"
                         step="0.5"
                         className="w-24 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#2D5016] focus:border-transparent"
                       />
@@ -932,7 +964,7 @@ const AddAttendance = () => {
                                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#2D5016] focus:border-transparent bg-white"
                               >
                                 <option value="">Select Action</option>
-                                <option value="Present">Present</option>
+                                <option value="At office">At office</option>
                                 <option value="Leave">Leave</option>
                                 <option value="WFH">Work From Home</option>
                               </select>
@@ -1051,10 +1083,10 @@ const AddAttendance = () => {
                 </div>
               </div>
 
-              <div className="bg-white rounded-xl shadow-lg overflow-hidden border border-gray-200">
+              <div className="bg-white rounded-xl shadow-lg overflow-hidden border border-gray-200 transform scale-[0.85] origin-top">
                 <div className="grid grid-cols-7 bg-gradient-to-r from-gray-600 to-[#2D5016]">
                   {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
-                    <div key={day} className="p-4 text-center font-semibold text-white">
+                    <div key={day} className="p-3 text-center font-semibold text-white text-sm">
                       {day}
                     </div>
                   ))}
@@ -1081,22 +1113,22 @@ const AddAttendance = () => {
                       days.push(
                         <div
                           key={dateStr}
-                          className={`min-h-[120px] p-2 border-b border-r border-gray-200 ${isCurrentMonth ? 'bg-white' : 'bg-gray-50'
+                          className={`min-h-[102px] p-1.5 border-b border-r border-gray-200 ${isCurrentMonth ? 'bg-white' : 'bg-gray-50'
                             } ${isToday ? 'bg-green-50 border-green-200' : ''}`}
                         >
-                          <div className={`text-sm font-medium mb-2 ${isCurrentMonth ? 'text-gray-900' : 'text-gray-400'
+                          <div className={`text-xs font-medium mb-1.5 ${isCurrentMonth ? 'text-gray-900' : 'text-gray-400'
                             } ${isToday ? 'text-[#2D5016] font-bold' : ''}`}>
                             {currentDate.getDate()}
                           </div>
                           {isWeekOff && isCurrentMonth ? (
-                            <div className="space-y-1">
-                              <div className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800 border border-gray-200">
+                            <div className="space-y-0.5">
+                              <div className="inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800 border border-gray-200">
                                 Week-off
                               </div>
                             </div>
                           ) : attendanceRecord && isCurrentMonth ? (
-                            <div className="space-y-1">
-                              <div className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${attendanceRecord.status === 'Present'
+                            <div className="space-y-0.5">
+                              <div className={`inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium ${attendanceRecord.status === 'At office'
                                 ? 'bg-green-100 text-green-800 border border-green-200'
                                 : attendanceRecord.status === 'WFH'
                                   ? 'bg-green-100 text-green-800 border border-green-200'
@@ -1108,13 +1140,13 @@ const AddAttendance = () => {
                               </div>
                               {attendanceRecord.hours > 0 && (
                                 <div className="text-xs text-gray-600 flex items-center gap-1">
-                                  <Clock className="h-3 w-3" />
+                                  <Clock className="h-2.5 w-2.5" />
                                   {attendanceRecord.hours}h
                                 </div>
                               )}
                               {attendanceRecord.projects && attendanceRecord.projects.length > 0 && (
                                 <div className="text-xs text-gray-600 flex items-center gap-1">
-                                  <Briefcase className="h-3 w-3" />
+                                  <Briefcase className="h-2.5 w-2.5" />
                                   {attendanceRecord.projects.length} project{attendanceRecord.projects.length !== 1 ? 's' : ''}
                                 </div>
                               )}
@@ -1134,7 +1166,7 @@ const AddAttendance = () => {
                 <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
                   <div className="flex items-center gap-2">
                     <div className="w-4 h-4 bg-green-100 border border-green-200 rounded"></div>
-                    <span className="text-sm text-gray-700">Present</span>
+                    <span className="text-sm text-gray-700">At office</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <div className="w-4 h-4 bg-green-100 border border-green-200 rounded"></div>
@@ -1281,7 +1313,7 @@ const AddAttendance = () => {
                               </div>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap">
-                              <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${record.status === 'Present'
+                              <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${record.status === 'At office'
                                 ? 'bg-green-100 text-green-800'
                                 : record.status === 'Leave'
                                   ? 'bg-red-100 text-red-800'

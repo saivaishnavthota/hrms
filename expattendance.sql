@@ -595,6 +595,9 @@ BEGIN
     IF e_hours < 0 THEN
         RAISE EXCEPTION 'Total hours cannot be negative: %', e_hours;
     END IF;
+    IF e_hours > 8 THEN
+        RAISE EXCEPTION 'Total hours cannot exceed 8 hours per day: %', e_hours;
+    END IF;
     IF e_project_ids IS NOT NULL AND array_length(e_project_ids, 1) > 0 THEN
         FOR v_project_id IN SELECT unnest(e_project_ids)
         LOOP
@@ -618,6 +621,9 @@ BEGIN
             END IF;
             IF v_sub_task_hours < 0 THEN
                 RAISE EXCEPTION 'Hours cannot be negative in sub_task: %', v_sub_task;
+            END IF;
+            IF v_sub_task_hours > 8 THEN
+                RAISE EXCEPTION 'Hours cannot exceed 8 hours in sub_task: %', v_sub_task;
             END IF;
             IF NOT EXISTS (
                 SELECT 1

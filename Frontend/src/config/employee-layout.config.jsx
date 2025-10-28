@@ -1,20 +1,15 @@
-import { LayoutGrid, ClipboardList, Plane, Upload, DollarSign, KeyRound,CalendarCheck,Coins } from 'lucide-react';
+import { LayoutGrid, ClipboardList, Plane, Upload, DollarSign, KeyRound,CalendarCheck,Coins, Clock } from 'lucide-react';
 
 export const MENU_SIDEBAR_EMPLOYEE = [
   {
-    title: 'Dashboard',
+    title: 'Home',
     icon: LayoutGrid,
     path: '/employee',
   },
   {
-    title: 'Book Your Time',
-    icon: ClipboardList,
-    path: '/employee/add-attendance',
-  },
-  {
-    title: 'Apply Leave',
-    icon: CalendarCheck,
-    path: '/employee/apply-leave',
+    title: 'Time Management',
+    icon: Clock,
+    path: '/employee/time-management',
   },
   {
     title: 'Upload Documents',

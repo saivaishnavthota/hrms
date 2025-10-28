@@ -462,10 +462,10 @@ const ManagerEmployees = () => {
   return (
     <div className="p-6 bg-gray-50">
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-semibold">Employees</h1>
+        <h1 className="font-heading-lg">Employees</h1>
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2">
-            <label htmlFor="month-selector" className="text-sm font-medium text-gray-700">
+            <label htmlFor="month-selector" className="font-subheading-sm text-gray-700">
               Allocation Month:
             </label>
             <select
@@ -502,7 +502,7 @@ const ManagerEmployees = () => {
 
       <div className="mt-4 overflow-x-auto bg-white rounded-lg border border-gray-200">
         <div className="px-4 py-3 bg-green-50 border-b border-gray-200">
-          <p className="text-sm text-green-700 font-medium">
+          <p className="font-body-sm text-green-700 font-medium">
             Showing allocation data for: <span className="font-bold">{new Date(selectedMonth + '-01').toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</span>
           </p>
         </div>
@@ -628,7 +628,7 @@ const ManagerEmployees = () => {
         <div className="fixed inset-0 bg-transparent backdrop-blur-[2px] flex items-center justify-center z-50">
           <div className="bg-gradient-to-br from-white via-gray-50 to-blue-50 rounded-xl shadow-2xl w-full max-w-lg mx-4 border border-gray-200">
             <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-gradient-to-r from-gray-600 to-[#2D5016] rounded-t-xl">
-              <h2 className="text-lg font-semibold text-white">Project Allocations - {selectedEmployee.name}</h2>
+              <h2 className="font-subheading-lg text-white">Project Allocations - {selectedEmployee.name}</h2>
               <button className="text-green-100 hover:text-white transition-colors p-1 rounded-full hover:bg-green-500" onClick={() => setViewOpen(false)} aria-label="Close"><X size={18} /></button>
             </div>
             <div className="p-6 space-y-4">
@@ -712,7 +712,7 @@ const ManagerEmployees = () => {
             {/* Header */}
             <div className="flex items-center justify-between p-5 border-b border-gray-200 bg-gradient-to-r from-[#2D5016] to-green-600 rounded-t-xl flex-shrink-0">
               <div>
-                <h2 className="text-xl font-bold text-white">Project Allocation</h2>
+                <h2 className="font-heading-md text-white">Project Allocation</h2>
                 <p className="text-sm text-green-100 mt-1">
                   Assign projects and allocate days for {selectedEmployee.name}
                 </p>
@@ -733,7 +733,7 @@ const ManagerEmployees = () => {
             <div className="p-4 border-b border-gray-200 bg-gradient-to-br from-gray-50 to-blue-50 flex-shrink-0">
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-semibold text-gray-900">Capacity Overview</h3>
+                  <h3 className="font-subheading-md text-gray-900">Capacity Overview</h3>
                   <div className={`px-4 py-2 rounded-full text-sm font-bold ${
                     getStatusColors(getCapacityStatus(calculateTotalAllocation(selectedProjects))).bg
                   } ${
@@ -773,7 +773,7 @@ const ManagerEmployees = () => {
                       <span className="text-white font-bold text-sm">!</span>
                     </div>
                     <div className="flex-1">
-                      <p className="text-sm font-semibold text-red-900">Capacity Limit Exceeded</p>
+                      <p className="font-body-sm font-semibold text-red-900">Capacity Limit Exceeded</p>
                       <p className="text-xs text-red-700">
                         Allocation exceeds monthly capacity by {Math.round(calculateTotalAllocation(selectedProjects) - MAX_MONTHLY_CAPACITY)} days. 
                         Please reduce project allocations before saving.
@@ -789,7 +789,7 @@ const ManagerEmployees = () => {
                       <span className="text-white font-bold text-sm">⚠</span>
                     </div>
                     <div className="flex-1">
-                      <p className="text-sm font-semibold text-yellow-900">Near Capacity</p>
+                      <p className="font-body-sm font-semibold text-yellow-900">Near Capacity</p>
                       <p className="text-xs text-yellow-700">
                         Employee is at {Math.round((calculateTotalAllocation(selectedProjects) / MAX_MONTHLY_CAPACITY) * 100)}% capacity utilization.
                       </p>
@@ -804,7 +804,7 @@ const ManagerEmployees = () => {
               <div className="space-y-3">
                 {selectedProjects.length === 0 ? (
                   <div className="text-center py-8">
-                    <p className="text-gray-600 font-medium mb-4">No projects allocated</p>
+                    <p className="font-body-md text-gray-600 font-medium mb-4">No projects allocated</p>
                     <p className="text-sm text-gray-500 mb-4">Click "Add Project" to start allocating</p>
                     <button
                       onClick={() => {
@@ -832,7 +832,7 @@ const ManagerEmployees = () => {
                         <div className="flex-1 space-y-2">
                           {/* Project Selector */}
                           <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                            <label className="block font-subheading-sm text-gray-700 mb-2">
                               Project Name
                             </label>
                             <select
@@ -862,7 +862,7 @@ const ManagerEmployees = () => {
 
                           {/* Days Allocation */}
                           <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                            <label className="block font-subheading-sm text-gray-700 mb-2">
                               Allocated Days
                             </label>
                             <div className="flex items-center gap-3">
@@ -984,7 +984,7 @@ const ManagerEmployees = () => {
                 <div className="w-10 h-10 rounded-full bg-white bg-opacity-20 flex items-center justify-center">
                   <span className="text-2xl">✓</span>
                 </div>
-                <h2 className="text-xl font-bold text-white">Allocation Successful</h2>
+                <h2 className="font-heading-md text-white">Allocation Successful</h2>
               </div>
               <button 
                 className="text-white hover:bg-white hover:bg-opacity-20 rounded-full p-2 transition-all" 
@@ -1016,7 +1016,7 @@ const ManagerEmployees = () => {
               </div>
 
               <div className="space-y-2">
-                <h3 className="text-sm font-semibold text-gray-700 mb-3">Project Details:</h3>
+                <h3 className="font-subheading-sm text-gray-700 mb-3">Project Details:</h3>
                 {(projectsSummary.projects || []).map((p, i) => {
                   const projectName = typeof p === 'object' ? p.projectName : p;
                   const days = typeof p === 'object' ? p.allocatedDays : 0;

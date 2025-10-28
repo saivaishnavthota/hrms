@@ -2,7 +2,7 @@ import { LayoutGrid, ClipboardList, UserPlus, Users, Plane, DollarSign, KeyRound
 
 export const MENU_SIDEBAR_MANAGER = [
   {
-    title: 'Dashboard',
+    title: 'Home',
     icon: LayoutGrid,
     path: '/manager',
   },

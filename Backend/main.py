@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from contextlib import asynccontextmanager
 from database import create_tables_database
-from routes import user_routes, document_routes,locations_routes, attendance_routes,leave_routes,onboarding_routes, calendar_routes,expenses_routes, project_routes, expense_management_routes, policy_routes, hr_config_routes,asset_routes, swreq_routes, entra_auth_routes, project_allocation_routes, employee_import_routes
+from routes import user_routes, document_routes,locations_routes, attendance_routes,leave_routes,onboarding_routes, calendar_routes,expenses_routes, project_routes, expense_management_routes, policy_routes, hr_config_routes,asset_routes, swreq_routes, entra_auth_routes, project_allocation_routes, employee_import_routes, bulk_allocation_routes
 from middleware.cors import add_cors_middleware
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -71,6 +71,7 @@ app.include_router(entra_auth_routes.router)
 app.include_router(entra_auth_routes.oauth2_router)  # Azure AD standard OAuth2 redirect path
 app.include_router(project_allocation_routes.router)
 app.include_router(employee_import_routes.router)
+app.include_router(bulk_allocation_routes.router)
 
 # Add static file serving for uploads
 import os

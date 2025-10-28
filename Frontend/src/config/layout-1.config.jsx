@@ -54,12 +54,13 @@ import {
   KeyRound,
   UserPlus as AssignIcon,
   FileText as RequestIcon,
+  BarChart3,
   Activity,
 } from 'lucide-react';
 
 export const MENU_SIDEBAR = [
   {
-    title: 'Dashboard',
+    title: 'Home',
     icon: LayoutGrid,
     path: '/hr/dashboard',
   },
@@ -143,6 +144,11 @@ export const MENU_SIDEBAR = [
     title: 'Employee Import',
     icon: Upload,
     path: '/hr/employee-import',
+  },
+  {
+    title: 'Employee Allocations',
+    icon: BarChart3,
+    path: '/hr/employee-allocation-dashboard',
   },
   {
     title: 'My Activity',

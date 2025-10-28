@@ -2,7 +2,7 @@ import { LayoutGrid, Briefcase, ClipboardList, Upload, CalendarCheck, BarChart3 
 
 export const MENU_SIDEBAR_ACCOUNT_MANAGER = [
   {
-    title: 'Dashboard',
+    title: 'Home',
     icon: LayoutGrid,
     path: '/account-manager',
   },

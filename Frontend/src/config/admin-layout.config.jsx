@@ -20,7 +20,7 @@ import {
 
 export const MENU_SIDEBAR_ADMIN = [
   {
-    title: 'Dashboard',
+    title: 'Home',
     icon: LayoutGrid,
     path: '/admin/dashboard',
   },

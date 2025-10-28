@@ -121,7 +121,7 @@ export function SearchDialog({ trigger }) {
     {
       title: 'Shortcuts',
       children: [
-        { icon: Home, info: 'Go to Dashboard' },
+        { icon: Home, info: 'Go to Home' },
         { icon: Badge, info: 'Public Profile' },
         { icon: CircleUserRound, info: 'My Profile' },
         { icon: Settings, info: 'My Account' },

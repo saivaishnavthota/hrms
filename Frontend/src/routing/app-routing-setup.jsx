@@ -40,6 +40,7 @@ import EmployeeAddAttendance from '@/components/Employee/AddAttendance';
 import HRAddAttendance from '@/components/Employee/AddAttendance';
 import ManagerAddAttendance from '@/components/Employee/AddAttendance';
 import ApplyLeave from '@/components/Employee/ApplyLeave';
+import TimeManagement from '@/components/Employee/TimeManagement';
 import SubmitExpense from '@/components/Employee/SubmitExpense';
 import UploadDocuments from '@/components/Employee/UploadDocuments';
 import SoftwareRequest from '@/components/Employee/SoftwareRequest';
@@ -57,6 +58,9 @@ import ManagerEmployeeAttendance from '@/components/Manager/EmployeesAttendance'
 import SoftwareRequestApproval from '@/components/Manager/SoftwareRequestApproval';
 import ManagerAttendance from '@/components/Manager/Attendance';
 import EmployeeAllocationDashboard from '@/components/Manager/EmployeeAllocationDashboard';
+import AccountManagerAllocationDashboard from '@/components/AccountManager/AccountManagerAllocationDashboard';
+import HRAllocationDashboard from '@/components/HR/HRAllocationDashboard';
+import SuperHRAllocationDashboard from '@/components/HR/SuperHRAllocationDashboard';
 // Super HR components
 import HRConfig from '@/components/HR/HRConfig';
 import ITSupporterDashboard from '@/components/ITSupporter/Dashboard';
@@ -108,6 +112,7 @@ export const AppRoutingSetup = () => {
         <Route path="asset-allocations" element={<AssetAllocations />} />
         <Route path="project-allocations" element={<ProjectAllocations />} />
         <Route path="employee-import" element={<EmployeeImport />} />
+        <Route path="employee-allocation-dashboard" element={<HRAllocationDashboard />} />
       </Route>
 
       {/* Protected Super-HR routes */}
@@ -128,13 +133,13 @@ export const AppRoutingSetup = () => {
         <Route path="asset-allocations" element={<AssetAllocations />} />
         <Route path="project-allocations" element={<ProjectAllocations />} />
         <Route path="my-activity" element={<MyActivity />} />
+        <Route path="employee-allocation-dashboard" element={<SuperHRAllocationDashboard />} />
       </Route>
 
       {/* Protected Employee routes using Layout1 with employee menu */}
       <Route path="/employee" element={<ProtectedRoute allowedRoles={["Employee"]}><Layout1 menu={MENU_SIDEBAR_EMPLOYEE} /></ProtectedRoute>}>
         <Route index element={<EmployeePage />} />
-        <Route path="add-attendance" element={<EmployeeAddAttendance />} />
-        <Route path="apply-leave" element={<ApplyLeave />} />
+        <Route path="time-management" element={<TimeManagement />} />
         <Route path="submit-expense" element={<SubmitExpense />} />
         <Route path="upload-documents" element={<UploadDocuments />} />
         <Route path="software-requests" element={<SoftwareRequest />} />
@@ -144,8 +149,7 @@ export const AppRoutingSetup = () => {
       {/* Protected Intern routes using Layout1 with intern menu */}
       <Route path="/intern" element={<ProtectedRoute allowedRoles={["Intern"]}><Layout1 menu={MENU_SIDEBAR_INTERN} /></ProtectedRoute>}>
         <Route index element={<InternPage />} />
-        <Route path="add-attendance" element={<EmployeeAddAttendance />} />
-        <Route path="apply-leave" element={<ApplyLeave />} />
+        <Route path="time-management" element={<TimeManagement />} />
         <Route path="submit-expense" element={<SubmitExpense />} />
         <Route path="upload-documents" element={<UploadDocuments />} />
         <Route path="set-password" element={<SetPassword />} />
@@ -182,7 +186,7 @@ export const AppRoutingSetup = () => {
         <Route path="apply-leave" element={<ApplyLeave />} />
         <Route path="projects" element={<Projects />} />
         <Route path="project-allocations" element={<ProjectAllocations />} />
-        <Route path="employee-allocation-dashboard" element={<EmployeeAllocationDashboard />} />
+        <Route path="employee-allocation-dashboard" element={<AccountManagerAllocationDashboard />} />
         <Route path="change-password" element={<SetPassword />} />
         {/* <Route path="my-profile" element={<MyProfile />} /> */}
       </Route>

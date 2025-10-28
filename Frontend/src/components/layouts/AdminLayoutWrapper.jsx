@@ -43,7 +43,7 @@ export function AdminLayoutWrapper() {
   ];
 
   const MANAGEMENT_ANALYTICS = [
-    { title: 'Dashboard', path: '/admin/dashboard', icon: LayoutGrid },
+    { title: 'Home', path: '/admin/dashboard', icon: LayoutGrid },
     { title: 'Leave Requests', path: '/admin/leave-requests', icon: Calendar },
     { title: 'Expense Management', path: '/admin/expense-management', icon: Coins },
     { title: 'Employee Attendance', path: '/admin/employees-attendance', icon: ClipboardCheck },

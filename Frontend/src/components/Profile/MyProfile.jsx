@@ -206,7 +206,7 @@ const fetchEmployeeProfile = async () => {
             }}
           >
             <ArrowLeft className="h-4 w-4" />
-            Back to Dashboard
+            Back to Home
           </Button>
           <Button
             className="gap-2"
@@ -237,7 +237,7 @@ const fetchEmployeeProfile = async () => {
               </div>
               <div>
                 <h3 className="font-semibold text-lg">{profileData?.name || user?.name || 'N/A'}</h3>
-                <p className="text-sm text-muted-foreground">Employee ID: {profileData?.id || user?.employeeId || 'N/A'}</p>
+                
               </div>
             </div>
             
@@ -252,7 +252,7 @@ const fetchEmployeeProfile = async () => {
               {(profileData?.company_employee_id || user?.company_employee_id) && (
                 <div className="flex items-center gap-2">
                   <UserCheck className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm">Company ID: {profileData?.company_employee_id || user?.company_employee_id}</span>
+                  <span className="text-sm">Employee ID: {profileData?.company_employee_id || user?.company_employee_id}</span>
                 </div>
               )}
               

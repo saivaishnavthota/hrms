@@ -2,7 +2,7 @@ import { LayoutGrid, Package, Building2, Users, ListChecks, Wrench, ClipboardLis
 
 export const MENU_SIDEBAR_IT_SUPPORTER = [
   {
-    title: 'Dashboard',
+    title: 'Home',
     icon: LayoutGrid,
     path: '/it-supporter',
   },

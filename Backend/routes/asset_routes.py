@@ -314,23 +314,81 @@ def delete_maintenance(maintenance_id: int, session: Session = Depends(get_sessi
     return None
 
 
+@router.get("/test-db-connection")
+async def test_db_connection(db: Session = Depends(get_session)):
+    """Test endpoint to verify database connection and User table access"""
+    try:
+        from models.user_model import User
+        from sqlmodel import text
+        
+        # Test basic database connection
+        result = db.exec(text("SELECT 1")).first()
+        print(f"Basic DB query result: {result}")
+        
+        # Test User table exists and has data
+        user_count = db.exec(text("SELECT COUNT(*) FROM employees")).first()
+        print(f"Total users in employees table: {user_count}")
+        
+        # Test SQLModel query
+        users = db.exec(select(User)).all()
+        print(f"SQLModel query found {len(users)} users")
+        
+        return {
+            "status": "success",
+            "basic_query": result,
+            "user_count": user_count,
+            "sqlmodel_count": len(users)
+        }
+    except Exception as e:
+        print(f"Database test error: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Database test failed: {str(e)}")
+
+
 @router.get("/employees/", response_model=List[Employee])
 async def get_employees(o_status: Optional[bool] = True, role: Optional[str] = None, db: Session = Depends(get_session)):
-    query = select(User).where(User.o_status == o_status)
-    if role:
-        query = query.where(User.role == role)
-    employees = db.exec(query).all()
-    return [
-        Employee(
-            employeeId=emp.id,
-            name=emp.name,
-            email=emp.email,
-            role=emp.role,
-            hrs=[],
-            managers=[]
-        )
-        for emp in employees
-    ]
+    try:
+        # Import User model here to avoid circular imports
+        from models.user_model import User
+        
+        print(f"Fetching employees with o_status={o_status}, role={role}")
+        
+        query = select(User).where(User.o_status == o_status)
+        if role:
+            query = query.where(User.role == role)
+        
+        employees = db.exec(query).all()
+        print(f"Found {len(employees)} employees in database")
+        
+        employee_list = []
+        for emp in employees:
+            try:
+                print(f"Processing employee: ID={emp.id}, Name={emp.name}, Email={emp.email}, Role={emp.role}")
+                
+                # Handle None values safely
+                employee_obj = Employee(
+                    employeeId=emp.id,
+                    name=emp.name or "Unknown",
+                    email=emp.email or emp.company_email or "No email",
+                    role=emp.role or "Unknown",
+                    hrs=[],
+                    managers=[]
+                )
+                employee_list.append(employee_obj)
+                print(f"Successfully created Employee object for {emp.name}")
+            except Exception as e:
+                # Log the error but continue with other employees
+                print(f"Error creating Employee object for ID {emp.id}: {e}")
+                continue
+        
+        print(f"Returning {len(employee_list)} employee objects")
+        return employee_list
+    except Exception as e:
+        print(f"Error in get_employees endpoint: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Error fetching employees: {str(e)}")
 
 @router.get("/employee/{employee_id}/assets", response_model=List[dict])
 def get_employee_assets(employee_id: int, session: Session = Depends(get_session)):

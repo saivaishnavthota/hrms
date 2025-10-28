@@ -131,6 +131,52 @@ class ProjectAllocationService:
         logger.warning(f"No match found for employee name: '{name}'")
         return None
 
+    @staticmethod
+    def find_employee_by_company_id(company_employee_id: str, session: Session) -> Optional[User]:
+        """
+        Find employee by company employee ID (YTPL Emp ID).
+        This is the primary method for project allocation imports.
+        """
+        if not company_employee_id:
+            logger.warning("Empty company employee ID provided")
+            return None
+            
+        # Clean the company employee ID
+        cleaned_id = str(company_employee_id).strip()
+        
+        # Remove .0 suffix if it's a numeric value with decimal
+        if cleaned_id.endswith('.0'):
+            cleaned_id = cleaned_id[:-2]
+        
+        # Handle cases where it might be a float representation
+        if '.' in cleaned_id:
+            cleaned_id = cleaned_id.split('.')[0]
+        
+        # Ensure it's exactly 6 characters - pad with zeros if shorter, truncate if longer
+        if len(cleaned_id) < 6:
+            cleaned_id = cleaned_id.zfill(6)  # Pad with leading zeros
+        elif len(cleaned_id) > 6:
+            cleaned_id = cleaned_id[:6]  # Truncate to 6 characters
+            logger.warning(f"Employee ID truncated to 6 characters: {cleaned_id}")
+        
+        # Validate that it's numeric (6-digit number)
+        if not cleaned_id.isdigit():
+            logger.warning(f"Invalid employee ID (non-numeric): {cleaned_id}")
+            return None
+        
+        logger.info(f"Looking up employee by company ID: '{cleaned_id}'")
+        
+        # Find employee by company employee ID
+        statement = select(User).where(User.company_employee_id == cleaned_id)
+        result = session.exec(statement).scalars().first()
+        
+        if result:
+            logger.info(f"✓ Found employee by company ID '{cleaned_id}': {result.name} (ID: {result.company_employee_id})")
+            return result
+        else:
+            logger.warning(f"✗ No employee found with company ID: '{cleaned_id}'")
+            return None
+
 
 
     @staticmethod
@@ -199,44 +245,53 @@ class ProjectAllocationService:
             
             updated = False
             
-            if company_employee_id and company_employee_id.strip():
-                # Check if this company_employee_id is already taken by another employee
-                existing_employee_with_id = session.query(User).filter(
-                    and_(
-                        User.company_employee_id == company_employee_id.strip(),
-                        User.id != employee.id  # Not the same employee
-                    )
-                ).first()
-                
-                if existing_employee_with_id:
-                    logger.warning(
-                        f"⚠️  Company employee ID {company_employee_id} already exists for "
-                        f"'{existing_employee_with_id.name}' (ID: {existing_employee_with_id.id}). "
-                        f"Cannot update '{fresh_employee.name}' (ID: {fresh_employee.id}). "
-                        f"Skipping ID update."
-                    )
-                elif fresh_employee.company_employee_id != company_employee_id.strip():
-                    fresh_employee.company_employee_id = company_employee_id.strip()
-                    updated = True
-                    logger.info(f"✓ Updated company_employee_id for {fresh_employee.name} to {company_employee_id}")
-            
-            if designation and designation.strip():
-                try:
-                    if hasattr(fresh_employee, 'designation') and fresh_employee.designation != designation.strip():
-                        fresh_employee.designation = designation.strip()
+            if company_employee_id:
+                # Convert to string and strip safely
+                company_employee_id_clean = str(company_employee_id).strip()
+                if company_employee_id_clean:
+                    # Check if this company_employee_id is already taken by another employee
+                    existing_employee_with_id = session.query(User).filter(
+                        and_(
+                            User.company_employee_id == company_employee_id_clean,
+                            User.id != employee.id  # Not the same employee
+                        )
+                    ).first()
+                    
+                    if existing_employee_with_id:
+                        logger.warning(
+                            f"⚠️  Company employee ID {company_employee_id_clean} already exists for "
+                            f"'{existing_employee_with_id.name}' (ID: {existing_employee_with_id.id}). "
+                            f"Cannot update '{fresh_employee.name}' (ID: {fresh_employee.id}). "
+                            f"Skipping ID update."
+                        )
+                    elif fresh_employee.company_employee_id != company_employee_id_clean:
+                        fresh_employee.company_employee_id = company_employee_id_clean
                         updated = True
-                        logger.info(f"✓ Updated designation for {fresh_employee.name}")
-                except AttributeError:
-                    logger.warning(f"⚠️  designation column not available for employee {fresh_employee.name}")
+                        logger.info(f"✓ Updated company_employee_id for {fresh_employee.name} to {company_employee_id_clean}")
             
-            if band and band.strip():
-                try:
-                    if hasattr(fresh_employee, 'band') and fresh_employee.band != band.strip():
-                        fresh_employee.band = band.strip()
-                        updated = True
-                        logger.info(f"✓ Updated band for {fresh_employee.name}")
-                except AttributeError:
-                    logger.warning(f"⚠️  band column not available for employee {fresh_employee.name}")
+            if designation:
+                # Convert to string and strip safely
+                designation_clean = str(designation).strip()
+                if designation_clean:
+                    try:
+                        if hasattr(fresh_employee, 'designation') and fresh_employee.designation != designation_clean:
+                            fresh_employee.designation = designation_clean
+                            updated = True
+                            logger.info(f"✓ Updated designation for {fresh_employee.name}")
+                    except AttributeError:
+                        logger.warning(f"⚠️  designation column not available for employee {fresh_employee.name}")
+            
+            if band:
+                # Convert to string and strip safely
+                band_clean = str(band).strip()
+                if band_clean:
+                    try:
+                        if hasattr(fresh_employee, 'band') and fresh_employee.band != band_clean:
+                            fresh_employee.band = band_clean
+                            updated = True
+                            logger.info(f"✓ Updated band for {fresh_employee.name}")
+                    except AttributeError:
+                        logger.warning(f"⚠️  band column not available for employee {fresh_employee.name}")
 
             if updated:
                 session.add(fresh_employee)
@@ -277,20 +332,29 @@ class ProjectAllocationService:
     @staticmethod
     def import_from_excel(file_path: str, project_id: int = 0, session: Session = None) -> Dict:
         """
-        Import project allocations from Excel with new structure:
+        Import project allocations from Excel file.
         
-        Expected columns:
-        - No: Row number
-        - Name: Employee name
-        - Company Name: Company
-        - Band: Employee band
-        - Account: Account name
-        - Project Name (Commercial): Commercial project name
-        - India-Location: Location
-        - Location: Location type
-        - Nov-25, Dec-25, etc.: Month columns with allocation days
-        - YTPL Emp ID: Company employee ID
-        - Title: Employee designation/title
+        Excel format expected:
+        - Column 0: No.
+        - Column 1: Name (for reference only)
+        - Column 2: Company Name
+        - Column 3: Band
+        - Column 4: Account
+        - Column 5: Project Name(Revenue)
+        - Column 6: Project Name (Commercial)
+        - Column 7: India-Location
+        - Column 8: Location
+        - Columns 9-23: Month columns (Nov-25 to Jan-27)
+        - Column 24: YTPL Emp ID (company employee ID - PRIMARY LOOKUP METHOD)
+        - Column 25: Designation
+        
+        Args:
+            file_path: Path to Excel file
+            project_id: Project ID (0 = extract from Excel, >0 = use specific project)
+            session: Database session
+            
+        Returns:
+            Dict with import results
         """
         try:
             # Read Excel file
@@ -342,66 +406,48 @@ class ProjectAllocationService:
             # Process each row
             for index, row in df.iterrows():
                 try:
-                    # Extract employee name (column 1: Name)
-                    employee_name = str(row.iloc[1]).strip() if len(row) > 1 and pd.notna(row.iloc[1]) else ""
+                    # Extract company employee ID (YTPL Emp ID) - primary lookup method
+                    # YTPL Emp ID is at column 24 (index 24) based on the logs
+                    company_employee_id_raw = row.iloc[24] if len(row) > 24 and pd.notna(row.iloc[24]) else None  # YTPL Emp ID
                     
-                    if not employee_name:
+                    # Debug logging
+                    logger.info(f"Row {index + 1}: Raw YTPL Emp ID = {company_employee_id_raw} (type: {type(company_employee_id_raw)})")
+                    
+                    # Convert to string and check if it's meaningful
+                    if company_employee_id_raw is not None:
+                        company_employee_id_str = str(company_employee_id_raw).strip()
+                        logger.info(f"Row {index + 1}: Cleaned YTPL Emp ID = '{company_employee_id_str}'")
+                        # Check for invalid values (0, 0.0, empty, nan, etc.)
+                        if (not company_employee_id_str or 
+                            company_employee_id_str.lower() in ['nan', 'none', ''] or
+                            company_employee_id_str in ['0', '0.0']):
+                            company_employee_id_raw = None
+                            logger.info(f"Row {index + 1}: YTPL Emp ID is empty/invalid after cleaning")
+                    
+                    if not company_employee_id_raw:
                         error_count += 1
-                        errors.append(f"Row {index + 1}: Empty employee name")
+                        errors.append(f"Row {index + 1}: Empty or invalid YTPL Emp ID")
                         continue
                     
-                    # Find employee
-                    employee = ProjectAllocationService.find_employee_by_name(employee_name, session)
+                    # Find employee by company ID
+                    employee = ProjectAllocationService.find_employee_by_company_id(company_employee_id_raw, session)
                     if not employee:
                         error_count += 1
-                        errors.append(f"Row {index + 1}: Employee '{employee_name}' not found in database")
+                        errors.append(f"Row {index + 1}: Employee with YTPL Emp ID '{company_employee_id_raw}' not found in database")
                         continue
                     
-                    # Extract metadata
+                    # Extract metadata with proper type handling
+                    employee_name = str(row.iloc[1]).strip() if len(row) > 1 and pd.notna(row.iloc[1]) else ""  # Name (for reference)
                     company = str(row.iloc[2]).strip() if len(row) > 2 and pd.notna(row.iloc[2]) else None  # Company Name
                     band = str(row.iloc[3]).strip() if len(row) > 3 and pd.notna(row.iloc[3]) else None  # Band
                     account = str(row.iloc[4]).strip() if len(row) > 4 and pd.notna(row.iloc[4]) else None  # Account
-                    project_name = str(row.iloc[5]).strip() if len(row) > 5 and pd.notna(row.iloc[5]) else None  # Project Name (Commercial)
-                    location = str(row.iloc[6]).strip() if len(row) > 6 and pd.notna(row.iloc[6]) else None  # India-Location
-                    location_type = str(row.iloc[7]).strip() if len(row) > 7 and pd.notna(row.iloc[7]) else None  # Location
-                    company_employee_id_raw = row.iloc[-2] if len(row) > len(row) - 2 and pd.notna(row.iloc[-2]) else None  # YTPL Emp ID (second to last)
-                    designation = str(row.iloc[-1]).strip() if len(row) > 0 and pd.notna(row.iloc[-1]) else None  # Title (last column)
+                    project_name = str(row.iloc[5]).strip() if len(row) > 5 and pd.notna(row.iloc[5]) else None  # Account Name/Project Name (Commercial)
+                    location = str(row.iloc[6]).strip() if len(row) > 6 and pd.notna(row.iloc[6]) else None  # Location
+                    designation = str(row.iloc[25]).strip() if len(row) > 25 and pd.notna(row.iloc[25]) else None  # Designation
                     
-                    # Clean company_employee_id - ensure it's exactly 6 characters
-                    company_employee_id = None
-                    if company_employee_id_raw:
-                        company_employee_id = str(company_employee_id_raw).strip()
-                        logger.info(f"Project allocation - Original employee ID: '{company_employee_id}'")
-                        
-                        # Remove .0 suffix if it's a numeric value with decimal
-                        if company_employee_id.endswith('.0'):
-                            company_employee_id = company_employee_id[:-2]
-                            logger.info(f"Project allocation - After removing .0: '{company_employee_id}'")
-                        
-                        # Also handle cases where it might be a float representation
-                        if '.' in company_employee_id:
-                            # Split by decimal and take only the integer part
-                            company_employee_id = company_employee_id.split('.')[0]
-                            logger.info(f"Project allocation - After handling decimal: '{company_employee_id}'")
-                        
-                        # Ensure it's exactly 6 characters - pad with zeros if shorter, truncate if longer
-                        if len(company_employee_id) < 6:
-                            company_employee_id = company_employee_id.zfill(6)  # Pad with leading zeros
-                            logger.info(f"Project allocation - After padding: '{company_employee_id}'")
-                        elif len(company_employee_id) > 6:
-                            company_employee_id = company_employee_id[:6]  # Truncate to 6 characters
-                            logger.warning(f"Project allocation - Employee ID truncated to 6 characters: {company_employee_id}")
-                        
-                        # Validate that it's numeric (6-digit number)
-                        if not company_employee_id.isdigit():
-                            logger.warning(f"Project allocation - Invalid employee ID (non-numeric): {company_employee_id}")
-                            company_employee_id = None  # Set to None if invalid
-                        
-                        logger.info(f"Project allocation - Final employee ID: '{company_employee_id}' (length: {len(company_employee_id) if company_employee_id else 0})")
-                    
-                    # Update employee info
+                    # Update employee info with the cleaned company employee ID
                     ProjectAllocationService.update_employee_info(
-                        employee, company_employee_id, designation, band, session
+                        employee, employee.company_employee_id, designation, band, session
                     )
                     
                     # Create or get project

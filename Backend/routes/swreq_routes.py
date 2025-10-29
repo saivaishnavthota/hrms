@@ -412,17 +412,9 @@ async def get_employee_managers(employee_id: int, session: Session = Depends(get
             import traceback
             traceback.print_exc()
         
-        # If no managers found, try fallback
+        # Do not fallback to all managers; return only managers assigned to the employee
         if not managers:
-            print(f"No managers found for employee {employee_id}, trying fallback")
-            try:
-                fallback_managers = session.exec(
-                    select(User).where(User.role == "Manager")
-                ).all()
-                print(f"Found {len(fallback_managers)} users with Manager role")
-                managers.extend(fallback_managers)
-            except Exception as e:
-                print(f"Fallback query failed: {str(e)}")
+            print(f"No assigned managers found for employee {employee_id}")
         
         print(f"Returning {len(managers)} managers for employee {employee_id}")
         # Return User objects directly, not dictionaries

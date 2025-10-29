@@ -71,7 +71,7 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends(), session: Sessi
 
         access_token = create_access_token(
             data={"sub": onboarding_user.email, "session_id": session_id, "role": onboarding_user.role},
-            expires_delta=timedelta(minutes=60)
+            expires_delta=timedelta(minutes=15)
         )
 
         return UseronboardingResponse(

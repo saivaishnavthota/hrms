@@ -104,7 +104,7 @@ def get_all_attendance_admin(
     
     return attendance_list
  
-VALID_ACTIONS = ["Present", "WFH", "Leave"]
+VALID_ACTIONS = ["Present", "WFH", "Leave", "At office"]
  
 # Employee fetch active assigned projects
 @router.get("/active-projects", response_model=List[dict])
@@ -121,8 +121,9 @@ def get_active_projects(
     
     # If month is provided, filter by project allocations
     if month:
+        # First, get regular projects with allocations
         query = text("""
-            SELECT DISTINCT p.project_id, p.project_name, pa.allocated_days, pa.consumed_days
+            SELECT DISTINCT p.project_id, p.project_name, pa.allocated_days, pa.consumed_days, p.account
             FROM projects p
             JOIN project_allocations pa ON p.project_id = pa.project_id
             WHERE pa.employee_id = :user_id
@@ -143,8 +144,32 @@ def get_active_projects(
                 "project_name": p._mapping["project_name"],
                 "allocated_days": allocated_days,
                 "consumed_days": consumed_days,
-                "remaining_days": allocated_days - consumed_days
+                "remaining_days": allocated_days - consumed_days,
+                "account": p._mapping["account"]
             })
+        
+        # Always add "In house" project if it exists, regardless of allocation
+        inhouse_query = text("""
+            SELECT p.project_id, p.project_name, p.account
+            FROM projects p
+            WHERE p.project_name = 'In-House Project'
+            AND p.account = 'Internal'
+            AND p.status = 'Active'
+        """)
+        inhouse_project = session.execute(inhouse_query).fetchone()
+        
+        if inhouse_project:
+            # Check if In-House Project is already in the result
+            inhouse_exists = any(p["project_name"] == "In-House Project" for p in result)
+            if not inhouse_exists:
+                result.append({
+                    "project_id": inhouse_project._mapping["project_id"],
+                    "project_name": inhouse_project._mapping["project_name"],
+                    "allocated_days": 999999.0,  # Unlimited
+                    "consumed_days": 0.0,
+                    "remaining_days": 999999.0,  # Unlimited
+                    "account": inhouse_project._mapping["account"]
+                })
         
         return result
     else:
@@ -214,34 +239,48 @@ async def save_attendance(
                         detail=f"Negative hours ({st.hours}) for sub_task '{st.sub_task}' on date {entry.date}"
                     )
                 
-                if st.hours > 8.0:
-                    raise HTTPException(
-                        status_code=400,
-                        detail=f"Hours ({st.hours}) cannot exceed 8 hours for sub_task '{st.sub_task}' on date {entry.date}"
-                    )
-                
-                # Parse the date to get the month for allocation validation
-                if isinstance(entry.date, str):
-                    entry_date_obj = datetime.strptime(entry.date, "%Y-%m-%d").date()
-                else:
-                    entry_date_obj = entry.date
-                
-                # Verify project allocation (not assignment)
-                result = session.execute(
+                # Check if this is an "In house" project - skip allocation validation
+                project_info = session.execute(
                     text("""
-                        SELECT 1
-                        FROM project_allocations
-                        WHERE employee_id = :user_id AND project_id = :project_id
-                        AND month = :month
-                        AND allocated_days > 0
+                        SELECT project_name, account
+                        FROM projects
+                        WHERE project_id = :project_id
                     """),
-                    {"user_id": user_id, "project_id": st.project_id, "month": entry_date_obj.strftime('%Y-%m')}
+                    {"project_id": st.project_id}
                 ).fetchone()
-                if not result:
+                
+                is_inhouse_project = (
+                    project_info and 
+                    project_info._mapping["project_name"] == "In house project" and
+                    project_info._mapping["account"] == "Internal"
+                )
+                
+                # Different hour limits for subtasks based on project type
+                max_hours_per_subtask = 8.0  # Keep 8 hours for all projects including In house
+                if st.hours > max_hours_per_subtask:
                     raise HTTPException(
                         status_code=400,
-                        detail=f"Invalid project_id {st.project_id} for employee {user_id} on date {entry.date}. Employee not allocated to this project for {entry_date_obj.strftime('%Y-%m')}"
+                        detail=f"Hours ({st.hours}) cannot exceed {max_hours_per_subtask} hours for sub_task '{st.sub_task}' on date {entry.date}"
                     )
+                
+                # Skip allocation validation for In house projects
+                if not is_inhouse_project:
+                    # Verify project allocation (not assignment) for regular projects
+                    result = session.execute(
+                        text("""
+                            SELECT 1
+                            FROM project_allocations
+                            WHERE employee_id = :user_id AND project_id = :project_id
+                            AND month = :month
+                            AND allocated_days > 0
+                        """),
+                        {"user_id": user_id, "project_id": st.project_id, "month": entry_date_obj.strftime('%Y-%m')}
+                    ).fetchone()
+                    if not result:
+                        raise HTTPException(
+                            status_code=400,
+                            detail=f"Invalid project_id {st.project_id} for employee {user_id} on date {entry.date}. Employee not allocated to this project for {entry_date_obj.strftime('%Y-%m')}"
+                        )
                 
                 # Add to cumulative consumption
                 project_days = float(st.hours) / 8.0 if st.hours > 0 else 1.0
@@ -252,6 +291,26 @@ async def save_attendance(
         # Validate total consumption for each project
         print(f"📊 Total consumption per project: {project_consumption}")
         for project_id, total_days in project_consumption.items():
+            # Check if this is an "In house" project - skip consumption validation
+            project_info = session.execute(
+                text("""
+                    SELECT project_name, account
+                    FROM projects
+                    WHERE project_id = :project_id
+                """),
+                {"project_id": project_id}
+            ).fetchone()
+            
+            is_inhouse_project = (
+                project_info and 
+                project_info._mapping["project_name"] == "In-House Project" and
+                project_info._mapping["account"] == "Internal"
+            )
+            
+            if is_inhouse_project:
+                print(f"🏠 Skipping validation for In-House Project {project_id}: {total_days} days")
+                continue
+            
             # Use the first date for month calculation (all dates should be in same month)
             first_date_str = next(iter(data.keys()))
             if isinstance(data[first_date_str].date, str):

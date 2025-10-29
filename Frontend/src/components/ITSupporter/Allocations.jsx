@@ -44,6 +44,7 @@ const Allocations = () => {
   });
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [employeeInput, setEmployeeInput] = useState('');
 
   // Pagination
   const {
@@ -102,6 +103,7 @@ const Allocations = () => {
     });
     setActiveTab('basic');
     setError(null);
+    setEmployeeInput('');
   };
 
   const openAdd = () => {
@@ -128,6 +130,12 @@ const Allocations = () => {
       employee_ack: !!allocation.employee_ack,
       notes: allocation.notes?.trim() || '',
     });
+    try {
+      const emp = employees.find(e => e.employeeId === Number(allocation.employee_id));
+      setEmployeeInput(emp ? emp.name : String(allocation.employee_id || ''));
+    } catch (_) {
+      setEmployeeInput(String(allocation.employee_id || ''));
+    }
     setViewAllocation(allocation);
     setIsEditing(true);
     setActiveTab('basic');
@@ -149,16 +157,30 @@ const Allocations = () => {
   };
 
   const onChangeField = (key, value) => {
-    setFormData(prev => ({ ...prev, [key]: typeof value === 'string' ? value.trim() : value }));
     if (key === 'employee_id') {
-      const employeeIdNum = Number(value);
-      const employee = employees.find(e => e.employeeId === employeeIdNum);
-      if (!employee && value !== '') {
-        setError(`Warning: Employee with ID ${value} not found in employee list`);
+      const input = String(value || '').trim();
+      // Find exact name match (case-insensitive)
+      const employee = employees.find(e => (e.name || '').toLowerCase() === input.toLowerCase());
+      if (employee) {
+        setFormData(prev => ({ ...prev, [key]: String(employee.employeeId) }));
+        setError(null);
+      } else if (input) {
+        // If no exact match, try includes and only set if unique
+        const matches = employees.filter(e => (e.name || '').toLowerCase().includes(input.toLowerCase()));
+        if (matches.length === 1) {
+          setFormData(prev => ({ ...prev, [key]: String(matches[0].employeeId) }));
+          setError(null);
+        } else {
+          setFormData(prev => ({ ...prev, [key]: '' }));
+          setError('Please select a valid employee from the list');
+        }
       } else {
+        setFormData(prev => ({ ...prev, [key]: '' }));
         setError(null);
       }
+      return;
     }
+    setFormData(prev => ({ ...prev, [key]: typeof value === 'string' ? value.trim() : value }));
   };
 
   const handleSubmit = async (e) => {
@@ -391,7 +413,27 @@ const Allocations = () => {
                         {fieldConfigs.basic.map(f => (
                           <div key={f.key}>
                             <label className="block text-sm font-medium text-gray-700 mb-1">{f.label}</label>
-                            {f.type === 'select' ? (
+                            {f.key === 'employee_id' ? (
+                              <>
+                                <input
+                                  list="employee-options"
+                                  value={employeeInput}
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    setEmployeeInput(val);
+                                    onChangeField('employee_id', val);
+                                  }}
+                                  placeholder="Type to search and select employee"
+                                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                  required
+                                />
+                                <datalist id="employee-options">
+                                  {employees.map(e => (
+                                    <option key={e.employeeId} value={e.name} />
+                                  ))}
+                                </datalist>
+                              </>
+                            ) : f.type === 'select' ? (
                               <select
                                 value={formData[f.key]}
                                 onChange={(e) => onChangeField(f.key, e.target.value)}
@@ -399,13 +441,9 @@ const Allocations = () => {
                                 required={f.required}
                               >
                                 <option value="">{f.placeholder}</option>
-                                {f.key === 'asset_id'
-                                  ? assets.map(a => (
-                                      <option key={a.asset_id} value={a.asset_id}>{a.asset_name}</option>
-                                    ))
-                                  : employees.map(e => (
-                                      <option key={e.employeeId} value={e.employeeId}>{e.name}</option>
-                                    ))}
+                                {f.key === 'asset_id' && assets.map(a => (
+                                  <option key={a.asset_id} value={a.asset_id}>{a.asset_name}</option>
+                                ))}
                               </select>
                             ) : (
                               <input

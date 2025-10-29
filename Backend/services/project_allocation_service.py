@@ -182,11 +182,11 @@ class ProjectAllocationService:
     @staticmethod
     def create_or_get_inhouse_project(session: Session) -> Project:
         """
-        Create or get the default 'In house project' for all employees
+        Create or get the default 'In-House Project' for all employees
         """
         # Try to find existing in-house project
         existing_project = session.exec(
-            select(Project).where(Project.project_name == "In house project")
+            select(Project).where(Project.project_name == "In-House Project")
         ).scalars().first()
         
         if existing_project:
@@ -195,8 +195,8 @@ class ProjectAllocationService:
         
         # Create new in-house project
         new_project = Project(
-            project_name="In house project",
-            project_name_commercial="In house project",
+            project_name="In-House Project",
+            project_name_commercial="In-House Project",
             account="Internal",
             project_objective="Default internal project for employee capacity management",
             status="Active"

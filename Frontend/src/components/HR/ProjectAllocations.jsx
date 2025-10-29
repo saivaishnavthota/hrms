@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -35,6 +36,8 @@ const ProjectAllocations = () => {
   const [importResults, setImportResults] = useState(null);
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [creatingDefaults, setCreatingDefaults] = useState(false);
+  const location = useLocation();
+  const isAccountManagerRoute = location.pathname.startsWith('/account-manager');
 
   // Generate month options (current year and next year)
   const currentYear = new Date().getFullYear();
@@ -351,23 +354,25 @@ const ProjectAllocations = () => {
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <CardTitle>Project Allocations</CardTitle>
-                  <Button 
-                    onClick={createDefaultAllocations}
-                    disabled={creatingDefaults}
-                    className="bg-[#2D5016] hover:bg-green-700"
-                  >
-                    {creatingDefaults ? (
-                      <>
-                        <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                        Creating...
-                      </>
-                    ) : (
-                      <>
-                        <Users className="w-4 h-4 mr-2" />
-                        Create Default Allocations
-                      </>
-                    )}
-                  </Button>
+                  {!isAccountManagerRoute && (
+                    <Button 
+                      onClick={createDefaultAllocations}
+                      disabled={creatingDefaults}
+                      className="bg-[#2D5016] hover:bg-green-700"
+                    >
+                      {creatingDefaults ? (
+                        <>
+                          <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                          Creating...
+                        </>
+                      ) : (
+                        <>
+                          <Users className="w-4 h-4 mr-2" />
+                          Create Default Allocations
+                        </>
+                      )}
+                    </Button>
+                  )}
                 </div>
               </CardHeader>
               <CardContent>

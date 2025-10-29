@@ -43,6 +43,7 @@ const EmployeeAllocationDashboard = () => {
   const [allocations, setAllocations] = useState({});
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedProject, setSelectedProject] = useState('all');
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [dateRange, setDateRange] = useState({
@@ -54,6 +55,21 @@ const EmployeeAllocationDashboard = () => {
   // Generate month options (current year and next year)
   const currentYear = new Date().getFullYear();
   const monthOptions = [];
+
+  // Get unique project names from allocations
+  const getUniqueProjects = () => {
+    const projects = new Set();
+    Object.values(allocations).forEach(monthAllocations => {
+      monthAllocations.forEach(allocation => {
+        if (allocation.project_name) {
+          projects.add(allocation.project_name);
+        }
+      });
+    });
+    return Array.from(projects).sort();
+  };
+
+  const uniqueProjects = getUniqueProjects();
   for (let year = currentYear; year <= currentYear + 1; year++) {
     for (let month = 1; month <= 12; month++) {
       const monthStr = `${year}-${month.toString().padStart(2, '0')}`;
@@ -338,15 +354,17 @@ const EmployeeAllocationDashboard = () => {
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div className="text-center p-4 bg-blue-50 rounded-lg">
                 <div className="font-heading-md text-blue-600">
-                  {searchTerm ? 
-                    employees.filter(emp => 
-                      emp.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                      emp.email?.toLowerCase().includes(searchTerm.toLowerCase())
-                    ).length 
+                  {searchTerm || (selectedProject && selectedProject !== 'all') ? 
+                    employees.filter(emp => {
+                      const matchesSearch = !searchTerm || 
+                        emp.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                        emp.email?.toLowerCase().includes(searchTerm.toLowerCase());
+                      return matchesSearch;
+                    }).length 
                     : employees.length}
                 </div>
                 <div className="font-body-sm text-blue-700">
-                  {searchTerm ? 'Filtered Employees' : 'Total Employees'}
+                  {searchTerm || (selectedProject && selectedProject !== 'all') ? 'Filtered Employees' : 'Total Employees'}
                 </div>
               </div>
               <div className="text-center p-4 bg-green-50 rounded-lg">
@@ -462,6 +480,23 @@ const EmployeeAllocationDashboard = () => {
                   )}
                 </div>
               </div>
+              
+              <div>
+                <Label htmlFor="project-filter">Filter by Project</Label>
+                <Select value={selectedProject} onValueChange={setSelectedProject}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a project" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Projects</SelectItem>
+                    {uniqueProjects.map(project => (
+                      <SelectItem key={project} value={project}>
+                        {project}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -512,7 +547,11 @@ const EmployeeAllocationDashboard = () => {
                             allocation.employee_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                             allocation.employee_email?.toLowerCase().includes(searchTerm.toLowerCase());
                           
-                          if (!matchesSearch) return;
+                          // Filter by project if provided
+                          const matchesProject = !selectedProject || selectedProject === 'all' || 
+                            allocation.project_name === selectedProject;
+                          
+                          if (!matchesSearch || !matchesProject) return;
                           
                           const groupKey = `${allocation.employee_id}-${allocation.project_name}-${allocation.client}`;
                           if (!employeeProjectGroups[groupKey]) {
@@ -610,7 +649,10 @@ const EmployeeAllocationDashboard = () => {
                       allocation.employee_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                       allocation.employee_email?.toLowerCase().includes(searchTerm.toLowerCase());
                     
-                    if (!matchesSearch) return;
+                    const matchesProject = !selectedProject || selectedProject === 'all' || 
+                      allocation.project_name === selectedProject;
+                    
+                    if (!matchesSearch || !matchesProject) return;
                     
                     const groupKey = `${allocation.employee_id}-${allocation.project_name}-${allocation.client}`;
                     if (!employeeProjectGroups[groupKey]) {

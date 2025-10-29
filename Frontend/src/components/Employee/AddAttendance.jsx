@@ -454,14 +454,14 @@ const AddAttendance = () => {
         return;
       }
 
-      const invalidHours = Object.values(attendanceData).some(row =>
-        !weekOffDays.includes(row.day) && 
-        !row.submitted && (  // Only check unsubmitted days
-          row.hours < 0 || row.hours > 8
-        )
-      );
+      // Check for invalid hours (8 hours max for all projects)
+      const invalidHours = Object.values(attendanceData).some(row => {
+        if (weekOffDays.includes(row.day) || row.submitted) return false;
+        return row.hours < 0 || row.hours > 8;
+      });
+      
       if (invalidHours) {
-        toast.warn('Total hours must be between 0 and 8 for non-week-off days');
+        toast.warn('Total hours must be between 0 and 8 for all projects');
         setTimeout(() => setMessage(''), 5000);
         return;
       }
@@ -493,7 +493,7 @@ const AddAttendance = () => {
 
           dataToSubmit[row.date] = {
             date: row.date,
-            action: row.status || '',
+            action: row.status === 'At office' ? 'Present' : row.status || '',
             hours: row.hours || 0, // Hours are now computed from subtasks
             project_ids: project_ids,
             sub_tasks: sub_tasks
@@ -547,6 +547,12 @@ const AddAttendance = () => {
     const calculateRemainingDays = useCallback((projectId) => {
       const project = projects.find(p => p.project_id === projectId);
       if (!project || project.allocated_days === undefined) return 0;
+      
+      // Check if this is an "In-House Project" - return unlimited
+      const isInHouseProject = project.project_name === "In-House Project" && project.account === "Internal";
+      if (isInHouseProject) {
+        return 999999; // Unlimited
+      }
       
       // Early return for projects with >=5 days allocated (no need for dynamic calculation)
       if (project.allocated_days >= 5) return project.allocated_days - project.consumed_days;
@@ -606,9 +612,10 @@ const AddAttendance = () => {
       if (field === 'hours') {
         const hoursValue = parseFloat(value) || 0;
         
-        // Validate individual subtask hours (max 8 per subtask)
-        if (hoursValue > 8) {
-          toast.warn('Maximum 8 hours allowed per subtask');
+        // Validate individual subtask hours (max 8 per subtask for all projects)
+        const maxHoursPerSubtask = 8;
+        if (hoursValue > maxHoursPerSubtask) {
+          toast.warn(`Maximum ${maxHoursPerSubtask} hours allowed per subtask`);
           return;
         }
         
@@ -624,9 +631,10 @@ const AddAttendance = () => {
           });
         });
         
-        // Validate total hours per day (max 8)
-        if (totalHours > 8) {
-          toast.warn('Maximum 8 hours allowed per day across all subtasks');
+        // Validate total hours per day (max 8 for all projects)
+        const maxHoursPerDay = 8;
+        if (totalHours > maxHoursPerDay) {
+          toast.warn(`Maximum ${maxHoursPerDay} hours allowed per day across all subtasks`);
           return;
         }
         
@@ -750,10 +758,12 @@ const AddAttendance = () => {
                       .map(p => {
                         const dynamicRemaining = calculateRemainingDays(p.project_id);
                         const isLowAllocation = p.allocated_days < 5;
+                        const isInHouseProject = p.project_name === "In-House Project" && p.account === "Internal";
+                        
                         return (
                           <option key={p.project_id} value={String(p.project_id)}>
                             {p.project_name_commercial || p.project_name}
-                            {p.allocated_days !== undefined && (
+                            {p.allocated_days !== undefined && !isInHouseProject && (
                               isLowAllocation 
                                 ? ` (${p.allocated_days} allocated, ${dynamicRemaining.toFixed(1)} remaining)` 
                                 : ` (${p.allocated_days} allocated, ${p.remaining_days.toFixed(1)} remaining)`

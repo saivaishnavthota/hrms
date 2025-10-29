@@ -45,7 +45,15 @@ const CAPACITY_WARNING_THRESHOLD = 16;
 const calculateTotalAllocation = (projects) => {
   if (!Array.isArray(projects)) return 0;
   return projects.reduce((sum, p) => {
-    const days = typeof p === 'object' ? (parseFloat(p.allocatedDays) || 0) : 0;
+    // Skip "In house" projects from capacity calculation
+    // Handle both data structures: employee.projects (projectName) and modal projects (project_name)
+    const projectName = p.projectName || p.project_name || '';
+    const account = p.account || '';
+    const isInHouseProject = projectName === "In-House Project" && account === "Internal";
+    
+    if (isInHouseProject) return sum;
+    
+    const days = typeof p === 'object' ? (parseFloat(p.allocatedDays || p.allocated_days) || 0) : 0;
     return sum + days;
   }, 0);
 };
@@ -205,7 +213,8 @@ const ManagerEmployees = () => {
                 allocatedDays: isNaN(allocatedDays) ? 0 : allocatedDays,
                 consumedDays: isNaN(consumedDays) ? 0 : consumedDays,
                 remainingDays: isNaN(remainingDays) ? 0 : remainingDays,
-                projectId: isNaN(projectId) ? 0 : projectId
+                projectId: isNaN(projectId) ? 0 : projectId,
+                account: project.account || '' // Include account field for In house project detection
               };
             });
 

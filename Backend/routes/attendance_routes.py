@@ -223,6 +223,18 @@ async def save_attendance(
                (not entry.sub_tasks or len(entry.sub_tasks) == 0):
                 continue
 
+            # Normalize entry date into a date object for downstream month checks
+            if isinstance(entry.date, str):
+                try:
+                    entry_date_obj = datetime.strptime(entry.date, "%Y-%m-%d").date()
+                except ValueError:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Invalid date format for {entry.date}. Expected YYYY-MM-DD"
+                    )
+            else:
+                entry_date_obj = entry.date
+
             if entry.action not in VALID_ACTIONS:
                 raise HTTPException(
                     status_code=400,
@@ -251,7 +263,7 @@ async def save_attendance(
                 
                 is_inhouse_project = (
                     project_info and 
-                    project_info._mapping["project_name"] == "In house project" and
+                    project_info._mapping["project_name"] == "In-House Project" and
                     project_info._mapping["account"] == "Internal"
                 )
                 

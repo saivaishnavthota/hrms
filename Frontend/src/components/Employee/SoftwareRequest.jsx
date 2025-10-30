@@ -615,9 +615,9 @@ const SoftwareRequest = () => {
   };
 
   return (
-    <div className="p-6 space-y-6 bg-gray-50">
+    <div className="mx-auto max-w-6xl px-6 py-6 space-y-6">
       <Tabs defaultValue="requests" className="space-y-6">
-        <TabsList>
+        <TabsList className="bg-white/60 backdrop-blur-sm px-2 py-1 rounded-md">
           <TabsTrigger value="requests">My Requests</TabsTrigger>
           <TabsTrigger value="new-request">New Request</TabsTrigger>
         </TabsList>

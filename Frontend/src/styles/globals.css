@@ -8,7 +8,10 @@
 
 /** Colors - https://tailwindcss.com/docs/colors **/
 :root {
-  --background: var(--color-white);
+  /* Global app background */
+  --background: #F6F2F4;
+  /* Global hover color for primary buttons */
+  --hover-primary: #AD96DC;
   --foreground: var(--color-zinc-950);
   --card: var(--color-white);
   --card-foreground: var(--color-zinc-950);
@@ -169,6 +172,7 @@
     @apply w-full m-0 p-0;
     font-family: var(--font-body);
     font-weight: var(--weight-body);
+    background-color: var(--background);
   }
 
   #root {
@@ -177,6 +181,17 @@
 
   *:focus-visible {
     @apply outline-ring rounded-xs shadow-none outline-2 outline-offset-3 transition-none!;
+  }
+
+  /* Global button hover color */
+  button:hover,
+  .btn:hover,
+  .btn-primary:hover,
+  .shadcn-button:hover,
+  .ui-button:hover,
+  [role="button"].hover\:bg-primary:hover {
+    background-color: var(--hover-primary) !important;
+    border-color: var(--hover-primary) !important;
   }
 }
 

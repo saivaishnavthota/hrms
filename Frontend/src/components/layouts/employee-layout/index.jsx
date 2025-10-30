@@ -3,7 +3,8 @@ import { Helmet } from 'react-helmet-async';
 import { Outlet } from 'react-router-dom';
 import { Link } from 'react-router-dom';
 import { toAbsoluteUrl } from '@/lib/helpers';
-import { UserDropdownMenu } from '@/components/layouts/layout-1/shared/topbar/user-dropdown-menu';
+import { logout } from '@/lib/auth';
+import { User as UserIcon, LogOut as LogOutIcon } from 'lucide-react';
 import CompanyPoliciesModal from '@/components/shared/CompanyPoliciesModal';
 import '@/styles/employee-layout.css';
 
@@ -23,7 +24,7 @@ export function EmployeeLayout() {
             <div className="employee-header-content">
               {/* Logo - Non-collapsible */}
               <div className="flex items-center gap-2.5">
-                <Link to="/" className="shrink-0 flex items-center gap-2">
+                <Link to="/employee" className="shrink-0 flex items-center gap-2">
                   <img
                     src={toAbsoluteUrl('/media/app/Nxzen.png')}
                     className="h-[25px] w-full"
@@ -33,20 +34,22 @@ export function EmployeeLayout() {
                 </Link>
               </div>
 
-              {/* Employee Portal Title */}
-              
+              {/* Employee Portal Title with divider */}
+              <div className="hidden sm:flex items-center gap-3">
+                <span className="h-6 w-px bg-gray-300" />
+                <span className="employee-header-title">Employee Portal</span>
+              </div>
 
-              {/* Profile - From Layout1 */}
-              <div className="flex items-center">
-                <UserDropdownMenu
-                  trigger={
-                    <img
-                      className="size-9 rounded-full border-2 border-green-500 shrink-0 cursor-pointer"
-                      src={toAbsoluteUrl('/media/avatars/300-2.png')}
-                      alt="User Avatar"
-                    />
-                  }
-                />
+              {/* Right actions: Profile and Logout */}
+              <div className="employee-header-actions">
+                <Link to="/my-profile" className="employee-header-action" aria-label="Profile">
+                  <UserIcon className="icon" />
+                  <span>Profile</span>
+                </Link>
+                <button onClick={logout} className="employee-header-action" aria-label="Logout">
+                  <LogOutIcon className="icon" />
+                  <span>Logout</span>
+                </button>
               </div>
             </div>
           </div>

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { useLocation } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { format, startOfMonth, endOfMonth } from 'date-fns';
-import { Calendar, ChevronDown, Clock, DollarSign } from 'lucide-react';
+import { Calendar, ChevronDown, Clock, DollarSign, CalendarDays, Receipt, NotebookPen, LayoutGrid, ClipboardList } from 'lucide-react';
 import {
   ResponsiveContainer,
   LineChart,
@@ -25,6 +25,7 @@ import SubmitExpense from '@/components/Employee/SubmitExpense';
 import SetPassword from '@/components/Employee/SetPassword';
 import { useUser } from '@/contexts/UserContext';
 import api, { leaveAPI } from '@/lib/api';
+// CompanyPolicies removed from quick actions per request
 
 const EmployeePage = () => {
   const location = useLocation();
@@ -33,6 +34,7 @@ const EmployeePage = () => {
     from: startOfMonth(new Date()),
     to: endOfMonth(new Date())
   });
+  // const [openPolicies, setOpenPolicies] = useState(false);
 
   const getPageInfo = (pathname) => {
     const routes = {
@@ -202,6 +204,30 @@ const EmployeePage = () => {
 
   return (
     <div className="employee-dashboard-container">
+      {/* Top menu tabs */}
+      {/* <div className="bg-white border-b">
+        <div className="max-w-7xl mx-auto px-4">
+          <nav className="flex gap-8 h-12 items-center text-sm">
+            {[
+              { to: '/employee', label: 'Home' },
+              { to: '/employee/time-management', label: 'Time Management' },
+              { to: '/employee/upload-documents', label: 'Upload Documents' },
+              { to: '/employee/software-requests', label: 'Software Requests' },
+            ].map((item) => {
+              const active = location.pathname === item.to || (item.to === '/employee' && location.pathname === '/employee/');
+              return (
+                <Link key={item.to} to={item.to} className={`transition-colors ${active ? 'text-green-700' : 'text-gray-600 hover:text-gray-900'}`}>
+                  <div className="flex flex-col">
+                    <span>{item.label}</span>
+                    <span className={`mt-2 h-0.5 ${active ? 'bg-green-700' : 'bg-transparent'}`}></span>
+                  </div>
+                </Link>
+              );
+            })}
+          </nav>
+        </div>
+      </div> */}
+
       {pageInfo.content ? (
         <div className="employee-content">
           {pageInfo.content}
@@ -209,11 +235,55 @@ const EmployeePage = () => {
       ) : (
         // Default dashboard content when no specific route is matched
         <div className="employee-dashboard-content">
-          {/* Welcome Section */}
-          <div className="employee-welcome-banner">
-            
-            <p className="text-blue-500 ml-4 mb-4">Overview of your weekly attendance, leaves, and documents.</p>
+          {/* Quick Actions */}
+          <div className="max-w-7xl mx-auto">
+            <h3 className="text-center text-lg font-semibold text-gray-800 mt-6">Quick Actions</h3>
+            <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <Link to="/employee" className="group rounded-xl border bg-white shadow-sm hover:shadow-md transition p-4 flex gap-3 items-start">
+                <div className="h-10 w-10 rounded-lg bg-gray-100 flex items-center justify-center">
+                  <LayoutGrid className="h-5 w-5 text-gray-700" />
+                </div>
+                <div>
+                  <div className="font-semibold text-gray-900 group-hover:text-gray-950">Home</div>
+                  <div className="text-xs text-gray-500">Go to dashboard</div>
+                </div>
+              </Link>
+
+              <Link to="/employee/time-management" className="group rounded-xl border bg-white shadow-sm hover:shadow-md transition p-4 flex gap-3 items-start">
+                <div className="h-10 w-10 rounded-lg bg-gray-100 flex items-center justify-center">
+                  <CalendarDays className="h-5 w-5 text-gray-700" />
+                </div>
+                <div>
+                  <div className="font-semibold text-gray-900 group-hover:text-gray-950">Book your time</div>
+                  <div className="text-xs text-gray-500">Track attendance</div>
+                </div>
+              </Link>
+
+
+              <Link to="/employee/submit-expense" className="group rounded-xl border bg-white shadow-sm hover:shadow-md transition p-4 flex gap-3 items-start">
+                <div className="h-10 w-10 rounded-lg bg-green-100 flex items-center justify-center">
+                  <Receipt className="h-5 w-5 text-green-700" />
+                </div>
+                <div>
+                  <div className="font-semibold text-gray-900">Expense Request</div>
+                  <div className="text-xs text-gray-500">Submit expenses</div>
+                </div>
+              </Link>
+
+              <Link to="/employee/software-requests" className="group rounded-xl border bg-white shadow-sm hover:shadow-md transition p-4 flex gap-3 items-start">
+                <div className="h-10 w-10 rounded-lg bg-blue-100 flex items-center justify-center">
+                  <ClipboardList className="h-5 w-5 text-blue-700" />
+                </div>
+                <div>
+                  <div className="font-semibold text-gray-900">Software Requests</div>
+                  <div className="text-xs text-gray-500">Request software access</div>
+                </div>
+              </Link>
+
+            </div>
           </div>
+
+          {/* Welcome banner removed */}
 
           {/* Analytics Grid */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -279,6 +349,7 @@ const EmployeePage = () => {
           {/* Recent Activity removed as requested */}
         </div>
       )}
+      {/* CompanyPoliciesModal removed */}
     </div>
   );
 };

@@ -1,10 +1,24 @@
 /* Employee Dashboard Layout Styles */
 
+/* Fonts and Theme */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,500;0,600;1,500;1,600&display=swap');
+
 /* Layout Variables for Employee Dashboard */
 :root {
   --employee-header-height: 4rem; /* 64px */
   --employee-content-padding: 0; /* No padding for full width */
   --employee-footer-height: auto;
+
+  /* Color palette inspired by the attached design */
+  --color-page-bg: #F6F2F4;        /* global background */
+  --color-header-bg: #faf7ff;      /* soft light for header */
+  --color-surface: #ffffff;        /* cards */
+  --color-border: #e7e7ee;         /* subtle borders */
+  --color-text: #1f2937;           /* slate-800 */
+  --color-muted: #6b7280;          /* slate-500 */
+  --color-accent: #166534;         /* green-700 */
+  --color-accent-underline: #275d38; /* darker green underline */
+  --color-soft-shadow: 0 8px 24px rgba(24, 24, 27, 0.06);
 }
 
 /* Employee Layout Container - Full Width */
@@ -13,16 +27,17 @@
   min-height: 100vh;
   margin: 0;
   padding: 0;
-  background-color: #f9fafb; /* bg-gray-50 */
+  background-color: var(--color-page-bg);
+  font-family: 'Inter', system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
 }
 
 /* Employee Header - Full Width */
 .employee-header {
   width: 100vw;
   height: var(--employee-header-height);
-  background-color: white;
-  border-bottom: 1px solid #e5e7eb; /* border-gray-200 */
-  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05); /* shadow-sm */
+  background-color: var(--color-header-bg);
+  border-bottom: 1px solid var(--color-border);
+  box-shadow: 0 1px 2px 0 rgba(0,0,0,0.04);
   position: relative;
   z-index: 10;
 }
@@ -93,8 +108,8 @@
 /* Employee Footer - Full Width */
 .employee-footer {
   width: 100vw;
-  background-color: white;
-  border-top: 1px solid #e5e7eb; /* border-gray-200 */
+  background-color: var(--color-header-bg);
+  border-top: 1px solid var(--color-border);
 
 }
 
@@ -182,14 +197,7 @@
 }
 
 /* Welcome Banner - Full Width */
-.employee-welcome-banner {
-  width: 100%;
-  background: linear-gradient(to right, #2563eb, #4f46e5); /* bg-gradient-to-r from-blue-600 to-indigo-600 */
-  border-radius: 0.5rem; /* rounded-lg */
-  padding: 1.5rem; /* p-6 */
-  color: white;
-  
-}
+/* removed welcome banner gradient */
 
 /* Quick Actions Grid */
 .employee-quick-actions {
@@ -250,4 +258,45 @@
   max-width: none !important;
   padding-left: 0 !important;
   padding-right: 0 !important;
+}
+
+/* Header title styling to match screenshot */
+.employee-header-title {
+  font-family: 'Playfair Display', Georgia, 'Times New Roman', serif;
+  font-style: italic;
+  font-weight: 600;
+  font-size: 1.375rem; /* ~22px */
+  color: var(--color-text);
+}
+
+/* Header right actions (Profile, Logout) */
+.employee-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 2rem;
+  font-size: 0.95rem;
+}
+
+.employee-header-action {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: #4b5563; /* gray-600 */
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.employee-header-action:hover {
+  color: var(--hover-primary);
+}
+
+.employee-header-action .icon {
+  width: 18px;
+  height: 18px;
+}
+
+/* Subtle card elevation for dashboard sections */
+.employee-dashboard-content .bg-white,
+.employee-dashboard-content .rounded-lg {
+  box-shadow: var(--color-soft-shadow);
 }

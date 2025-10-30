@@ -10,6 +10,7 @@ import { MENU_SIDEBAR_ACCOUNT_MANAGER } from '@/config/account-manager-layout.co
 import { MENU_SIDEBAR_IT_SUPPORTER } from '@/config/it-supporter-layout.config';
 import { MENU_SIDEBAR_ADMIN } from '@/config/admin-layout.config';
 import { AdminLayoutWrapper } from '@/components/layouts/AdminLayoutWrapper';
+import { EmployeeLayout } from '@/components/layouts/employee-layout';
 import EmployeeManagement from '@/components/HR/EmployeeManagement';
 import Dashboard from '@/components/HR/Dashboard';
 import ChangePassword from '@/components/HR/ChangePassword';
@@ -136,8 +137,8 @@ export const AppRoutingSetup = () => {
         <Route path="employee-allocation-dashboard" element={<SuperHRAllocationDashboard />} />
       </Route>
 
-      {/* Protected Employee routes using Layout1 with employee menu */}
-      <Route path="/employee" element={<ProtectedRoute allowedRoles={["Employee"]}><Layout1 menu={MENU_SIDEBAR_EMPLOYEE} /></ProtectedRoute>}>
+      {/* Protected Employee routes using custom EmployeeLayout (no top tabs) */}
+      <Route path="/employee" element={<ProtectedRoute allowedRoles={["Employee"]}><EmployeeLayout /></ProtectedRoute>}>
         <Route index element={<EmployeePage />} />
         <Route path="time-management" element={<TimeManagement />} />
         <Route path="submit-expense" element={<SubmitExpense />} />

@@ -21,10 +21,5 @@ export const MENU_SIDEBAR_EMPLOYEE = [
   //   icon: Coins,
   //   path: '/employee/submit-expense',
   // },
-   {
-    title: 'Software Requests',
-    icon: ClipboardList, 
-    path: '/employee/software-requests',
-  },
  
 ];

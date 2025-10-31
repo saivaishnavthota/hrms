@@ -245,6 +245,7 @@ const EmployeeImport = ({ onImportComplete }) => {
                 <div className="grid grid-cols-3 gap-2 text-sm font-mono">
                   <div>YTPL Emp ID</div>
                   <div>Employee Full Name</div>
+                  <div>DOJ</div>
                   <div>Title</div>
                   <div>Location</div>
                   <div>Company Email</div>
@@ -260,6 +261,7 @@ const EmployeeImport = ({ onImportComplete }) => {
                 <li>• <strong>Title</strong> will be set as employee designation (optional)</li>
                 <li>• <strong>Location</strong> will be matched with existing locations or created if new (optional)</li>
                 <li>• <strong>Company Email</strong> should be a valid email format (optional)</li>
+                <li>• <strong>DOJ</strong> is optional; formats like dd/mm/yyyy are supported</li>
                 <li>• Existing employees will be updated if found by name or ID</li>
                 <li>• New employees will be created with default role "Employee"</li>
               </ul>

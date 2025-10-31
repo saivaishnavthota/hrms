@@ -51,7 +51,7 @@ import AccountManagerDashboard from '@/components/AccountManager/Dashboard';
 import ManagerEmployees from '@/components/Manager/Employees';
 import ManagerLeaveRequests from '@/components/Manager/LeaveRequests';
 import ManagerLeaveManagement from '@/components/Manager/LeaveManagement';
-// import AccountManagerExpenseManagement from '@/components/AccountManager/ExpenseManagement';
+import AccountManagerExpenseManagement from '@/components/AccountManager/ExpenseManagement';
 import Projects from '@/components/AccountManager/Projects';
 import ManagerDashboard from '@/components/Manager/Dashboard';
 import ManagerExpenseManagement from '@/components/Manager/ExpenseManagement';
@@ -181,7 +181,7 @@ export const AppRoutingSetup = () => {
       <Route path="/account-manager" element={<ProtectedRoute allowedRoles={["Account Manager"]}><Layout1 menu={MENU_SIDEBAR_ACCOUNT_MANAGER} /></ProtectedRoute>}>
         <Route index element={<AccountManagerDashboard />} />
         <Route path="dashboard" element={<AccountManagerDashboard />} />
-        {/* <Route path="expense-management" element={<AccountManagerExpenseManagement />} /> */}
+        <Route path="expense-management" element={<AccountManagerExpenseManagement />} />
         <Route path="upload-documents" element={<UploadDocuments />} />
         <Route path="add-attendance" element={<EmployeeAddAttendance />} />
         <Route path="apply-leave" element={<ApplyLeave />} />

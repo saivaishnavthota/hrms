@@ -1,8 +1,9 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
 from sqlmodel import Session, select
 from typing import List, Optional
 from database import get_session
 from models.asset_model import Vendor, Asset, AssetAllocation, AssetMaintenance
+from models.user_model import User as EmployeeModel
 from schemas.asset_schema import (
     VendorCreate, VendorUpdate, VendorResponse,
     AssetCreate, AssetUpdate, AssetResponse,
@@ -10,8 +11,11 @@ from schemas.asset_schema import (
     AssetMaintenanceCreate, AssetMaintenanceUpdate, AssetMaintenanceResponse
 )
 from models.user_model import User
-from schemas.user_schema import Employee
+from schemas.user_schema import Employee as EmployeeSchema
 from auth import get_current_user
+import csv
+from io import StringIO
+from datetime import datetime
 
 router = APIRouter(prefix="/assets", tags=["Assets"])
 
@@ -94,6 +98,275 @@ def get_asset(asset_id: int, session: Session = Depends(get_session)):
     if not asset:
         raise HTTPException(status_code=404, detail="Asset not found")
     return AssetResponse.from_orm(asset)
+
+@router.post("/assets/bulk-upload", response_model=dict)
+def bulk_upload_assets(
+    file: UploadFile = File(..., description="CSV file with asset records"),
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+):
+    if current_user.role not in ["Admin", "IT Supporter", "HR", "Manager"]:
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    raw = file.file.read().decode("utf-8-sig")
+    reader = csv.DictReader(StringIO(raw))
+
+    def norm(key: str) -> str:
+        return (key or "").strip().lower().replace(" ", "_")
+
+    # Build header map for tolerant matching
+    header_map = {norm(h): h for h in reader.fieldnames or []}
+
+    def get(row, *candidates):
+        for cand in candidates:
+            h = header_map.get(norm(cand))
+            if h and h in row and str(row[h]).strip() != "":
+                return str(row[h]).strip()
+        return None
+
+    def parse_date(val: str):
+        if not val:
+            return None
+        for fmt in ("%Y-%m-%d", "%d-%m-%Y", "%d/%m/%Y", "%m/%d/%Y"):
+            try:
+                return datetime.strptime(val, fmt).date()
+            except Exception:
+                continue
+        return None
+
+    created = 0
+    updated = 0
+    skipped = 0
+    errors = []
+
+    for idx, row in enumerate(reader, start=2):  # start=2 accounts for header row
+        try:
+            asset_name = get(row, "asset_name", "asset_nam")
+            asset_type = get(row, "asset_type")
+            asset_tag = get(row, "asset_tag")
+            serial_number = get(row, "serial_number", "serial_num")
+
+            if not asset_name or not asset_type or not asset_tag or not serial_number:
+                skipped += 1
+                errors.append(f"Row {idx}: Missing required fields (asset_name, asset_type, asset_tag, serial_number)")
+                continue
+
+            # Resolve vendor
+            vendor_name = get(row, "vendor_name")
+            vendor_type = get(row, "vendor_type")
+            vendor_id = None
+            if vendor_name:
+                vendor = session.exec(
+                    select(Vendor).where(Vendor.vendor_name == vendor_name)
+                ).first()
+                if not vendor:
+                    vendor = Vendor(
+                        vendor_name=vendor_name,
+                        vendor_type=vendor_type if vendor_type in ("Purchased", "Rental") else None,
+                    )
+                    session.add(vendor)
+                    session.flush()
+                vendor_id = vendor.vendor_id
+
+            # Prepare asset fields
+            asset_data = {
+                "asset_name": asset_name,
+                "asset_type": asset_type,
+                "asset_tag": asset_tag,
+                "serial_number": serial_number,
+                "brand": get(row, "brand"),
+                "model": get(row, "model"),
+                "model_no": get(row, "model_no"),
+                "operating_system": get(row, "operating_system", "os"),
+                "ram": get(row, "ram", "operating_ram"),
+                "hdd_capacity": get(row, "hdd_capacity", "storage"),
+                "processor": get(row, "processor"),
+                "purchase_date": parse_date(get(row, "purchase_date")),
+                "purchase_price": float(get(row, "purchase_price") or 0) or None,
+                "vendor_id": vendor_id,
+                "status": get(row, "status") or "In Stock",
+                "condition": get(row, "condition") or "Good",
+                "eol_date": parse_date(get(row, "eol_date")),
+                "amc_start_date": parse_date(get(row, "amc_start_date")),
+                "amc_end_date": parse_date(get(row, "amc_end_date")),
+                "rental_cost": float(get(row, "rental_cost") or 0) or None,
+                "administrator": get(row, "administrator"),
+                "additional_notes": get(row, "notes", "additional_notes"),
+            }
+
+            # Upsert by asset_tag or serial_number
+            existing = session.exec(
+                select(Asset).where(
+                    (Asset.asset_tag == asset_tag) | (Asset.serial_number == serial_number)
+                )
+            ).first()
+
+            if existing:
+                for k, v in asset_data.items():
+                    setattr(existing, k, v)
+                session.add(existing)
+                updated += 1
+            else:
+                obj = Asset(**asset_data)
+                session.add(obj)
+                created += 1
+
+        except Exception as e:
+            errors.append(f"Row {idx}: {str(e)}")
+            skipped += 1
+
+    session.commit()
+
+    return {
+        "success": True,
+        "created": created,
+        "updated": updated,
+        "skipped": skipped,
+        "errors": errors[:20],  # cap details
+    }
+
+@router.post("/allocations/bulk-upload", response_model=dict)
+def bulk_upload_allocations(
+    file: UploadFile = File(..., description="CSV file with asset allocations"),
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+):
+    if current_user.role not in ["Admin", "IT Supporter", "HR", "Manager"]:
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    raw = file.file.read().decode("utf-8-sig")
+    reader = csv.DictReader(StringIO(raw))
+
+    def norm(key: str) -> str:
+        return (key or "").strip().lower().replace(" ", "_")
+
+    header_map = {norm(h): h for h in reader.fieldnames or []}
+
+    def get(row, *candidates):
+        for cand in candidates:
+            h = header_map.get(norm(cand))
+            if h and h in row and str(row[h]).strip() != "":
+                return str(row[h]).strip()
+        return None
+
+    def parse_bool(val: str):
+        if val is None:
+            return None
+        v = val.strip().lower()
+        if v in ("true", "yes", "1", "y"):
+            return True
+        if v in ("false", "no", "0", "n"):
+            return False
+        return None
+
+    def parse_date(val: str):
+        if not val:
+            return None
+        for fmt in ("%Y-%m-%d", "%d-%m-%Y", "%d/%m/%Y", "%m/%d/%Y"):
+            try:
+                return datetime.strptime(val, fmt).date()
+            except Exception:
+                continue
+        return None
+
+    created = 0
+    updated = 0
+    skipped = 0
+    errors = []
+
+    for idx, row in enumerate(reader, start=2):
+        try:
+            asset_tag = get(row, "asset_tag")
+            # Prefer mapping by company_employee_id to avoid mistakes
+            employee_company_id_raw = get(row, "employee_id", "company_employee_id", "ytpl_emp_id")
+            allocation_date = parse_date(get(row, "allocation_date"))
+            expected_return_date = parse_date(get(row, "expected_return_date"))
+            condition_at_allocation = get(row, "condition_at_allocation")
+            employee_ack = parse_bool(get(row, "employee_ack"))
+            notes = get(row, "notes")
+
+            if not asset_tag or not employee_company_id_raw or not allocation_date:
+                skipped += 1
+                errors.append(f"Row {idx}: Missing required fields (asset_tag, employee_company_id, allocation_date)")
+                continue
+
+            # Resolve asset
+            asset = session.exec(select(Asset).where(Asset.asset_tag == asset_tag)).first()
+            if not asset:
+                skipped += 1
+                errors.append(f"Row {idx}: Asset with tag '{asset_tag}' not found")
+                continue
+
+            # Resolve employee STRICTLY by company_employee_id (normalize and zero-pad)
+            clean_comp_id = employee_company_id_raw
+            # Remove trailing .0 if present and whitespace
+            if clean_comp_id.endswith('.0'):
+                clean_comp_id = clean_comp_id[:-2]
+            clean_comp_id = clean_comp_id.strip()
+            # Keep only integer part if like 800105.0
+            if '.' in clean_comp_id:
+                clean_comp_id = clean_comp_id.split('.')[0]
+            # Zero-pad to 6 characters
+            if len(clean_comp_id) < 6:
+                clean_comp_id = clean_comp_id.zfill(6)
+
+            emp_obj = session.exec(
+                select(EmployeeModel).where(EmployeeModel.company_employee_id == clean_comp_id)
+            ).first()
+
+            if not emp_obj:
+                skipped += 1
+                errors.append(f"Row {idx}: Employee with company_employee_id '{employee_company_id_raw}' (normalized='{clean_comp_id}') not found")
+                continue
+
+            # Idempotent upsert: unique by (asset_id, employee_id, allocation_date)
+            existing = session.exec(
+                select(AssetAllocation).where(
+                    (AssetAllocation.asset_id == asset.asset_id)
+                    & (AssetAllocation.employee_id == emp_obj.id)
+                    & (AssetAllocation.allocation_date == allocation_date)
+                )
+            ).first()
+
+            if existing:
+                existing.expected_return_date = expected_return_date
+                existing.condition_at_allocation = condition_at_allocation or existing.condition_at_allocation
+                if employee_ack is not None:
+                    existing.employee_ack = employee_ack
+                existing.notes = notes or existing.notes
+                session.add(existing)
+                updated += 1
+            else:
+                alloc = AssetAllocation(
+                    asset_id=asset.asset_id,
+                    employee_id=emp_obj.id,
+                    allocation_date=allocation_date,
+                    expected_return_date=expected_return_date,
+                    condition_at_allocation=condition_at_allocation,
+                    employee_ack=bool(employee_ack) if employee_ack is not None else False,
+                    notes=notes,
+                )
+                session.add(alloc)
+                created += 1
+
+            # Optionally mark asset status when allocated
+            if asset.status != "Allocated":
+                asset.status = "Allocated"
+                session.add(asset)
+
+        except Exception as e:
+            skipped += 1
+            errors.append(f"Row {idx}: {str(e)}")
+
+    session.commit()
+
+    return {
+        "success": True,
+        "created": created,
+        "updated": updated,
+        "skipped": skipped,
+        "errors": errors[:20],
+    }
 
 @router.put("/assets/{asset_id}", response_model=AssetResponse)
 def update_asset(asset_id: int, asset: AssetUpdate, session: Session = Depends(get_session)):
@@ -346,7 +619,7 @@ async def test_db_connection(db: Session = Depends(get_session)):
         raise HTTPException(status_code=500, detail=f"Database test failed: {str(e)}")
 
 
-@router.get("/employees/", response_model=List[Employee])
+@router.get("/employees/", response_model=List[EmployeeSchema])
 async def get_employees(o_status: Optional[bool] = True, role: Optional[str] = None, db: Session = Depends(get_session)):
     try:
         # Import User model here to avoid circular imports
@@ -367,7 +640,7 @@ async def get_employees(o_status: Optional[bool] = True, role: Optional[str] = N
                 print(f"Processing employee: ID={emp.id}, Name={emp.name}, Email={emp.email}, Role={emp.role}")
                 
                 # Handle None values safely
-                employee_obj = Employee(
+                employee_obj = EmployeeSchema(
                     employeeId=emp.id,
                     name=emp.name or "Unknown",
                     email=emp.email or emp.company_email or "No email",

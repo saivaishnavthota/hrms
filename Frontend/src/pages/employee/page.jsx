@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { format, startOfMonth, endOfMonth } from 'date-fns';
-import { Calendar, ChevronDown, Clock, DollarSign, CalendarDays, Receipt, NotebookPen, LayoutGrid, ClipboardList } from 'lucide-react';
+import { Calendar, ChevronDown, Clock, DollarSign, CalendarDays, NotebookPen, LayoutGrid, ClipboardList, PoundSterling } from 'lucide-react';
 import {
   ResponsiveContainer,
   LineChart,
@@ -110,9 +110,9 @@ const EmployeePage = () => {
       });
       const data = response?.data || {};
 
-      // Build a 7-day series for current week (Mon-Sun)
+      // Build a 5-day series for current week (Mon-Fri)
       const monday = getWeekStartMonday(new Date());
-      const series = Array.from({ length: 7 }, (_, i) => {
+      const series = Array.from({ length: 5 }, (_, i) => {
         const d = new Date(monday);
         d.setDate(monday.getDate() + i);
         const key = formatDateLocal(d);
@@ -129,8 +129,6 @@ const EmployeePage = () => {
         { day: 'Wed', hours: 0 },
         { day: 'Thu', hours: 0 },
         { day: 'Fri', hours: 0 },
-        { day: 'Sat', hours: 0 },
-        { day: 'Sun', hours: 0 },
       ]);
     }
   };
@@ -236,18 +234,10 @@ const EmployeePage = () => {
         // Default dashboard content when no specific route is matched
         <div className="employee-dashboard-content">
           {/* Quick Actions */}
-          <div className="max-w-7xl mx-auto">
-            <h3 className="text-center text-lg font-semibold text-gray-800 mt-6">Quick Actions</h3>
-            <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              <Link to="/employee" className="group rounded-xl border bg-white shadow-sm hover:shadow-md transition p-4 flex gap-3 items-start">
-                <div className="h-10 w-10 rounded-lg bg-gray-100 flex items-center justify-center">
-                  <LayoutGrid className="h-5 w-5 text-gray-700" />
-                </div>
-                <div>
-                  <div className="font-semibold text-gray-900 group-hover:text-gray-950">Home</div>
-                  <div className="text-xs text-gray-500">Go to dashboard</div>
-                </div>
-              </Link>
+          <div className="max-w-7xl mx-auto pt-3 pb-6">
+            <h3 className="text-center text-lg font-semibold text-gray-800">Quick Actions</h3>
+            <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              
 
               <Link to="/employee/time-management" className="group rounded-xl border bg-white shadow-sm hover:shadow-md transition p-4 flex gap-3 items-start">
                 <div className="h-10 w-10 rounded-lg bg-gray-100 flex items-center justify-center">
@@ -262,7 +252,7 @@ const EmployeePage = () => {
 
               <Link to="/employee/submit-expense" className="group rounded-xl border bg-white shadow-sm hover:shadow-md transition p-4 flex gap-3 items-start">
                 <div className="h-10 w-10 rounded-lg bg-green-100 flex items-center justify-center">
-                  <Receipt className="h-5 w-5 text-green-700" />
+                  <PoundSterling className="h-5 w-5 text-green-700" />
                 </div>
                 <div>
                   <div className="font-semibold text-gray-900">Expense Request</div>
@@ -286,7 +276,7 @@ const EmployeePage = () => {
           {/* Welcome banner removed */}
 
           {/* Analytics Grid */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Weekly Attendance Chart */}
             <div className="bg-white rounded-lg border p-6">
               <div className="flex items-center justify-between mb-4">
@@ -328,22 +318,7 @@ const EmployeePage = () => {
               </div>
             </div>
 
-            {/* Documents Status */}
-            <div className="bg-white rounded-lg border p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="font-semibold text-gray-900">Documents Status</h3>
-                <span className="text-sm text-gray-600">{documentsStatus.completed}/{documentsStatus.required} completed</span>
-              </div>
-              <div className="space-y-3">
-                <div className="h-3 w-full bg-gray-200 rounded-full overflow-hidden">
-                  <div className="h-3 bg-indigo-600 rounded-full" style={{ width: `${documentsPercent}%` }} />
-                </div>
-                <div className="flex justify-between text-sm text-gray-600">
-                  <span>Completion</span>
-                  <span className="font-medium text-gray-900">{documentsPercent}%</span>
-                </div>
-              </div>
-            </div>
+            {/* Documents Status removed */}
           </div>
 
           {/* Recent Activity removed as requested */}

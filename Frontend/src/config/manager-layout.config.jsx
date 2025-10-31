@@ -26,11 +26,11 @@ export const MENU_SIDEBAR_MANAGER = [
     icon: CalendarCheck,
     path: '/manager/leave-management',
   },
-  // {
-  //   title: 'Expense Management',
-  //   icon: Coins,
-  //   path: '/manager/expense-management',
-  // },
+  {
+    title: 'Expense Management',
+    icon: Coins,
+    path: '/manager/expense-management',
+  },
   {
     title: 'Upload Documents',
     icon: Upload,

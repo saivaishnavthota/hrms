@@ -1,4 +1,4 @@
-import { LayoutGrid, Briefcase, ClipboardList, Upload, CalendarCheck, BarChart3 } from 'lucide-react';
+import { LayoutGrid, Briefcase, ClipboardList, Upload, CalendarCheck, BarChart3, Coins } from 'lucide-react';
 
 export const MENU_SIDEBAR_ACCOUNT_MANAGER = [
   {
@@ -6,11 +6,11 @@ export const MENU_SIDEBAR_ACCOUNT_MANAGER = [
     icon: LayoutGrid,
     path: '/account-manager',
   },
-  // {
-  //   title: 'Expense Management',
-  //   icon: Coins,
-  //   path: '/account-manager/expense-management',
-  // },
+  {
+    title: 'Expense Management',
+    icon: Coins,
+    path: '/account-manager/expense-management',
+  },
   {
     title: 'Upload Documents',
     icon: Upload,

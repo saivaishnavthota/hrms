@@ -13,19 +13,31 @@ const TimeManagement = () => {
         
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="mb-6 bg-gray-100 rounded-md p-1 w-full max-w-md">
-            <TabsTrigger 
-              value="attendance" 
-              className={`flex-1 ${activeTab === 'attendance' ? 'bg-[#3C6230] text-white' : 'text-[#5C636A]'}`}
-            >
-              Book Your Time
-            </TabsTrigger>
-            <TabsTrigger 
-              value="leave" 
-              className={`flex-1 ${activeTab === 'leave' ? 'bg-[#3C6230] text-white' : 'text-[#5C636A]'}`}
-            >
-              Apply Leave
-            </TabsTrigger>
+          <TabsList className="mb-6 rounded-md p-1 w-full max-w-md">
+          <TabsTrigger
+  value="attendance"
+  className={`flex-1 transition-all duration-200 rounded-lg h-10
+    ${activeTab === 'attendance' 
+      ? 'bg-[#3C6230] text-white shadow-[0_6px_20px_rgba(0,0,0,0.6)] -translate-y-1' 
+      : 'text-[#5C636A] shadow hover:shadow-[0_4px_12px_rgba(0,0,0,0.4)] hover:-translate-y-0.5'}
+  `}
+>
+  Book Your Time
+</TabsTrigger>
+
+<TabsTrigger
+  value="leave"
+  className={`flex-1 transition-all duration-200 rounded-lg h-10
+    ${activeTab === 'leave' 
+      ? 'bg-[#3C6230] text-white shadow-[0_6px_20px_rgba(0,0,0,0.6)] -translate-y-1' 
+      : 'text-[#5C636A] shadow hover:shadow-[0_4px_12px_rgba(0,0,0,0.4)] hover:-translate-y-0.5'}
+  `}
+>
+  Apply Leave
+</TabsTrigger>
+
+
+
           </TabsList>
 
           <TabsContent value="attendance" className="mt-0">

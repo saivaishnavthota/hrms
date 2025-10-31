@@ -146,6 +146,10 @@ const ManagerEmployees = () => {
     remainingCapacity: 20,
     status: 'healthy' // 'healthy', 'at-capacity', 'exceeded'
   });
+
+  // Filters
+  const [assignmentFilter, setAssignmentFilter] = useState('all'); // all | assigned | unassigned
+  const [projectFilter, setProjectFilter] = useState('all'); // 'all' or projectId string
   
   // Month selection for allocations
   const [selectedMonth, setSelectedMonth] = useState(() => {
@@ -466,7 +470,21 @@ const ManagerEmployees = () => {
     }
   };
 
-  const tableRows = useMemo(() => employees, [employees])
+  const distinctProjects = useMemo(() => {
+    const map = new Map();
+    employees.forEach(e => (e.projects || []).forEach(p => {
+      if (p.projectId) map.set(String(p.projectId), p.projectName || `#${p.projectId}`);
+    }));
+    return Array.from(map.entries()).map(([id, name]) => ({ id, name }));
+  }, [employees]);
+
+  const tableRows = useMemo(() => {
+    let rows = employees;
+    if (assignmentFilter === 'assigned') rows = rows.filter(e => (e.projects || []).length > 0);
+    if (assignmentFilter === 'unassigned') rows = rows.filter(e => (e.projects || []).length === 0);
+    if (projectFilter !== 'all') rows = rows.filter(e => (e.projects || []).some(p => String(p.projectId) === String(projectFilter)));
+    return rows;
+  }, [employees, assignmentFilter, projectFilter])
 
   return (
     <div className="p-6 bg-gray-50">
@@ -494,6 +512,33 @@ const ManagerEmployees = () => {
                   </option>
                 );
               })}
+            </select>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <label className="font-subheading-sm text-gray-700">Assignment:</label>
+            <select
+              value={assignmentFilter}
+              onChange={(e) => setAssignmentFilter(e.target.value)}
+              className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#2D5016] focus:border-transparent text-sm"
+            >
+              <option value="all">All</option>
+              <option value="assigned">Assigned</option>
+              <option value="unassigned">Unassigned</option>
+            </select>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <label className="font-subheading-sm text-gray-700">Project:</label>
+            <select
+              value={projectFilter}
+              onChange={(e) => setProjectFilter(e.target.value)}
+              className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#2D5016] focus:border-transparent text-sm"
+            >
+              <option value="all">All projects</option>
+              {distinctProjects.map(p => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
             </select>
           </div>
         </div>

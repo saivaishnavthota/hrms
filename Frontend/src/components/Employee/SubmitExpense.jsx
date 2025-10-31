@@ -23,6 +23,7 @@ const SubmitExpense = () => {
     sgst: 0,
     discount: 0,
   });
+  // Attachments temporarily disabled
   const [receipts, setReceipts] = useState([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [expenseHistory, setExpenseHistory] = useState([]);
@@ -58,17 +59,7 @@ const SubmitExpense = () => {
     setExpenseData(prev => ({ ...prev, [name]: value }));
   };
  
-  const handleReceiptUpload = (e) => {
-    const files = Array.from(e.target.files);
-    const newReceipts = files.map(file => ({
-      id: Date.now() + Math.random(),
-      file,
-      name: file.name,
-      size: file.size,
-      preview: URL.createObjectURL(file)
-    }));
-    setReceipts(prev => [...prev, ...newReceipts]);
-  };
+  const handleReceiptUpload = () => {};
  
   const handleRemoveReceipt = (id) => {
     const receipt = receipts.find(r => r.id === id);
@@ -107,10 +98,7 @@ const SubmitExpense = () => {
       let employeeId = user?.employeeId || JSON.parse(localStorage.getItem('userData') || '{}')?.employeeId;
       if (!employeeId) throw new Error('Employee ID not found. Please log in.');
 
-      // Validate that at least one receipt is uploaded
-      if (receipts.length === 0) {
-        throw new Error('Receipt submission is mandatory. Please upload at least one receipt.');
-      }
+      // Receipt upload is temporarily disabled; skip validation
 
       const formData = new FormData();
       formData.append('employee_id', Number(employeeId));
@@ -126,12 +114,7 @@ const SubmitExpense = () => {
         formData.append('discount', parseFloat(expenseData.discount || 0));
       }
 
-      // Append files to form data
-      receipts.forEach(receipt => {
-        if (receipt.file) {
-          formData.append('files', receipt.file);
-        }
-      });
+      // Files are disabled
  
       const res = await api.post('/expenses/submit-exp', formData, {
         headers: {
@@ -153,7 +136,6 @@ const SubmitExpense = () => {
         discount: 0
       });
  
-      receipts.forEach(r => r.preview && URL.revokeObjectURL(r.preview));
       setReceipts([]);
  
       await loadExpenseHistory(employeeId);
@@ -523,67 +505,18 @@ const SubmitExpense = () => {
                 )}
               </div>
  
-              {/* Receipt Upload */}
-              <div>
-                <label className="block text-sm font-medium mb-2">
-                  Upload Receipts <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="file"
-                  multiple
-                  accept=".jpg,.jpeg,.png,.pdf"
-                  onChange={handleReceiptUpload}
-                  className="hidden"
-                  id="receipt-upload"
-                />
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => document.getElementById('receipt-upload').click()}
-                >
-                  <Upload className="h-4 w-4 mr-2" />
-                  Select Files
-                </Button>
-                <p className="text-xs text-gray-500 mt-1">
-                  At least one receipt is required (Max: 70 KB per file). Supported formats: JPG, PNG, PDF
-                </p>
- 
-                {receipts.length > 0 && (
-                  <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-4">
-                    {receipts.map((receipt) => (
-                      <div key={receipt.id} className="relative border rounded-lg p-2">
-                        <p className="text-xs truncate">{receipt.name}</p>
-                        <p className="text-xs text-muted-foreground">{formatFileSize(receipt.size)}</p>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleRemoveReceipt(receipt.id)}
-                          className="absolute -top-2 -right-2 w-6 h-6 p-0 bg-red-100 text-red-600 rounded-full"
-                        >
-                          <X className="h-3 w-3" />
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
+              {/* Receipt Upload temporarily removed */}
  
               <div className="flex gap-3 pt-4">
                 <Button
                   type="submit"
-                  disabled={isSubmitting || receipts.length === 0}
+                  disabled={isSubmitting}
                   className="flex-1 bg-orange-600 hover:bg-orange-700 text-white disabled:bg-gray-400"
                 >
-                  {isSubmitting ? 'Submitting...' : receipts.length === 0 ? 'Upload Receipt to Submit' : 'Submit Expense'}
+                  {isSubmitting ? 'Submitting...' : 'Submit Expense'}
                 </Button>
               </div>
-              {receipts.length === 0 && (
-                <p className="text-sm text-red-500 mt-2 flex items-center">
-                  <AlertCircle className="h-4 w-4 mr-1" />
-                  Please upload at least one receipt to submit the expense.
-                </p>
-              )}
+              {/* Receipt warning removed */}
             </form>
           </TabsContent>
  

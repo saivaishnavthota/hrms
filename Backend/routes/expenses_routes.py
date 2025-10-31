@@ -1,10 +1,10 @@
 from datetime import datetime, timedelta
 from typing import List, Optional, Literal
-from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException, Request, Query
+from fastapi import APIRouter, Depends, Form, HTTPException, Request, Query
 from sqlmodel import Session, select, extract
 from sqlalchemy.sql import text
 from database import get_session
-from models.expenses_model import ExpenseRequest, ExpenseAttachment, ExpenseHistory
+from models.expenses_model import ExpenseRequest, ExpenseHistory
 from utils.code import generate_request_code
 from auth import get_current_user, role_required
 from models.user_model import User
@@ -178,7 +178,6 @@ async def submit_expense(
     description: Optional[str] = Form(None),
     expense_date: str = Form(...),
     tax_included: bool = Form(False),
-    files: List[UploadFile] = File(None),
  
     discount: Optional[float] = Form(0),
     cgst: Optional[float] = Form(0),
@@ -186,21 +185,14 @@ async def submit_expense(
  
     session: Session = Depends(get_session),
 ):
-    """Submit an expense request with mandatory attachments stored in local storage."""
-    print(f"Received submit-exp request: employee_id={employee_id}, category={category}, amount={amount}, currency={currency}, expense_date={expense_date}, tax_included={tax_included}, files={[f.filename for f in files if f.filename]}")
+    """Submit an expense request (attachments removed)."""
+    print(f"Received submit-exp request: employee_id={employee_id}, category={category}, amount={amount}, currency={currency}, expense_date={expense_date}, tax_included={tax_included}")
    
     try:
-        # Validate that at least one receipt is provided
-        if not files or len(files) == 0 or all(not file.filename for file in files):
-            raise HTTPException(status_code=400, detail="Receipt submission is mandatory. Please upload at least one receipt.")
+        # Attachments are optional; skip mandatory receipt validation
         
         final_amount = calculate_final_amount(amount, discount, cgst, sgst)
 
-        # Validate file size (70 KB = 70 * 1024 bytes)
-        for file in files:
-            if file.size > 70 * 1024:
-                raise HTTPException(status_code=400, detail=f"File {file.filename} exceeds 70 KB limit")
- 
         # Create expense request
         req = ExpenseRequest(
             request_code=generate_request_code(),
@@ -219,39 +211,7 @@ async def submit_expense(
         session.add(req)
         session.flush()
  
-        attachments = []
-        if files:
-            for file in files:
-                if not file.filename:
-                    continue
-                    
-                file_data = await file.read()
-                if not file_data:
-                    continue
- 
-                # Create attachment record with binary data
-                attachment = ExpenseAttachment(
-                    request_id=req.request_id,
-                    file_name=file.filename,
-                    file_type=file.content_type,
-                    content_type=file.content_type,
-                    file_size=len(file_data) / 1024,  # Size in KB
-                    file_data=file_data,  # Store binary data in database
-                )
-                session.add(attachment)
-                session.flush()  # Get the attachment_id
-                
-                # Generate URL for this attachment
-                file_url = build_file_url(attachment.attachment_id)
-                
-                attachments.append({
-                    "attachment_id": attachment.attachment_id,
-                    "file_name": attachment.file_name,
-                    "file_url": file_url,
-                    "file_type": attachment.file_type,
-                    "file_size": attachment.file_size,
-                    "uploaded_at": attachment.uploaded_at,
-                })
+        attachments = []  # attachments removed
  
         session.commit()
         print(f"Expense submitted: request_id={req.request_id}, request_code={req.request_code}")
@@ -312,93 +272,7 @@ async def submit_expense(
         print(f"Error submitting expense: {str(e)}\nSQL: {e.__cause__}")
         raise HTTPException(status_code=500, detail=f"Failed to submit expense: {str(e)}")
  
-@router.post("/add-attachment", response_model=dict)
-async def add_attachment(
-    request_id: int = Form(...),
-    file: UploadFile = File(...),
-    user_id: int = Form(...),
-    session: Session = Depends(get_session),
-):
-    """Add an attachment to an existing expense request."""
-    print(f"Adding attachment for request_id={request_id}, user_id={user_id}")
-    expense = session.get(ExpenseRequest, request_id)
-    if not expense:
-        raise HTTPException(status_code=404, detail="Expense request not found")
-    if expense.employee_id != user_id:
-        raise HTTPException(status_code=403, detail="Unauthorized to add attachment")
- 
-    if file.size > 70 * 1024:
-        raise HTTPException(status_code=400, detail=f"File {file.filename} exceeds 70 KB limit")
- 
-    file_data = await file.read()
-    if not file_data:
-        raise HTTPException(status_code=400, detail="Empty file")
- 
-    try:
-        # Create attachment record with binary data
-        attachment = ExpenseAttachment(
-            request_id=request_id,
-            file_name=file.filename,
-            file_type=file.content_type,
-            content_type=file.content_type,
-            file_size=len(file_data) / 1024,  # Size in KB
-            file_data=file_data,  # Store binary data in database
-        )
-        session.add(attachment)
-        session.flush()  # Get the attachment_id
-        
-        # Generate URL for this attachment
-        file_url = build_file_url(attachment.attachment_id)
-        
-        session.commit()
-        
-        return {
-            "attachment_id": attachment.attachment_id,
-            "file_name": attachment.file_name,
-            "file_url": file_url,
-            "file_type": attachment.file_type,
-            "file_size": attachment.file_size,
-            "uploaded_at": attachment.uploaded_at,
-        }
-    except Exception as e:
-        session.rollback()
-        print(f"Error adding attachment: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Failed to add attachment: {str(e)}")
- 
-@router.get("/attachment/{attachment_id}")
-async def get_attachment(
-    attachment_id: int,
-    session: Session = Depends(get_session),
-):
-    """Serve an attachment file from the database."""
-    try:
-        attachment = session.get(ExpenseAttachment, attachment_id)
-        if not attachment:
-            raise HTTPException(status_code=404, detail="Attachment not found")
-        
-        if not attachment.file_data:
-            raise HTTPException(status_code=404, detail="File data not found")
-        
-        # Determine content type
-        content_type = attachment.content_type or attachment.file_type or "application/octet-stream"
-        
-        # Return file as response
-        from fastapi.responses import Response
-        return Response(
-            content=attachment.file_data,
-            media_type=content_type,
-            headers={
-                "Content-Disposition": f'inline; filename="{attachment.file_name}"',
-                "Access-Control-Allow-Origin": "*",
-                "Access-Control-Allow-Methods": "GET",
-                "Access-Control-Allow-Headers": "*",
-            }
-        )
-    except HTTPException:
-        raise
-    except Exception as e:
-        print(f"Error serving attachment {attachment_id}: {str(e)}")
-        raise HTTPException(status_code=500, detail="Error serving file")
+# Attachment endpoints removed
 
 @router.get("/my-expenses", response_model=List[dict])
 def list_my_expenses(
@@ -446,17 +320,7 @@ def list_my_expenses(
                 }
             )
  
-        attachments = [
-            {
-                "attachment_id": att.attachment_id,
-                "file_name": att.file_name,
-                "file_url": build_file_url(att.attachment_id),  # Generate URL dynamically
-                "file_type": att.file_type,
-                "file_size": att.file_size,
-                "uploaded_at": att.uploaded_at,
-            }
-            for att in exp.attachments
-        ]
+        attachments = []
  
         result.append(
             {
@@ -522,17 +386,7 @@ def list_all_expenses(
     for exp in expenses:
         employee = session.get(User, exp.employee_id)
  
-        attachments = [
-            {
-                "attachment_id": att.attachment_id,
-                "file_name": att.file_name,
-                "file_url": build_file_url(att.attachment_id),  # Generate URL dynamically
-                "file_type": att.file_type,
-                "file_size": att.file_size,
-                "uploaded_at": att.uploaded_at,
-            }
-            for att in exp.attachments
-        ]
+        attachments = []
  
         history_entries = session.exec(
             select(ExpenseHistory)
@@ -555,9 +409,9 @@ def list_all_expenses(
                 "currency": exp.currency,
                 "status": exp.status,
                 "description": exp.description,
-                "date": exp.expense_date.strftime("%Y-%m-%d"),
+                "date": exp.expense_date.strftime("%Y-%m-%d") if getattr(exp, "expense_date", None) else None,
                 "taxIncluded": exp.tax_included,
-                "submitted_at": exp.created_at.strftime("%Y-%m-%d"),
+                "submitted_at": exp.created_at.strftime("%Y-%m-%d") if getattr(exp, "created_at", None) else None,
                 "attachments": attachments,
                 "reason": manager_reason or "-",
                 "discount_percentage": exp.discount_percentage,
@@ -779,17 +633,7 @@ def list_all_expenses(
     for exp in expenses:
         employee = session.get(User, exp.employee_id)
  
-        attachments = [
-            {
-                "attachment_id": att.attachment_id,
-                "file_name": att.file_name,
-                "file_url": build_file_url(att.attachment_id),  # Generate URL dynamically
-                "file_type": att.file_type,
-                "file_size": att.file_size,
-                "uploaded_at": att.uploaded_at,
-            }
-            for att in exp.attachments
-        ]
+        attachments = []
  
         history_entries = session.exec(
             select(ExpenseHistory)
@@ -812,9 +656,9 @@ def list_all_expenses(
                 "currency": exp.currency,
                 "status": exp.status,
                 "description": exp.description,
-                "date": exp.expense_date.strftime("%Y-%m-%d"),
+                "date": exp.expense_date.strftime("%Y-%m-%d") if getattr(exp, "expense_date", None) else None,
                 "taxIncluded": exp.tax_included,
-                "submitted_at": exp.created_at.strftime("%Y-%m-%d"),
+                "submitted_at": exp.created_at.strftime("%Y-%m-%d") if getattr(exp, "created_at", None) else None,
                 "attachments": attachments,
                 "reason": hr_reason or "-",
                 "discount_percentage": exp.discount_percentage,
@@ -1347,32 +1191,4 @@ async def delete_expense(
         print(f"Error deleting expense request_id={request_id}: {str(e)}\nSQL: {e.__cause__}")
         raise HTTPException(status_code=500, detail=f"Failed to delete expense: {str(e)}")
 
-@router.get("/storage-info")
-async def get_storage_info(session: Session = Depends(get_session)):
-    """Get storage information for expense documents in database."""
-    try:
-        # Count total attachments and total size
-        result = session.execute(
-            text("""
-                SELECT 
-                    COUNT(*) as total_files,
-                    COALESCE(SUM(file_size), 0) as total_size_kb,
-                    COALESCE(SUM(OCTET_LENGTH(file_data)), 0) as total_size_bytes
-                FROM expense_attachments
-                WHERE file_data IS NOT NULL
-            """)
-        ).fetchone()
-        
-        return {
-            "status": "success",
-            "data": {
-                "total_files": result.total_files,
-                "total_size_kb": float(result.total_size_kb),
-                "total_size_mb": round(float(result.total_size_kb) / 1024, 2),
-                "total_size_bytes": result.total_size_bytes,
-                "storage_type": "PostgreSQL Database (bytea)"
-            }
-        }
-    except Exception as e:
-        print(f"Error getting storage info: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Error getting storage info: {str(e)}")
+# Storage info endpoint removed

@@ -45,6 +45,7 @@ const Allocations = () => {
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
   const [employeeInput, setEmployeeInput] = useState('');
+  const [employeeSearch, setEmployeeSearch] = useState('');
 
   // Pagination
   const {
@@ -87,7 +88,18 @@ const Allocations = () => {
   // Reset pagination when data changes
   useEffect(() => {
     resetPagination();
-  }, [allocations]);
+  }, [allocations, employeeSearch]);
+
+  // Filter allocations by employee name (case-insensitive)
+  const getFilteredAllocations = () => {
+    if (!employeeSearch.trim()) return allocations;
+    const q = employeeSearch.toLowerCase();
+    return allocations.filter(al => {
+      const emp = employees.find(e => e.employeeId === al.employee_id);
+      const name = (emp?.name || '').toLowerCase();
+      return name.includes(q);
+    });
+  };
 
   const resetForm = () => {
     setFormData({
@@ -297,7 +309,16 @@ const Allocations = () => {
 
         {allocations.length > 0 && (
           <>
-            <div className="flex justify-end mb-2">
+            <div className="flex items-center justify-between mb-2 gap-3">
+              <div className="w-full max-w-sm">
+                <input
+                  type="text"
+                  value={employeeSearch}
+                  onChange={(e) => setEmployeeSearch(e.target.value)}
+                  placeholder="Search by employee name"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-600"
+                />
+              </div>
               <PageSizeSelect
                 pageSize={pageSize}
                 onChange={handlePageSizeChange}
@@ -317,7 +338,7 @@ const Allocations = () => {
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {getPaginatedData(allocations).map((al, index) => (
+                    {getPaginatedData(getFilteredAllocations()).map((al, index) => (
                       <tr key={al.allocation_id} className="hover:bg-gray-50 transition-colors">
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{(currentPage - 1) * pageSize + index + 1}</td>
                       <td className="px-6 py-4 whitespace-nowrap">
@@ -366,9 +387,9 @@ const Allocations = () => {
               hideInfo={true}
               hidePageSize={true}
               currentPage={currentPage}
-              totalPages={getTotalPages(allocations.length)}
+              totalPages={getTotalPages(getFilteredAllocations().length)}
               pageSize={pageSize}
-              totalItems={allocations.length}
+              totalItems={getFilteredAllocations().length}
               onPageChange={handlePageChange}
               onPageSizeChange={handlePageSizeChange}
             />

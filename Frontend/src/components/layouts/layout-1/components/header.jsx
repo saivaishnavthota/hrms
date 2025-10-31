@@ -53,7 +53,7 @@ export function Header({ menu }) {
     ? 'Welcome to HR Portal'
     : isAdmin
     ? 'Welcome to Admin Portal'
-    : 'Welcome to IT Supporter Portal';
+    : 'Welcome to IT Support Portal';
 
   // Close sheet when route changes
   useEffect(() => {
@@ -113,12 +113,12 @@ export function Header({ menu }) {
         {/* Right: Profile & Logout buttons */}
         <div className="hidden lg:flex items-center justify-end gap-3">
           <Link to="/my-profile">
-            <Button variant="outline" size="md" className="gap-2 bg-brand text-brand-foreground hover:bg-brand/90 border-none">
+            <Button variant="outline" size="md" className="gap-2 h-11 bg-brand text-brand-foreground hover:bg-[#AD96DC] hover:text-white border-none transition-colors">
               <User className="size-5" />
               Profile
             </Button>
           </Link>
-          <Button variant="outline" size="md" className="gap-2 bg-brand text-brand-foreground hover:bg-brand/90 border-none" onClick={logout}>
+          <Button variant="outline" size="md" className="gap-2 h-11 bg-brand text-brand-foreground hover:bg-[#AD96DC] hover:text-white border-none transition-colors" onClick={logout}>
             <LogOut className="size-5" />
             Logout
           </Button>

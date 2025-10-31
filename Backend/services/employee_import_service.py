@@ -150,7 +150,42 @@ class EmployeeImportService:
             logger.info(f"First 3 rows:\n{df.head(3)}")
             logger.info(f"========================================")
             
+            # Normalize column names to handle variations (spaces, dots, case, hyphens)
+            def _normalize(col: str) -> str:
+                try:
+                    return re.sub(r"[^a-z0-9]", "", str(col).lower())
+                except Exception:
+                    return str(col)
+            
+            canonical_by_normalized = {
+                'sno': 'S.NO',
+                'serialno': 'S.NO',
+                'ytplempid': 'YTPL Emp ID',
+                'ytplid': 'YTPL Emp ID',
+                'employeefullname': 'Employee Full Name',
+                'fullname': 'Employee Full Name',
+                'name': 'Employee Full Name',
+                'doj': 'DOJ',
+                'dateofjoining': 'DOJ',
+                'joiningdate': 'DOJ',
+                'title': 'Title',
+                'designation': 'Title',
+                'location': 'Location',
+                'companyemail': 'Company Email',
+                'workemail': 'Company Email',
+                'officialemail': 'Company Email'
+            }
+            rename_map = {}
+            for original in list(df.columns):
+                normalized = _normalize(original)
+                if normalized in canonical_by_normalized:
+                    rename_map[original] = canonical_by_normalized[normalized]
+            if rename_map:
+                df = df.rename(columns=rename_map)
+                logger.info(f"Normalized columns applied. New columns: {list(df.columns)}")
+            
             # Validate required columns
+            # DOJ is optional; S.NO may be present and is ignored
             required_columns = ['YTPL Emp ID', 'Employee Full Name', 'Title', 'Location', 'Company Email']
             missing_columns = [col for col in required_columns if col not in df.columns]
             
@@ -180,6 +215,18 @@ class EmployeeImportService:
                     title = str(row['Title']).strip() if pd.notna(row['Title']) else ""
                     location = str(row['Location']).strip() if pd.notna(row['Location']) else ""
                     company_email = str(row['Company Email']).strip() if pd.notna(row['Company Email']) else ""
+                    # DOJ is optional and may be in different formats
+                    doj_value = None
+                    if 'DOJ' in df.columns:
+                        raw_doj = row['DOJ']
+                        if pd.notna(raw_doj) and str(raw_doj).strip():
+                            try:
+                                # Use pandas to parse with dayfirst to support dd/mm/yyyy
+                                parsed = pd.to_datetime(raw_doj, dayfirst=True, errors='coerce')
+                                if not pd.isna(parsed):
+                                    doj_value = parsed.to_pydatetime()
+                            except Exception:
+                                doj_value = None
                     
                     logger.info(f"Raw data extracted:")
                     logger.info(f"  - Name: '{full_name}'")
@@ -187,6 +234,7 @@ class EmployeeImportService:
                     logger.info(f"  - Title: '{title}'")
                     logger.info(f"  - Location: '{location}'")
                     logger.info(f"  - Company Email: '{company_email}'")
+                    logger.info(f"  - DOJ: '{doj_value}'")
                     
                     # Clean company_employee_id - ensure it's exactly 6 characters
                     if company_employee_id_raw:
@@ -276,6 +324,14 @@ class EmployeeImportService:
                             existing_employee.company_email = company_email
                             updated = True
                         
+                        # Update DOJ if provided
+                        if doj_value is not None:
+                            # Only update if different or previously unset
+                            if not existing_employee.doj or existing_employee.doj.date() != doj_value.date():
+                                logger.info(f"Updating doj: {existing_employee.doj} -> {doj_value}")
+                                existing_employee.doj = doj_value
+                                updated = True
+
                         if updated:
                             session.add(existing_employee)
                             updated_count += 1
@@ -302,7 +358,8 @@ class EmployeeImportService:
                             company_email=company_email if company_email else None,
                             role="Employee",  # Default role
                             o_status=True,  # Active by default
-                            created_at=datetime.now()
+                            created_at=datetime.now(),
+                            doj=doj_value
                         )
                         logger.info(f"User object created: {new_employee}")
                         

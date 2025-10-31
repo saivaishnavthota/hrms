@@ -261,7 +261,7 @@ const AddAttendance = () => {
       const weekStart = formatDateLocal(weekDates[0]);
       const weekEnd = formatDateLocal(weekDates[6]);
    
-     
+   
    
       const baseData = {};
       weekDates.forEach((date, index) => {
@@ -317,9 +317,9 @@ const AddAttendance = () => {
               sum + (project.subtasks || []).reduce((subSum, subtask) => subSum + parseFloat(subtask.hours || 0), 0), 0);
    
    
-            updatedData[rowIndex] = {
+           updatedData[rowIndex] = {
               ...updatedData[rowIndex],
-              status: attendance.action || attendance.status,
+              status: (attendance.action === 'Present' ? 'At office' : (attendance.action || attendance.status || '')),
               hours: parseFloat(totalHours.toFixed(2)),
               projects: projects,
               submitted: !!attendance.action
@@ -352,7 +352,8 @@ const AddAttendance = () => {
       [index]: {
         ...prev[index],
         status,
-        hours: status === 'Leave' ? 0 : prev[index].hours
+        hours: status === 'Leave' ? 0 : prev[index].hours,
+        projects: status === 'Leave' ? [] : prev[index].projects
       }
     }));
   };
@@ -442,21 +443,42 @@ const AddAttendance = () => {
         return;
       }
 
-      const hasValidData = Object.values(attendanceData).some(row =>
-        !weekOffDays.includes(row.day) && 
-        !row.submitted && (  // Only check unsubmitted days
-          row.status || row.hours > 0 || row.projects.length > 0
-        )
-      );
+      // Helper to detect if a row changed from the last submitted snapshot
+      const hasRowChanged = (row) => {
+        const prev = submittedAttendance.find(r => r.date === row.date);
+        if (!prev) return true; // No snapshot, treat as changed
+        const sameStatus = (prev.status || '') === (row.status || '');
+        const sameHours = parseFloat(prev.hours || 0) === parseFloat(row.hours || 0);
+        const normalizeProjects = (projects) =>
+          (projects || []).map(p => ({
+            projectId: String(p.projectId || ''),
+            projectName: String(p.projectName || ''),
+            subtasks: (p.subtasks || []).map(st => ({ name: String(st.name || ''), hours: parseFloat(st.hours || 0) }))
+          }));
+        const prevProjects = normalizeProjects(prev.projects);
+        const currProjects = normalizeProjects(row.projects);
+        const sameProjects = JSON.stringify(prevProjects) === JSON.stringify(currProjects);
+        return !(sameStatus && sameHours && sameProjects);
+      };
+
+      // Determine if there's valid data on at least one editable day
+      const hasValidData = Object.values(attendanceData).some(row => {
+        const changed = hasRowChanged(row);
+        return !weekOffDays.includes(row.day) && ( // Non week-off
+          (!row.submitted && (row.status || row.hours > 0 || row.projects.length > 0)) // new submission
+          || (row.submitted && changed) // allow updates to already submitted rows if changed
+        );
+      });
+
       if (!hasValidData) {
-        toast.warn('Please provide attendance data for at least one unsubmitted non-week-off day');
+        toast.warn('Please provide attendance data for at least one unsubmitted or changed non-week-off day');
         setTimeout(() => setMessage(''), 5000);
         return;
       }
 
       // Check for invalid hours (8 hours max for all projects)
       const invalidHours = Object.values(attendanceData).some(row => {
-        if (weekOffDays.includes(row.day) || row.submitted) return false;
+        if (weekOffDays.includes(row.day)) return false;
         return row.hours < 0 || row.hours > 8;
       });
       
@@ -470,39 +492,41 @@ const AddAttendance = () => {
       const dataToSubmit = {};
 
       Object.values(attendanceData).forEach(row => {
-        // Only include unsubmitted days that are not week-offs and have valid data
-        if (!weekOffDays.includes(row.day) && 
-            !row.submitted && (  // Only include unsubmitted days
-          row.status || row.hours > 0 || row.projects.length > 0
-        )) {
-          const project_ids = row.projects
-            .map(p => (p.projectId ? parseInt(p.projectId, 10) : null))
-            .filter(id => Number.isInteger(id));
+        // Only include non-week-off days with valid data
+        if (!weekOffDays.includes(row.day)) {
+          const changed = hasRowChanged(row);
+          const canInclude = (!row.submitted && (row.status || row.hours > 0 || row.projects.length > 0)) || (row.submitted && changed);
+          if (canInclude) {
+            const project_ids = row.projects
+              .map(p => (p.projectId ? parseInt(p.projectId, 10) : null))
+              .filter(id => Number.isInteger(id));
 
-          const sub_tasks = row.projects
-            .map(p =>
-              (p.subtasks || []).map(subtask => ({
-                project_id: parseInt(p.projectId, 10),
-                sub_task: subtask.name,
-                hours: subtask.hours
-               
-              }))
-            )
-            .flat()
-            .filter(st => st.project_id && st.sub_task);
+            const sub_tasks = row.projects
+              .map(p =>
+                (p.subtasks || []).map(subtask => ({
+                  project_id: p.projectId ? parseInt(p.projectId, 10) : null,
+                  sub_task: subtask.name,
+                  hours: subtask.hours
+                 
+                }))
+              )
+              .flat()
+              // Keep subtasks that have a non-empty name (Unassigned has fixed id)
+              .filter(st => (st.sub_task && String(st.sub_task).trim().length > 0));
 
-          dataToSubmit[row.date] = {
-            date: row.date,
-            action: row.status === 'At office' ? 'Present' : row.status || '',
-            hours: row.hours || 0, // Hours are now computed from subtasks
-            project_ids: project_ids,
-            sub_tasks: sub_tasks
-          };
+            dataToSubmit[row.date] = {
+              date: row.date,
+              action: row.status === 'At office' ? 'Present' : row.status || '',
+              hours: row.hours || 0,
+              project_ids: project_ids,
+              sub_tasks: sub_tasks
+            };
+          }
         }
       });
 
       if (Object.keys(dataToSubmit).length === 0) {
-        toast.error('No valid unsubmitted attendance data to submit for non-week-off days');
+        toast.error('No valid attendance changes to submit');
         setTimeout(() => setMessage(''), 5000);
         setLoading(false);
         return;
@@ -517,6 +541,8 @@ const AddAttendance = () => {
       if (response.data.success) {
         toast.success('Attendance submitted successfully!');
         setTimeout(() => setMessage(''), 3000);
+
+        // Refresh from server to update submitted snapshot and UI
         await Promise.all([fetchWeeklyAttendance(), fetchDailyAttendance()]);
       }
     } catch (error) {
@@ -540,7 +566,16 @@ const AddAttendance = () => {
   }, [activeTab, user, selectedMonth, selectedYear]);
 
   const ProjectPopup = ({ onClose, onSave, existingProjects = [] }) => {
-    const [selectedProjects, setSelectedProjects] = useState(existingProjects);
+    const unassignedMode = (projects || []).length === 0;
+    const UNASSIGNED_PROJECT_ID = '123';
+    const [selectedProjects, setSelectedProjects] = useState(() => {
+      if (existingProjects && existingProjects.length > 0) return existingProjects;
+      if (unassignedMode) {
+        // Seed with a single Unassigned bucket mapped to fixed project id
+        return [{ projectId: UNASSIGNED_PROJECT_ID, projectName: 'Unassigned', subtasks: [{ name: '', hours: 0 }] }];
+      }
+      return [];
+    });
 
     // Calculate remaining days for a project based on current selections (memoized)
     // Only calculates for projects with <5 days allocated to optimize performance
@@ -577,6 +612,13 @@ const AddAttendance = () => {
 
 
     const addProject = () => {
+      if (unassignedMode) {
+        // Only one Unassigned bucket allowed
+        if (selectedProjects.length === 0) {
+          setSelectedProjects([{ projectId: UNASSIGNED_PROJECT_ID, projectName: 'Unassigned', subtasks: [{ name: '', hours: 0 }] }]);
+        }
+        return;
+      }
       setSelectedProjects([
         ...selectedProjects,
         { projectId: '', projectName: '', subtasks: [{ name: '', hours: 0 }] }
@@ -658,7 +700,7 @@ const AddAttendance = () => {
       <div className="fixed inset-0 bg-transparent backdrop-blur-[2px] flex items-center justify-center z-50">
         <div className="bg-gradient-to-br from-white via-gray-50 to-green-50 rounded-xl shadow-2xl max-w-2xl w-full mx-4 max-h-[80vh] overflow-y-auto border border-gray-200">
           <div className="flex justify-between items-center p-6 border-b border-gray-200 bg-gradient-to-r from-gray-600 to-[#2D5016] rounded-t-xl">
-            <h3 className="font-semibold text-white">Select Projects & Subtasks</h3>
+            <h3 className="font-semibold text-white">{unassignedMode ? 'Unassigned Work & Subtasks' : 'Select Projects & Subtasks'}</h3>
             <button onClick={onClose} className="text-green-100 hover:text-white transition-colors p-1 rounded-full hover:bg-[#2D5016]">
               <X size={24} />
             </button>
@@ -670,13 +712,13 @@ const AddAttendance = () => {
               <div className="flex items-center gap-2">
                 <Calendar className="w-4 h-4 text-[#2D5016]" />
                 <span className="text-sm font-medium text-green-800">
-                  Projects for {new Date(allocationMonth + '-01').toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+                  {unassignedMode ? 'No active project assignment found' : `Projects for ${new Date(allocationMonth + '-01').toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}`}
                 </span>
               </div>
             </div>
 
             {/* Allocation Summary - Show all projects, dynamic calculations only for <5 days */}
-            {selectedProjects.length > 0 && (
+            {!unassignedMode && selectedProjects.length > 0 && (
               <div className={`border rounded-lg p-4 ${
                 selectedProjects.some(p => {
                   const projectData = projects.find(proj => proj.project_id === p.projectId);
@@ -747,34 +789,39 @@ const AddAttendance = () => {
             {selectedProjects.map((project, projectIndex) => (
               <div key={projectIndex} className="border border-gray-200 rounded-lg p-4 bg-gray-50">
                 <div className="flex items-center gap-3 mb-3">
-                  <select
-                    value={project.projectId || ''}
-                    onChange={(e) => updateProject(projectIndex, 'projectId', e.target.value)}
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#2D5016] focus:border-transparent"
-                  >
-                    <option value="">Select Project</option>
-                    {projects
-                      .filter(p => p.allocated_days !== undefined) // Show all projects with allocated days
-                      .map(p => {
-                        const dynamicRemaining = calculateRemainingDays(p.project_id);
-                        const isLowAllocation = p.allocated_days < 5;
-                        const isInHouseProject = p.project_name === "In-House Project" && p.account === "Internal";
-                        
-                        return (
-                          <option key={p.project_id} value={String(p.project_id)}>
-                            {p.project_name_commercial || p.project_name}
-                            {p.allocated_days !== undefined && !isInHouseProject && (
-                              isLowAllocation 
-                                ? ` (${p.allocated_days} allocated, ${dynamicRemaining.toFixed(1)} remaining)` 
-                                : ` (${p.allocated_days} allocated, ${p.remaining_days.toFixed(1)} remaining)`
-                            )}
-                          </option>
-                        );
-                      })}
-                    {projects.filter(p => p.allocated_days !== undefined).length === 0 && (
-                      <option value="" disabled>No projects with allocated days found</option>
-                    )}
-                  </select>
+                  {unassignedMode ? (
+                    <div className="flex-1 px-3 py-2 border border-gray-200 rounded-lg bg-white text-gray-700">
+                      Unassigned
+                    </div>
+                  ) : (
+                    <select
+                      value={project.projectId || ''}
+                      onChange={(e) => updateProject(projectIndex, 'projectId', e.target.value)}
+                      className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#2D5016] focus:border-transparent"
+                    >
+                      <option value="">Select Project</option>
+                      {projects
+                        .filter(p => p.allocated_days !== undefined)
+                        .map(p => {
+                          const dynamicRemaining = calculateRemainingDays(p.project_id);
+                          const isLowAllocation = p.allocated_days < 5;
+                          const isInHouseProject = p.project_name === "In-House Project" && p.account === "Internal";
+                          return (
+                            <option key={p.project_id} value={String(p.project_id)}>
+                              {p.project_name_commercial || p.project_name}
+                              {p.allocated_days !== undefined && !isInHouseProject && (
+                                isLowAllocation 
+                                  ? ` (${p.allocated_days} allocated, ${dynamicRemaining.toFixed(1)} remaining)` 
+                                  : ` (${p.allocated_days} allocated, ${p.remaining_days.toFixed(1)} remaining)`
+                              )}
+                            </option>
+                          );
+                        })}
+                      {projects.filter(p => p.allocated_days !== undefined).length === 0 && (
+                        <option value="" disabled>No projects with allocated days found</option>
+                      )}
+                    </select>
+                  )}
                   <button
                     onClick={() => removeProject(projectIndex)}
                     className="text-red-500 hover:text-red-700 p-1"
@@ -821,7 +868,7 @@ const AddAttendance = () => {
                 </div>
               </div>
             ))}
-            {selectedProjects.length === 0 && (
+            {!unassignedMode && selectedProjects.length === 0 && (
               <div className="text-center p-4">
                 <p className="text-gray-500 mb-2">No projects selected</p>
                 <p className="text-sm text-[#2D5016] bg-green-50 border border-green-200 rounded-lg p-3">
@@ -832,12 +879,14 @@ const AddAttendance = () => {
           </div>
 
           <div className="flex justify-between items-center mt-6 p-6 border-t border-gray-200">
-            <button
-              onClick={addProject}
-              className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-            >
-              <Plus size={18} /> Add Project
-            </button>
+            {!unassignedMode && (
+              <button
+                onClick={addProject}
+                className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+              >
+                <Plus size={18} /> Add Project
+              </button>
+            )}
 
             <div className="flex gap-3">
               <button
@@ -849,7 +898,10 @@ const AddAttendance = () => {
               <button
                 onClick={() => {
                   console.log('Saving selectedProjects:', selectedProjects);
-                  onSave(selectedProjects.filter(p => p.projectId && p.projectName));
+                  const toSave = unassignedMode
+                    ? selectedProjects // seeded with fixed Unassigned id
+                    : selectedProjects.filter(p => p.projectId && p.projectName);
+                  onSave(toSave);
                 }}
                 className="px-6 py-2 bg-[#2D5016] text-white rounded-lg hover:bg-green-700 transition-colors"
               >
@@ -863,6 +915,14 @@ const AddAttendance = () => {
   };
 
   const weekDates = getWeekDates(currentWeek);
+  // Determine if the currently displayed week is read-only (past weeks lock from next Monday)
+  const displayedWeekMonday = new Date(weekDates[0]);
+  const displayedWeekNextMonday = new Date(displayedWeekMonday);
+  displayedWeekNextMonday.setDate(displayedWeekMonday.getDate() + 7);
+  // Keep previous week editable through Monday; lock starts Tuesday 00:00
+  const displayedWeekLockThreshold = new Date(displayedWeekNextMonday);
+  displayedWeekLockThreshold.setDate(displayedWeekLockThreshold.getDate() + 1);
+  const displayedWeekLocked = new Date() >= displayedWeekLockThreshold;
 
   if (!user?.employeeId) {
     return (
@@ -876,7 +936,7 @@ const AddAttendance = () => {
    
     <div className="max-w-6xl mx-auto p-6 min-h-screen">
       <div className="bg-white rounded-2xl shadow-xl overflow-hidden">
-        <div className="bg-gradient-to-r from-[#2D5016] to-green-600 text-white p-6">
+      <div className="bg-gradient-to-r from-[#F6F2F4] to-[#F6F2F4] text-black p-6">
          
           <h1 className="text-medium font-bold flex items-center gap-3">
             <Calendar className="text-green-200" />
@@ -943,7 +1003,7 @@ const AddAttendance = () => {
               <div className="bg-white rounded-xl shadow-lg overflow-hidden border border-gray-200">
                 <div className="overflow-x-auto">
                   <table className="w-full">
-                    <thead className="bg-gradient-to-r from-[#2D5016] to-green-600 text-white p-6">
+                    <thead className="bg-gradient-to-r from-[#F6F2F4] to-[#F6F2F4] text-black p-6">
                       <tr>
                         <th className="px-4 py-4 text-left font-semibold">Day</th>
                         <th className="px-4 py-4 text-left font-semibold">Date</th>
@@ -955,7 +1015,25 @@ const AddAttendance = () => {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-200">
-                      {Object.entries(attendanceData).map(([index, row]) => (
+                      {Object.entries(attendanceData)
+                        .filter(([_, row]) => !weekOffDays.includes(row.day))
+                        .map(([index, row]) => {
+                          const rowDate = new Date(row.date);
+                          const day = rowDate.getDay(); // 0 (Sun) .. 6 (Sat)
+                          const mondayOfWeek = new Date(rowDate);
+                          mondayOfWeek.setDate(rowDate.getDate() - ((day + 6) % 7));
+                          const nextMonday = new Date(mondayOfWeek);
+                          nextMonday.setDate(mondayOfWeek.getDate() + 7);
+                          // Keep previous week editable through Monday; lock starts Tuesday 00:00
+                          const lockThreshold = new Date(nextMonday);
+                          lockThreshold.setDate(lockThreshold.getDate() + 1);
+                          const isLocked = new Date() >= lockThreshold;
+                          // Determine if this row belongs to the real current week (today's week)
+                          const today = new Date();
+                          const todayMonday = new Date(today);
+                          todayMonday.setDate(today.getDate() - ((today.getDay() + 6) % 7));
+                          const isCurrentRealWeek = todayMonday.toDateString() === mondayOfWeek.toDateString();
+                          return (
                         <tr key={index} className="hover:bg-gray-50 transition-colors">
                           <td className="px-4 py-4 font-medium text-gray-900">{row.day}</td>
                           <td className="px-4 py-4 text-gray-700">
@@ -965,42 +1043,32 @@ const AddAttendance = () => {
                             })}
                           </td>
                           <td className="px-4 py-4">
-                            {weekOffDays.includes(row.day) ? (
-                              <span className="text-gray-400 text-sm">Week-off</span>
-                            ) : (
                               <select
                                 value={row.status}
                                 onChange={(e) => handleStatusChange(index, e.target.value)}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#2D5016] focus:border-transparent bg-white"
+                                disabled={isLocked || (!isCurrentRealWeek && row.submitted)}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#2D5016] focus:border-transparent bg-white disabled:opacity-60 disabled:cursor-not-allowed"
                               >
                                 <option value="">Select Action</option>
                                 <option value="At office">At office</option>
                                 <option value="Leave">Leave</option>
                                 <option value="WFH">Work From Home</option>
                               </select>
-                            )}
                           </td>
                           <td className="px-4 py-4">
-                            {weekOffDays.includes(row.day) ? (
-                              <span className="text-gray-400 text-sm">N/A</span>
-                            ) : (
                               <span className="text-gray-900">{row.hours.toFixed(2)} hrs</span>
-                            )}
                           </td>
                           <td className="px-4 py-4">
-                            {weekOffDays.includes(row.day) ? (
-                              <span className="text-gray-400 text-sm">N/A</span>
-                            ) : (
                               <div className="space-y-2">
                                 <button
                                   onClick={() => openProjectPopup(index)}
-                                  className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-gradient-to-r from-[#2D5016] to-green-600 text-white rounded-lg hover:from-green-600 hover:to-green-700 transition-all duration-200 shadow-sm"
+                                  disabled={isLocked || (!isCurrentRealWeek && row.submitted) || row.status === 'Leave'}
+                                  className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-white text-green-700 rounded-lg hover:bg-green-50 hover:text-green-800 transition-all duration-200 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                   <Edit3 size={16} />
                                   {row.projects.length > 0 ? 'Edit Projects' : 'Projects'}
                                 </button>
                               </div>
-                            )}
                           </td>
                           <td className="px-4 py-4">
                             <div className="flex items-center gap-3">
@@ -1014,23 +1082,29 @@ const AddAttendance = () => {
                               title="View details"
                               onClick={() => handleShowProjects({ date: row.date, projects: row.projects, hours: row.hours, status: row.status })}
                               className="inline-flex items-center justify-center p-2 text-[#2D5016] rounded-full "
-                              disabled={weekOffDays.includes(row.day)}
+                              disabled={false}
                             >
                               <Eye className="h-4 w-4" />
                             </button>
                           </td>
                         </tr>
-                      ))}
+                          );
+                        })}
                     </tbody>
                   </table>
                 </div>
               </div>
 
-              <div className="flex justify-center">
+              <div className="flex flex-col items-center gap-2">
+                {displayedWeekLocked && (
+                  <div className="text-sm text-gray-600 bg-gray-50 border border-gray-200 px-3 py-2 rounded-lg text-center">
+                    This is a past week. Editing is locked.
+                  </div>
+                )}
                 <button
                   onClick={submitAttendance}
-                  disabled={loading}
-                  className="flex items-center gap-3 px-8 py-3 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-xl hover:from-green-600 hover:to-emerald-600 transition-all duration-200 shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed font-semibold"
+                  disabled={loading || displayedWeekLocked}
+                  className="flex items-center gap-3 px-8 py-3 bg-gradient-to-r from-[#8DE971] to-[#74D45A] text-white rounded-xl hover:from-[#79DB63] hover:to-[#66C855] transition-all duration-200 shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed font-semibold"
                 >
                   <Save size={20} />
                   {loading ? 'Submitting...' : 'Submit Attendance'}
@@ -1094,7 +1168,7 @@ const AddAttendance = () => {
               </div>
 
               <div className="bg-white rounded-xl shadow-lg overflow-hidden border border-gray-200 transform scale-[0.85] origin-top">
-                <div className="grid grid-cols-7 bg-gradient-to-r from-gray-600 to-[#2D5016]">
+                <div className="grid grid-cols-7 bg-gradient-to-r from-gray-600 to-[#74D45A]">
                   {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
                     <div key={day} className="p-3 text-center font-semibold text-white text-sm">
                       {day}
@@ -1286,7 +1360,7 @@ const AddAttendance = () => {
                   </div>
                   <div className="overflow-x-auto">
                     <table className="min-w-full divide-y divide-gray-200">
-                      <thead className="bg-gradient-to-r from-[#2D5016] to-green-600">
+                      <thead className="bg-gradient-to-r from-[#8DE971] to-[#74D45A]">
                         <tr>
                           <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                             Day

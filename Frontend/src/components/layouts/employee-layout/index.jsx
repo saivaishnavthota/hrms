@@ -22,21 +22,17 @@ export function EmployeeLayout() {
         <header className="employee-header">
           <div className="employee-header-container">
             <div className="employee-header-content">
-              {/* Logo - Non-collapsible */}
-              <div className="flex items-center gap-2.5">
+              {/* Logo and Title - aligned center */}
+              <div className="flex items-center gap-3">
                 <Link to="/employee" className="shrink-0 flex items-center gap-2">
                   <img
                     src={toAbsoluteUrl('/media/app/Nxzen.png')}
                     className="h-[25px] w-full"
                     alt="Nxzen Logo"
                   />
-                  <span className="text-lg font-semibold text-gray-800 dark:text-white">Nxzen</span>
+                  <span className="text-lg font-semibold text-gray-800 dark:text-white">nxzen</span>
                 </Link>
-              </div>
-
-              {/* Employee Portal Title with divider */}
-              <div className="hidden sm:flex items-center gap-3">
-                <span className="h-6 w-px bg-gray-300" />
+                <span className="h-6 w-px bg-gray-300 hidden sm:inline" />
                 <span className="employee-header-title">Employee Portal</span>
               </div>
 
@@ -70,7 +66,7 @@ export function EmployeeLayout() {
               <span className="mx-2">•</span>
               <button 
                 onClick={() => setIsPoliciesModalOpen(true)}
-                className="text-blue-600 hover:text-blue-700 hover:underline cursor-pointer"
+                className="text-gray-600 hover:text-gray-600 hover:underline cursor-pointer"
               >
                 Company Policies
               </button>
